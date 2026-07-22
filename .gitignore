@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment
+.env
+
+# VS Code
+.vscode/settings.json
+
+# Build
+build/
+dist/
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+
+# Logs
+*.log
+
+# Windows
+Thumbs.db
+Desktop.ini
