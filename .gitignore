@@ -24,3 +24,5 @@ dist/
 # Windows
 Thumbs.db
 Desktop.ini
+
+*.egg-info/
