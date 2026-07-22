@@ -1,18 +1,22 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
-from contextlib import asynccontextmanager
 
 # Setup logging
 setup_logging()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code here
     yield
     # Shutdown code here
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -37,10 +41,20 @@ app.add_middleware(
 # Include API router
 app.include_router(api_router, prefix=settings.api_prefix)
 
-@app.get("/")
+
+@app.get("/", tags=["Root"])
 async def root():
     return {
         "service": settings.app_name,
         "version": settings.app_version,
-        "docs_url": "/docs"
+        "docs_url": "/docs",
+    }
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "version": settings.app_version,
     }
