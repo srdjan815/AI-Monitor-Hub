@@ -14,6 +14,7 @@ from app.modules.catalog.schemas import (
     AttributeUpdate,
     CategoryAttributeReorder,
     CategoryCreate,
+    CategoryTree,
     CategoryUpdate,
 )
 from app.modules.catalog.utils import stable_code
@@ -189,6 +190,38 @@ class CatalogService:
         category.version += 1
 
         await self.session.commit()
+
+    async def get_category_tree(self) -> list[CategoryTree]:
+        categories = await self.repository.list_all_categories()
+
+        nodes: dict[uuid.UUID, CategoryTree] = {}
+
+        for category in categories:
+            nodes[category.id] = CategoryTree(
+                id=category.id,
+                name=category.name,
+                code=category.code,
+                parent_id=category.parent_id,
+                position=category.position,
+                is_active=category.is_active,
+                children=[],
+            )
+
+        roots: list[CategoryTree] = []
+
+        for node in nodes.values():
+            if node.parent_id is None:
+                roots.append(node)
+                continue
+
+            parent = nodes.get(node.parent_id)
+
+            if parent is not None:
+                parent.children.append(node)
+            else:
+                roots.append(node)
+
+        return roots
 
     async def create_attribute(
         self,

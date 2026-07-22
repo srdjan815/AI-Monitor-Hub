@@ -37,6 +37,18 @@ class CategoryRead(BaseModel):
     updated_at: datetime
 
 
+class CategoryTree(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    code: str
+    parent_id: uuid.UUID | None
+    position: int
+    is_active: bool
+    children: list["CategoryTree"] = Field(default_factory=list)
+
+
 class CategoryList(BaseModel):
     items: list[CategoryRead]
     total: int
@@ -66,8 +78,10 @@ class AttributeCreate(BaseModel):
     def validate_scope(self) -> AttributeCreate:
         if self.scope == AttributeScope.CATEGORY and self.category_id is None:
             raise ValueError("category_id je obavezan za kategorijski atribut")
+
         if self.scope == AttributeScope.GLOBAL and self.category_id is not None:
             raise ValueError("Globalni atribut ne sme imati category_id")
+
         return self
 
 

@@ -17,6 +17,7 @@ from app.modules.catalog.schemas import (
     CategoryCreate,
     CategoryList,
     CategoryRead,
+    CategoryTree,
     CategoryUpdate,
 )
 from app.modules.catalog.service import CatalogService
@@ -58,7 +59,20 @@ async def list_categories(
     )
 
 
-@router.get("/categories/{category_id}", response_model=CategoryRead)
+@router.get(
+    "/categories/tree",
+    response_model=list[CategoryTree],
+)
+async def get_category_tree(
+    session: AsyncSession = Depends(get_db),
+) -> list[CategoryTree]:
+    return await CatalogService(session).get_category_tree()
+
+
+@router.get(
+    "/categories/{category_id}",
+    response_model=CategoryRead,
+)
 async def get_category(
     category_id: uuid.UUID,
     session: AsyncSession = Depends(get_db),
@@ -74,7 +88,10 @@ async def get_category(
     return CategoryRead.model_validate(category)
 
 
-@router.patch("/categories/{category_id}", response_model=CategoryRead)
+@router.patch(
+    "/categories/{category_id}",
+    response_model=CategoryRead,
+)
 async def update_category(
     category_id: uuid.UUID,
     payload: CategoryUpdate,
@@ -97,7 +114,10 @@ async def deactivate_category(
     session: AsyncSession = Depends(get_db),
 ) -> Response:
     await CatalogService(session).deactivate_category(category_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
 
 
 @router.post(
@@ -110,10 +130,14 @@ async def create_attribute(
     session: AsyncSession = Depends(get_db),
 ) -> AttributeRead:
     attribute = await CatalogService(session).create_attribute(payload)
+
     return AttributeRead.model_validate(attribute)
 
 
-@router.get("/attributes", response_model=AttributeList)
+@router.get(
+    "/attributes",
+    response_model=AttributeList,
+)
 async def list_attributes(
     scope: str | None = None,
     active_only: bool = True,
@@ -129,12 +153,18 @@ async def list_attributes(
     )
 
     return AttributeList(
-        items=[AttributeRead.model_validate(row) for row in rows],
+        items=[
+            AttributeRead.model_validate(row)
+            for row in rows
+        ],
         total=total,
     )
 
 
-@router.patch("/attributes/{attribute_id}", response_model=AttributeRead)
+@router.patch(
+    "/attributes/{attribute_id}",
+    response_model=AttributeRead,
+)
 async def update_attribute(
     attribute_id: uuid.UUID,
     payload: AttributeUpdate,
@@ -183,14 +213,19 @@ async def list_category_attributes(
                 if link.is_visible_override is not None
                 else link.attribute.is_visible
             ),
-            ai_prompt=link.ai_prompt_override or link.attribute.ai_prompt,
+            ai_prompt=(
+                link.ai_prompt_override
+                or link.attribute.ai_prompt
+            ),
             validation_rules=(
                 link.validation_rules_override
                 if link.validation_rules_override is not None
                 else link.attribute.validation_rules
             ),
             is_active=link.is_active,
-            attribute=AttributeRead.model_validate(link.attribute),
+            attribute=AttributeRead.model_validate(
+                link.attribute
+            ),
         )
         for link in links
     ]
@@ -210,4 +245,6 @@ async def reorder_category_attributes(
         payload,
     )
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
