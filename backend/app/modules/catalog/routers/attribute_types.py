@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.modules.catalog.repository import CatalogRepository
 from app.modules.catalog.schemas import (
     AttributeTypeCreate,
     AttributeTypeList,
@@ -34,7 +33,7 @@ async def list_attribute_types(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ) -> AttributeTypeList:
-    rows, total = await CatalogRepository(session).list_attribute_types(
+    rows, total = await CatalogService(session).list_attribute_types(
         active_only=active_only,
         limit=limit,
         offset=offset,
@@ -51,13 +50,9 @@ async def get_attribute_type(
     attribute_type_id: uuid.UUID,
     session: AsyncSession = Depends(get_db),
 ) -> AttributeTypeRead:
-    attribute_type = await CatalogRepository(session).get_attribute_type(attribute_type_id)
-
-    if attribute_type is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tip atributa nije pronađen",
-        )
+    attribute_type = await CatalogService(session).get_attribute_type(
+        attribute_type_id
+    )
 
     return AttributeTypeRead.model_validate(attribute_type)
 

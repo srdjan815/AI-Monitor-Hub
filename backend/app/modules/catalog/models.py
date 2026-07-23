@@ -45,6 +45,7 @@ class Category(UUIDMixin, TimestampMixin, Base):
     attribute_links: Mapped[list[CategoryAttribute]] = relationship(
         back_populates="category", cascade="all, delete-orphan"
     )
+    products: Mapped[list[Product]] = relationship(back_populates="category")
 
 
 class AttributeDefinition(UUIDMixin, TimestampMixin, Base):
@@ -113,3 +114,40 @@ class CategoryAttribute(UUIDMixin, TimestampMixin, Base):
     attribute: Mapped[AttributeDefinition] = relationship(
         back_populates="category_links", lazy="selectin"
     )
+
+
+class Product(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "products"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_products_code"),
+        UniqueConstraint("sku", name="uq_products_sku"),
+        UniqueConstraint("ean", name="uq_products_ean"),
+        Index("ix_products_category", "category_id"),
+        Index("ix_products_status", "status"),
+        Index("ix_products_active", "is_active"),
+        Index("ix_products_brand", "brand"),
+    )
+
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    code: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    sku: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ean: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    mpn: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    manufacturer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="DRAFT"
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    category: Mapped[Category] = relationship(back_populates="products")

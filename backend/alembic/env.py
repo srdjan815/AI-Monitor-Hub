@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.db import Base
 from app.modules.execution import models as execution_models  # noqa: F401
 from app.modules.catalog import models as catalog_models  # noqa: F401
+from app.modules.inventory import models as inventory_models  # noqa: F401
 
 # --------------------------------------------------------------------
 # Alembic configuration

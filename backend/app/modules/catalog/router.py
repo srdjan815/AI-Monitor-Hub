@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.modules.catalog.repository import CatalogRepository
+from app.modules.catalog.routers import attribute_types, products
 from app.modules.catalog.schemas import (
     AttributeCreate,
     AttributeList,
@@ -24,12 +25,11 @@ from app.modules.catalog.service import CatalogService
 
 router = APIRouter(tags=["catalog"])
 
-# Include sub-routers
-from app.modules.catalog.routers import products, attribute_types
-
 # Register the sub-routers
 router.include_router(products.router)
 router.include_router(attribute_types.router)
+
+
 @router.post(
     "/categories",
     response_model=CategoryRead,

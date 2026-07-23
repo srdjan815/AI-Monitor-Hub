@@ -1,4 +1,3 @@
-import logging
 from logging.config import dictConfig
 from functools import lru_cache
 
