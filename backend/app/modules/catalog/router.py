@@ -24,7 +24,12 @@ from app.modules.catalog.service import CatalogService
 
 router = APIRouter(tags=["catalog"])
 
+# Include sub-routers
+from app.modules.catalog.routers import products, attribute_types
 
+# Register the sub-routers
+router.include_router(products.router)
+router.include_router(attribute_types.router)
 @router.post(
     "/categories",
     response_model=CategoryRead,
