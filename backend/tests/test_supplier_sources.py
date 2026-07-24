@@ -479,7 +479,11 @@ async def test_error_source_can_recover_to_draft() -> None:
 
 def test_supplier_source_openapi_and_scope() -> None:
     schema = app.openapi()
-    source_paths = {path for path in schema["paths"] if "/sources" in path}
+    source_paths = {
+        path
+        for path in schema["paths"]
+        if "/sources" in path and "/schema-profiles" not in path
+    }
     assert source_paths == {
         "/api/v1/suppliers/{supplier_id}/sources",
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}",

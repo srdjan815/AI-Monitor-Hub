@@ -40,6 +40,9 @@ SUPPLIERS_WRITE = "suppliers.write"
 SUPPLIER_SOURCES_READ = "supplier_sources.read"
 SUPPLIER_SOURCES_WRITE = "supplier_sources.write"
 SUPPLIER_SOURCES_VALIDATE = "supplier_sources.validate"
+SCHEMA_PROFILES_READ = "schema_profiles.read"
+SCHEMA_PROFILES_WRITE = "schema_profiles.write"
+SCHEMA_PROFILES_ACTIVATE = "schema_profiles.activate"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -67,6 +70,9 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         SUPPLIER_SOURCES_READ,
         SUPPLIER_SOURCES_WRITE,
         SUPPLIER_SOURCES_VALIDATE,
+        SCHEMA_PROFILES_READ,
+        SCHEMA_PROFILES_WRITE,
+        SCHEMA_PROFILES_ACTIVATE,
         ADMIN_ACCESS,
     }
 )
@@ -107,10 +113,19 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SUPPLIER_SOURCES_READ,
             SUPPLIER_SOURCES_WRITE,
             SUPPLIER_SOURCES_VALIDATE,
+            SCHEMA_PROFILES_READ,
+            SCHEMA_PROFILES_WRITE,
+            SCHEMA_PROFILES_ACTIVATE,
         }
     ),
     "supplier_source_validator": frozenset(
         {SUPPLIER_SOURCES_READ, SUPPLIER_SOURCES_VALIDATE}
+    ),
+    "schema_profile_editor": frozenset(
+        {SUPPLIER_SOURCES_READ, SCHEMA_PROFILES_READ, SCHEMA_PROFILES_WRITE}
+    ),
+    "schema_profile_activator": frozenset(
+        {SUPPLIER_SOURCES_READ, SCHEMA_PROFILES_READ, SCHEMA_PROFILES_ACTIVATE}
     ),
     "read_only": frozenset(
         {
@@ -121,6 +136,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             EXECUTION_READ,
             SUPPLIERS_READ,
             SUPPLIER_SOURCES_READ,
+            SCHEMA_PROFILES_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -497,6 +513,10 @@ def required_permission(request: Request) -> str:
         if method == "POST" and path.endswith(("/cancel", "/retry")):
             return EXECUTION_MANAGE
         return EXECUTION_SUBMIT if method == "POST" else EXECUTION_READ
+    if "/schema-profiles" in path:
+        if method == "POST" and path.endswith(("/activate", "/archive")):
+            return SCHEMA_PROFILES_ACTIVATE
+        return SCHEMA_PROFILES_WRITE if write else SCHEMA_PROFILES_READ
     if "/suppliers" in path and "/sources" in path:
         if method == "POST" and path.endswith("/validate"):
             return SUPPLIER_SOURCES_VALIDATE

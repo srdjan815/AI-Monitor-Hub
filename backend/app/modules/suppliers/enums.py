@@ -40,6 +40,29 @@ class SupplierSourceValidationStatus(StrEnum):
     INVALID = "INVALID"
 
 
+class SchemaProfileStatus(StrEnum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
+
+
+class SchemaFieldDataType(StrEnum):
+    STRING = "STRING"
+    INTEGER = "INTEGER"
+    DECIMAL = "DECIMAL"
+    BOOLEAN = "BOOLEAN"
+    DATE = "DATE"
+    DATETIME = "DATETIME"
+    TIME = "TIME"
+    UUID = "UUID"
+    EMAIL = "EMAIL"
+    URL = "URL"
+    PHONE = "PHONE"
+    JSON = "JSON"
+    ENUM = "ENUM"
+    BINARY = "BINARY"
+
+
 __all__ = [
     "SupplierContactType",
     "SupplierSourceStatus",
