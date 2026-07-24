@@ -28,16 +28,17 @@ files, 189 untracked nonignored files, and no staged files. All Git-visible
 files were classified individually. The generated classification and redacted
 secret report are the authoritative final inventories.
 
-Controlled application commit:
+Controlled commits:
 
 | Commit | Message | Files | Gate before commit |
 |---|---|---:|---|
 | `11762e5` | `feat(foundation): version frozen application platform` | 209 | full serial, five seeds, xdist, branch coverage, static, migration, Docker, multi-instance, secret and staged-diff gates passed |
+| `5c707fc` | `docs: freeze foundation architecture and operations` | 60 | documentation, link, machine-path and release-evidence gates passed |
+| `d63d47d` | `test: remove local database assumptions` | 7 | clean-database integration failures reproduced and corrected |
+| `39c0913` | `fix(config): accept compose-only environment values` | 2 | `.env.example` copied verbatim, focused regression and clean-clone suite passed |
 
-The documentation commit and release-evidence commit are resolved by the local
-annotated `foundation-v1.0` tag. This report is updated after Git-only
-reproduction with their full hashes; a commit cannot truthfully contain its own
-hash.
+The final release-evidence commit is resolved by the local annotated
+`foundation-v1.0` tag; a commit cannot truthfully contain its own hash.
 
 No remote commit or tag is pushed by this sprint.
 
@@ -84,6 +85,7 @@ reviewed compatible targets documented in
 | xdist, 2 workers, load-file | 288 passed in 46.90 s |
 | Post-build xdist | 288 passed in 51.36 s |
 | Branch-coverage run, seed 777 | 288 passed in 176.28 s |
+| Clean-clone Linux suite | 289 passed, fresh database and no-cache image |
 | Skips / xfails | zero |
 | API health / protected auth | 200 / 401 without credentials / 200 with admin token |
 | Swagger | 200 in the development profile |
@@ -181,9 +183,33 @@ temporary replica containers created by this sprint were removed.
 
 ## Reproducibility from Git alone
 
-The full clean-clone evidence is intentionally populated after the
-documentation commit exists. Until that evidence is written, the release
-verdict remains pending and the tag must not be created.
+A `--no-local` clone was created at
+`%LOCALAPPDATA%\Temp\AI-Monitor-Hub-foundation-repro-20260724T205000` and
+advanced only through Git fetch plus fast-forward merge. No source file was
+copied from the working repository. The tracked source/test/migration/config
+manifest at `39c0913d946e8cdc296f6236d2ebfab2a230f174` has aggregate SHA-256
+`DB4C0AED5645F5880F177701D8FDC29D33CAE999A516988FD91268E7AC156340`
+in both repositories.
+
+The clone used a new Windows CPython 3.12.10 virtual environment and an exact
+lock installation. Windows Ruff, format, C901, MyPy, `pip check`, and
+`pip-audit` passed. An isolated Compose project built API and worker images
+without cache, created new PostgreSQL and Redis volumes, upgraded an empty
+database through all 20 revisions, and reached a healthy API. Running the
+suite inside that clean API image collected and passed all 289 tests. The
+clone OpenAPI hash, migration head, 46-table mapper count, and lock hash match
+the primary repository.
+
+Clean-clone image IDs:
+
+- API:
+  `2e59444cf7f3fe72c63310c1f5cee9ac1c724e79ef6df8fa32ddf529384b0bae`;
+- worker:
+  `a682da34918a0f5e0c999f6f319241d1908e8655b2e2de9c28a7b6617f193a92`.
+
+The proof also found and fixed two genuine portability defects: direct
+integration tests no longer assume one hard-coded database, and Pydantic
+settings now tolerate Compose-only values documented in `.env.example`.
 
 ## Twenty-category scorecard
 
@@ -204,11 +230,11 @@ verdict remains pending and the tag must not be created.
 | 13 | Observability | 9.8 | bounded structured logs and per-replica metrics pass; aggregation is external infrastructure |
 | 14 | Horizontal scaling | 9.8 | shared limiter and two replicas pass; Redis HA and Prometheus deployment are external |
 | 15 | Git hygiene | 10.0 | exhaustive classification, ignore policy, staging and secret gates pass |
-| 16 | Reproducibility | pending | populated only after the Git-only clone proof |
+| 16 | Reproducibility | 10.0 | Git-only clone, exact Windows install, clean no-cache images, empty migration and 289-test proof pass |
 | 17 | Windows development | 10.0 | supported CPython, exact install, VS Code, static and audit gates pass |
 | 18 | Docker/Linux deployment | 10.0 | pinned clean images, parity, health and two workers pass |
 | 19 | Documentation | 9.5 | onboarding and operations are complete; repository declares MIT but still needs owner-approved root license text before public distribution |
-| 20 | Release readiness | pending | populated after clean-clone proof and annotated tag |
+| 20 | Release readiness | 10.0 | all blocking gates pass; annotated local tag resolves the evidence commit |
 
 ## Explicit gaps below 10
 
