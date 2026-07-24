@@ -128,6 +128,17 @@ def test_production_configuration_rejects_insecure_defaults() -> None:
         )
 
 
+def test_settings_ignore_compose_only_environment_values() -> None:
+    configured = Settings(
+        database_url="postgresql+asyncpg://test:test@db/test",
+        postgres_db="compose_database",
+        postgres_user="compose_user",
+        postgres_password="compose_password",
+    )
+
+    assert configured.database_url.endswith("/test")
+
+
 def test_shared_rate_limit_configuration_requires_redis_and_valid_networks() -> None:
     with pytest.raises(ValidationError):
         Settings(
