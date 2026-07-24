@@ -60,11 +60,8 @@ def factory() -> tuple:
 async def seed(session: AsyncSession) -> tuple[Product, Language, ContentType]:
     suffix = uuid.uuid4().hex
     category = Category(name=f"Integration {suffix}", code=f"i_{suffix}")
-    language = Language(
-        code=f"x-{suffix[:12]}",
-        name=f"Integration {suffix}",
-        native_name=f"Integration {suffix}",
-    )
+    language = await session.scalar(select(Language).where(Language.code == "sr"))
+    assert language is not None
     content_type = ContentType(
         name=f"Integration {suffix}",
         slug=f"integration-{suffix}",

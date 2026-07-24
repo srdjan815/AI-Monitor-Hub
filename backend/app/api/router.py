@@ -5,6 +5,7 @@ from app.modules.execution.router import router as execution_router
 from app.modules.catalog.router import router as catalog_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.product_content.router import router as product_content_router
+from app.modules.suppliers.router import router as supplier_router
 
 # Create main API router
 api_router = APIRouter()
@@ -16,3 +17,4 @@ api_router.include_router(execution_router, dependencies=protected)
 api_router.include_router(catalog_router, dependencies=protected)
 api_router.include_router(inventory_router, dependencies=protected)
 api_router.include_router(product_content_router, dependencies=protected)
+api_router.include_router(supplier_router, dependencies=protected)

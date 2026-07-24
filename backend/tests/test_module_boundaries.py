@@ -20,6 +20,7 @@ API_ROOT = "http://localhost:8000/api/v1"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 CATALOG_ROOT = BACKEND_ROOT / "app" / "modules" / "catalog"
 INVENTORY_IMPORT = "app.modules.inventory"
+SUPPLIER_ROOT = BACKEND_ROOT / "app" / "modules" / "suppliers"
 ARCHITECTURE_EXCEPTIONS: dict[str, str] = {}
 
 
@@ -52,6 +53,23 @@ def test_catalog_does_not_import_inventory() -> None:
             if module == INVENTORY_IMPORT or module.startswith(f"{INVENTORY_IMPORT}.")
         )
         for path in CATALOG_ROOT.rglob("*.py")
+    }
+    assert not {path: imports for path, imports in violations.items() if imports}
+
+
+def test_supplier_administration_respects_frozen_module_boundaries() -> None:
+    forbidden_prefixes = (
+        "app.modules.catalog",
+        "app.modules.inventory",
+        "app.modules.product_content",
+    )
+    violations = {
+        str(path.relative_to(BACKEND_ROOT)): sorted(
+            module
+            for module in imported_modules(path)
+            if module.startswith(forbidden_prefixes)
+        )
+        for path in SUPPLIER_ROOT.rglob("*.py")
     }
     assert not {path: imports for path, imports in violations.items() if imports}
 

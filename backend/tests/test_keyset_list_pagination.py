@@ -29,10 +29,17 @@ def _suffix() -> str:
     return uuid.uuid4().hex
 
 
-def _active_category_id(client: httpx.Client) -> str:
-    response = client.get("/categories", params={"limit": 1})
-    response.raise_for_status()
-    return response.json()["items"][0]["id"]
+def _create_category(client: httpx.Client) -> str:
+    token = _suffix()
+    response = client.post(
+        "/categories",
+        json={
+            "name": f"Disposable cursor category {token}",
+            "code": f"cursor_category_{token}",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
 
 
 def _create_product(
@@ -91,7 +98,7 @@ def _tamper(cursor: str) -> str:
 def test_product_cursor_is_signed_filter_bound_and_snapshot_stable(
     client: httpx.Client,
 ) -> None:
-    category_id = _active_category_id(client)
+    category_id = _create_category(client)
     created_ids: list[str] = []
 
     try:
@@ -192,13 +199,14 @@ def test_product_cursor_is_signed_filter_bound_and_snapshot_stable(
     finally:
         for product_id in created_ids:
             client.delete(f"/products/{product_id}")
+        client.delete(f"/categories/{category_id}")
 
 
 def test_inventory_lists_use_stable_keysets_and_snapshot_boundaries(
     client: httpx.Client,
 ) -> None:
     suffix = _suffix()
-    category_id = _active_category_id(client)
+    category_id = _create_category(client)
     product_ids: list[str] = []
     inventory_ids: list[str] = []
     reservation_ids: list[str] = []
@@ -377,6 +385,7 @@ def test_inventory_lists_use_stable_keysets_and_snapshot_boundaries(
             client.delete(f"/warehouses/{warehouse_id}")
         for product_id in product_ids:
             client.delete(f"/products/{product_id}")
+        client.delete(f"/categories/{category_id}")
 
 
 def test_job_cursor_is_signed_filter_bound_and_snapshot_stable(

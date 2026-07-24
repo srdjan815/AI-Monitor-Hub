@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import asyncio
+import os
 import uuid
 
 import httpx
 import pytest
 from app.core.security import create_access_token
+from app.core.config import settings
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from app.modules.product_content.models import Language
 
 API = "http://localhost:8000/api/v1"
+DATABASE_URL = os.getenv(
+    "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
+    settings.database_url,
+)
 
 
 @pytest.fixture
@@ -17,6 +28,28 @@ def client() -> httpx.Client:
         headers={"Authorization": f"Bearer {create_access_token('pytest')}"},
     ) as value:
         yield value
+
+
+@pytest.fixture
+def language_cleanup() -> list[uuid.UUID]:
+    language_ids: list[uuid.UUID] = []
+    yield language_ids
+
+    async def purge() -> None:
+        if not language_ids:
+            return
+        engine = create_async_engine(DATABASE_URL)
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with sessions() as session:
+                await session.execute(
+                    delete(Language).where(Language.id.in_(language_ids))
+                )
+                await session.commit()
+        finally:
+            await engine.dispose()
+
+    asyncio.run(purge())
 
 
 def create_product(client: httpx.Client) -> dict:
@@ -45,7 +78,10 @@ def seeded_language(client: httpx.Client) -> dict:
     )
 
 
-def test_language_and_content_type_complete_crud(client: httpx.Client) -> None:
+def test_language_and_content_type_complete_crud(
+    client: httpx.Client,
+    language_cleanup: list[uuid.UUID],
+) -> None:
     token = uuid.uuid4().hex[:8]
     language = client.post(
         "/content/languages",
@@ -57,6 +93,7 @@ def test_language_and_content_type_complete_crud(client: httpx.Client) -> None:
     )
     assert language.status_code == 201, language.text
     language_id = language.json()["id"]
+    language_cleanup.append(uuid.UUID(language_id))
     assert client.get(f"/content/languages/{language_id}").status_code == 200
     updated = client.patch(
         f"/content/languages/{language_id}",

@@ -35,6 +35,11 @@ INVENTORY_ADJUST = "inventory.adjust"
 EXECUTION_READ = "execution.read"
 EXECUTION_SUBMIT = "execution.submit"
 EXECUTION_MANAGE = "execution.manage"
+SUPPLIERS_READ = "suppliers.read"
+SUPPLIERS_WRITE = "suppliers.write"
+SUPPLIER_SOURCES_READ = "supplier_sources.read"
+SUPPLIER_SOURCES_WRITE = "supplier_sources.write"
+SUPPLIER_SOURCES_VALIDATE = "supplier_sources.validate"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -57,6 +62,11 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         EXECUTION_READ,
         EXECUTION_SUBMIT,
         EXECUTION_MANAGE,
+        SUPPLIERS_READ,
+        SUPPLIERS_WRITE,
+        SUPPLIER_SOURCES_READ,
+        SUPPLIER_SOURCES_WRITE,
+        SUPPLIER_SOURCES_VALIDATE,
         ADMIN_ACCESS,
     }
 )
@@ -90,8 +100,28 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
     "execution_operator": frozenset(
         {EXECUTION_READ, EXECUTION_SUBMIT, EXECUTION_MANAGE}
     ),
+    "supplier_admin": frozenset(
+        {
+            SUPPLIERS_READ,
+            SUPPLIERS_WRITE,
+            SUPPLIER_SOURCES_READ,
+            SUPPLIER_SOURCES_WRITE,
+            SUPPLIER_SOURCES_VALIDATE,
+        }
+    ),
+    "supplier_source_validator": frozenset(
+        {SUPPLIER_SOURCES_READ, SUPPLIER_SOURCES_VALIDATE}
+    ),
     "read_only": frozenset(
-        {CATALOG_READ, ATTRIBUTES_READ, CONTENT_READ, INVENTORY_READ, EXECUTION_READ}
+        {
+            CATALOG_READ,
+            ATTRIBUTES_READ,
+            CONTENT_READ,
+            INVENTORY_READ,
+            EXECUTION_READ,
+            SUPPLIERS_READ,
+            SUPPLIER_SOURCES_READ,
+        }
     ),
     "internal_service": ALL_PERMISSIONS,
 }
@@ -467,6 +497,12 @@ def required_permission(request: Request) -> str:
         if method == "POST" and path.endswith(("/cancel", "/retry")):
             return EXECUTION_MANAGE
         return EXECUTION_SUBMIT if method == "POST" else EXECUTION_READ
+    if "/suppliers" in path and "/sources" in path:
+        if method == "POST" and path.endswith("/validate"):
+            return SUPPLIER_SOURCES_VALIDATE
+        return SUPPLIER_SOURCES_WRITE if write else SUPPLIER_SOURCES_READ
+    if "/suppliers" in path:
+        return SUPPLIERS_WRITE if write else SUPPLIERS_READ
     if "/inventory" in path or "/warehouses" in path:
         if any(part in path for part in ("/movements", "/reservations")) and write:
             return INVENTORY_ADJUST

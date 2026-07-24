@@ -62,11 +62,8 @@ async def seed(session: AsyncSession) -> tuple[Product, Language, ContentType]:
         name=f"Content race {suffix}",
         code=f"content_race_{suffix}",
     )
-    language = Language(
-        code=f"z-{suffix[:12]}",
-        name=f"Content race {suffix}",
-        native_name=f"Content race {suffix}",
-    )
+    language = await session.scalar(select(Language).where(Language.code == "sr"))
+    assert language is not None
     content_type = ContentType(
         name=f"Content race {suffix}",
         slug=f"content-race-{suffix}",
