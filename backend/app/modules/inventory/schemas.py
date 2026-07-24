@@ -5,19 +5,20 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.limits import MAX_DB_INTEGER, MAX_DESCRIPTION_CHARS, MAX_NOTE_CHARS
 from app.modules.inventory.enums import MovementType, ReservationStatus
 
 
 class WarehouseCreate(BaseModel):
     code: str = Field(min_length=1, max_length=100)
     name: str = Field(min_length=1, max_length=255)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=MAX_DESCRIPTION_CHARS)
     is_active: bool = True
 
 
 class WarehouseUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=MAX_DESCRIPTION_CHARS)
     is_active: bool | None = None
 
 
@@ -42,28 +43,26 @@ class WarehouseList(BaseModel):
 class InventoryCreate(BaseModel):
     warehouse_id: uuid.UUID
     product_id: uuid.UUID
-    quantity_on_hand: int = Field(default=0, ge=0)
-    quantity_reserved: int = Field(default=0, ge=0)
-    minimum_stock: int = Field(default=0, ge=0)
-    reorder_point: int = Field(default=0, ge=0)
+    quantity_on_hand: int = Field(default=0, ge=0, le=MAX_DB_INTEGER)
+    quantity_reserved: int = Field(default=0, ge=0, le=MAX_DB_INTEGER)
+    minimum_stock: int = Field(default=0, ge=0, le=MAX_DB_INTEGER)
+    reorder_point: int = Field(default=0, ge=0, le=MAX_DB_INTEGER)
     is_active: bool = True
 
     @model_validator(mode="after")
     def validate_quantities(self) -> InventoryCreate:
         if self.quantity_reserved > self.quantity_on_hand:
-            raise ValueError(
-                "quantity_reserved ne sme biti veći od quantity_on_hand"
-            )
+            raise ValueError("quantity_reserved ne sme biti veći od quantity_on_hand")
         return self
 
 
 class InventoryUpdate(BaseModel):
     warehouse_id: uuid.UUID | None = None
     product_id: uuid.UUID | None = None
-    quantity_on_hand: int | None = Field(default=None, ge=0)
-    quantity_reserved: int | None = Field(default=None, ge=0)
-    minimum_stock: int | None = Field(default=None, ge=0)
-    reorder_point: int | None = Field(default=None, ge=0)
+    quantity_on_hand: int | None = Field(default=None, ge=0, le=MAX_DB_INTEGER)
+    quantity_reserved: int | None = Field(default=None, ge=0, le=MAX_DB_INTEGER)
+    minimum_stock: int | None = Field(default=None, ge=0, le=MAX_DB_INTEGER)
+    reorder_point: int | None = Field(default=None, ge=0, le=MAX_DB_INTEGER)
     is_active: bool | None = None
 
 
@@ -94,11 +93,11 @@ class InventoryMovementCreate(BaseModel):
     product_id: uuid.UUID
     source_warehouse_id: uuid.UUID | None = None
     destination_warehouse_id: uuid.UUID | None = None
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=MAX_DB_INTEGER)
     reference_type: str | None = Field(default=None, max_length=100)
     reference_id: str | None = Field(default=None, max_length=255)
     external_reference: str | None = Field(default=None, max_length=255)
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=MAX_NOTE_CHARS)
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     created_by: str | None = Field(default=None, max_length=120)
 
@@ -134,11 +133,11 @@ class InventoryMovementList(BaseModel):
 class InventoryReservationCreate(BaseModel):
     product_id: uuid.UUID
     warehouse_id: uuid.UUID
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=MAX_DB_INTEGER)
     external_reference: str | None = Field(default=None, max_length=255)
     reference_type: str | None = Field(default=None, max_length=100)
     reference_id: str | None = Field(default=None, max_length=255)
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=MAX_NOTE_CHARS)
     expires_at: datetime | None = None
 
 
@@ -172,9 +171,9 @@ class InventoryReservationList(BaseModel):
 
 
 class InventoryReservationFulfill(BaseModel):
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=MAX_DB_INTEGER)
     external_reference: str | None = Field(default=None, max_length=255)
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=MAX_NOTE_CHARS)
 
 
 class ReservationReleaseResponse(InventoryReservationRead):

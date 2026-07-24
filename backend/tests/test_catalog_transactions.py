@@ -40,9 +40,7 @@ async def test_category_create_rolls_back_on_persistence_failure() -> None:
     repository.create_category.side_effect = persistence_error()
 
     with pytest.raises(HTTPException) as error:
-        await service.create_category(
-            CategoryCreate(name="Rollback Category")
-        )
+        await service.create_category(CategoryCreate(name="Rollback Category"))
 
     assert error.value.status_code == 409
     session.rollback.assert_awaited_once()

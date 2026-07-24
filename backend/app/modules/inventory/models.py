@@ -33,10 +33,12 @@ class Warehouse(UUIDMixin, TimestampMixin, Base):
     code: Mapped[str] = mapped_column(String(100), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    __mapper_args__ = {
+        "version_id_col": version,
+        "version_id_generator": False,
+    }
 
     inventory_records: Mapped[list[Inventory]] = relationship(
         back_populates="warehouse"
@@ -73,6 +75,7 @@ class Inventory(UUIDMixin, TimestampMixin, Base):
         ),
         Index("ix_inventory_warehouse_active", "warehouse_id", "is_active"),
         Index("ix_inventory_product_active", "product_id", "is_active"),
+        Index("ix_inventory_created_cursor", "created_at", "id"),
     )
 
     warehouse_id: Mapped[uuid.UUID] = mapped_column(
@@ -83,26 +86,18 @@ class Inventory(UUIDMixin, TimestampMixin, Base):
         ForeignKey("products.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    quantity_on_hand: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
-    quantity_reserved: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
-    minimum_stock: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
-    reorder_point: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
+    quantity_on_hand: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    quantity_reserved: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    minimum_stock: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reorder_point: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    __mapper_args__ = {
+        "version_id_col": version,
+        "version_id_generator": False,
+    }
 
-    warehouse: Mapped[Warehouse] = relationship(
-        back_populates="inventory_records"
-    )
+    warehouse: Mapped[Warehouse] = relationship(back_populates="inventory_records")
     product: Mapped[Product] = relationship()
 
     @property
@@ -165,11 +160,14 @@ class InventoryMovement(UUIDMixin, Base):
             "movement_type",
             "occurred_at",
         ),
+        Index(
+            "ix_inventory_movements_occurred_cursor",
+            "occurred_at",
+            "id",
+        ),
     )
 
-    movement_number: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
+    movement_number: Mapped[str] = mapped_column(String(32), nullable=False)
     movement_type: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
@@ -188,15 +186,9 @@ class InventoryMovement(UUIDMixin, Base):
         nullable=True,
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    reference_type: Mapped[str | None] = mapped_column(
-        String(100), nullable=True
-    )
-    reference_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
-    external_reference: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    reference_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    reference_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    external_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -206,12 +198,8 @@ class InventoryMovement(UUIDMixin, Base):
         nullable=False,
         server_default=func.now(),
     )
-    created_by: Mapped[str | None] = mapped_column(
-        String(120), nullable=True
-    )
-    is_reversed: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )
+    created_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_reversed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     reversed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -220,6 +208,10 @@ class InventoryMovement(UUIDMixin, Base):
         nullable=True,
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    __mapper_args__ = {
+        "version_id_col": version,
+        "version_id_generator": False,
+    }
 
     product: Mapped[Product] = relationship()
     source_warehouse: Mapped[Warehouse | None] = relationship(
@@ -274,12 +266,14 @@ class InventoryReservation(UUIDMixin, TimestampMixin, Base):
             "status",
             "expires_at",
         ),
-        Index("ix_inventory_reservations_created", "created_at"),
+        Index(
+            "ix_inventory_reservations_created",
+            "created_at",
+            "id",
+        ),
     )
 
-    reservation_number: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
+    reservation_number: Mapped[str] = mapped_column(String(32), nullable=False)
     product_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("products.id", ondelete="RESTRICT"), nullable=False
     )
@@ -287,21 +281,13 @@ class InventoryReservation(UUIDMixin, TimestampMixin, Base):
         ForeignKey("warehouses.id", ondelete="RESTRICT"), nullable=False
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    fulfilled_quantity: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
+    fulfilled_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default=ReservationStatus.ACTIVE.value
     )
-    reference_type: Mapped[str | None] = mapped_column(
-        String(100), nullable=True
-    )
-    reference_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
-    external_reference: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    reference_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    reference_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    external_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -316,6 +302,10 @@ class InventoryReservation(UUIDMixin, TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    __mapper_args__ = {
+        "version_id_col": version,
+        "version_id_generator": False,
+    }
 
     product: Mapped[Product] = relationship()
     warehouse: Mapped[Warehouse] = relationship()

@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+from app.core.security import create_access_token
 
 
 API_ROOT = "http://localhost:8000/api/v1"
@@ -12,7 +13,11 @@ API_ROOT = "http://localhost:8000/api/v1"
 
 @pytest.fixture
 def api_client() -> httpx.Client:
-    with httpx.Client(base_url=API_ROOT, timeout=10.0) as client:
+    with httpx.Client(
+        base_url=API_ROOT,
+        timeout=10.0,
+        headers={"Authorization": f"Bearer {create_access_token('pytest')}"},
+    ) as client:
         yield client
 
 
@@ -71,22 +76,28 @@ def test_inventory_reservation_lifecycle(
             },
         )
         assert missing_balance.status_code == 404
-        assert api_client.post(
-            "/inventory/reservations",
-            json={
-                "product_id": product_id,
-                "warehouse_id": warehouse_id,
-                "quantity": 0,
-            },
-        ).status_code == 422
-        assert api_client.post(
-            "/inventory/reservations",
-            json={
-                "product_id": product_id,
-                "warehouse_id": warehouse_id,
-                "quantity": 101,
-            },
-        ).status_code == 422
+        assert (
+            api_client.post(
+                "/inventory/reservations",
+                json={
+                    "product_id": product_id,
+                    "warehouse_id": warehouse_id,
+                    "quantity": 0,
+                },
+            ).status_code
+            == 422
+        )
+        assert (
+            api_client.post(
+                "/inventory/reservations",
+                json={
+                    "product_id": product_id,
+                    "warehouse_id": warehouse_id,
+                    "quantity": 101,
+                },
+            ).status_code
+            == 422
+        )
 
         external_reference = f"reservation-{suffix}"
         payload = {
@@ -97,18 +108,14 @@ def test_inventory_reservation_lifecycle(
             "reference_type": "TEST",
             "reference_id": suffix,
         }
-        created = api_client.post(
-            "/inventory/reservations", json=payload
-        )
+        created = api_client.post("/inventory/reservations", json=payload)
         assert created.status_code == 201
         reservation = created.json()
         assert reservation["reservation_number"].startswith("RES-")
         assert reservation["remaining_quantity"] == 40
         assert reservation["status"] == "ACTIVE"
 
-        equivalent = api_client.post(
-            "/inventory/reservations", json=payload
-        )
+        equivalent = api_client.post("/inventory/reservations", json=payload)
         assert equivalent.status_code == 201
         assert equivalent.json()["id"] == reservation["id"]
         conflict = api_client.post(
@@ -148,23 +155,26 @@ def test_inventory_reservation_lifecycle(
         )
         assert movements.status_code == 200
         assert movements.json()["items"][0]["movement_type"] == "ISSUE"
+        assert movements.json()["items"][0]["reference_id"] == reservation["id"]
         assert (
-            movements.json()["items"][0]["reference_id"]
-            == reservation["id"]
+            api_client.post(
+                f"/inventory/reservations/{reservation['id']}/fulfill",
+                json={"quantity": 26},
+            ).status_code
+            == 422
         )
-        assert api_client.post(
-            f"/inventory/reservations/{reservation['id']}/fulfill",
-            json={"quantity": 26},
-        ).status_code == 422
 
         released = api_client.post(
             f"/inventory/reservations/{reservation['id']}/release"
         )
         assert released.status_code == 200
         assert released.json()["status"] == "RELEASED"
-        assert api_client.post(
-            f"/inventory/reservations/{reservation['id']}/release"
-        ).status_code == 409
+        assert (
+            api_client.post(
+                f"/inventory/reservations/{reservation['id']}/release"
+            ).status_code
+            == 409
+        )
         current = api_client.get(f"/inventory/{inventory_id}").json()
         assert current["quantity_reserved"] == 0
 
@@ -176,11 +186,17 @@ def test_inventory_reservation_lifecycle(
                 "quantity": 10,
             },
         ).json()
-        cancelled = api_client.post(
-            f"/inventory/reservations/{cancel['id']}/cancel"
-        )
+        cancelled = api_client.post(f"/inventory/reservations/{cancel['id']}/cancel")
         assert cancelled.status_code == 200
         assert cancelled.json()["status"] == "CANCELLED"
+
+        # Drain disposable expired rows from interrupted earlier runs so this
+        # global maintenance endpoint is deterministic on a reused test DB.
+        drained = api_client.post(
+            "/inventory/reservations/expire",
+            params={"limit": 500},
+        )
+        assert drained.status_code == 200
 
         expired = api_client.post(
             "/inventory/reservations",
@@ -188,9 +204,7 @@ def test_inventory_reservation_lifecycle(
                 "product_id": product_id,
                 "warehouse_id": warehouse_id,
                 "quantity": 5,
-                "expires_at": (
-                    datetime.now(UTC) - timedelta(minutes=1)
-                ).isoformat(),
+                "expires_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
             },
         ).json()
         future = api_client.post(
@@ -199,31 +213,27 @@ def test_inventory_reservation_lifecycle(
                 "product_id": product_id,
                 "warehouse_id": warehouse_id,
                 "quantity": 5,
-                "expires_at": (
-                    datetime.now(UTC) + timedelta(days=1)
-                ).isoformat(),
+                "expires_at": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
             },
         ).json()
-        summary = api_client.post(
-            "/inventory/reservations/expire", params={"limit": 1}
-        )
+        summary = api_client.post("/inventory/reservations/expire", params={"limit": 1})
         assert summary.status_code == 200
         assert summary.json() == {"processed": 1, "skipped": 0}
-        assert api_client.get(
-            f"/inventory/reservations/{expired['id']}"
-        ).json()["status"] == "EXPIRED"
-        assert api_client.get(
-            f"/inventory/reservations/{future['id']}"
-        ).json()["status"] == "ACTIVE"
+        assert (
+            api_client.get(f"/inventory/reservations/{expired['id']}").json()["status"]
+            == "EXPIRED"
+        )
+        assert (
+            api_client.get(f"/inventory/reservations/{future['id']}").json()["status"]
+            == "ACTIVE"
+        )
 
         active = api_client.get(
             "/inventory/reservations",
             params={"product_id": product_id, "active_only": "true"},
         )
         assert active.status_code == 200
-        assert {item["id"] for item in active.json()["items"]} == {
-            future["id"]
-        }
+        assert {item["id"] for item in active.json()["items"]} == {future["id"]}
         all_rows = api_client.get(
             "/inventory/reservations",
             params={
@@ -236,9 +246,9 @@ def test_inventory_reservation_lifecycle(
         assert all_rows.status_code == 200
         assert all_rows.json()["total"] == 4
         assert len(all_rows.json()["items"]) == 2
-        assert api_client.get(
-            f"/inventory/reservations/{uuid.uuid4()}"
-        ).status_code == 404
+        assert (
+            api_client.get(f"/inventory/reservations/{uuid.uuid4()}").status_code == 404
+        )
     finally:
         if inventory_id is not None:
             api_client.delete(f"/inventory/{inventory_id}")

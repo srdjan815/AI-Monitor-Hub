@@ -4,6 +4,7 @@ import uuid
 
 import httpx
 import pytest
+from app.core.security import create_access_token
 
 
 API_ROOT = "http://localhost:8000/api/v1"
@@ -11,7 +12,11 @@ API_ROOT = "http://localhost:8000/api/v1"
 
 @pytest.fixture
 def api_client() -> httpx.Client:
-    with httpx.Client(base_url=API_ROOT, timeout=10.0) as client:
+    with httpx.Client(
+        base_url=API_ROOT,
+        timeout=10.0,
+        headers={"Authorization": f"Bearer {create_access_token('pytest')}"},
+    ) as client:
         yield client
 
 

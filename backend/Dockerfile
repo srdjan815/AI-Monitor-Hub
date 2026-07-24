@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b
 
 # Working directory
 WORKDIR /app
@@ -7,20 +7,16 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# System packages
-RUN apt-get update && apt-get install -y \
-    gcc \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy project
 COPY . /app/
 
-# Upgrade pip
-RUN python -m pip install --upgrade pip
+# Use a reviewed installer version.
+RUN python -m pip install pip==26.1.2
 
-# Install application + development dependencies
-RUN pip install --no-cache-dir -e ".[dev]"
+# Install the complete exact lock, then register the local application without
+# allowing editable installation to resolve a second dependency graph.
+RUN pip install --no-cache-dir -r requirements.lock \
+    && pip install --no-cache-dir --no-build-isolation --no-deps -e .
 
 # Create non-root user
 RUN adduser --disabled-password --gecos "" appuser && \
@@ -33,7 +29,7 @@ EXPOSE 8000
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
 
 # Start API
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

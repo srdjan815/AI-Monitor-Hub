@@ -13,7 +13,9 @@ def test_category_name_is_preserved() -> None:
 
 def test_stable_code_transliterates_serbian_characters() -> None:
     assert stable_code("Matične ploče") == "maticne_ploce"
-    assert stable_code("ID proizvoda / Šifra proizvoda") == "id_proizvoda_sifra_proizvoda"
+    assert (
+        stable_code("ID proizvoda / Šifra proizvoda") == "id_proizvoda_sifra_proizvoda"
+    )
 
 
 def test_category_attribute_requires_category() -> None:

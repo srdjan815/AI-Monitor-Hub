@@ -8,20 +8,24 @@ backend/venv/
 # Python generated files
 __pycache__/
 *.py[cod]
-*.pyo
+*.egg-info/
+build/
+dist/
 
-# Environment
+# Environment and local overrides
 .env
+.env.*
+!.env.example
+!.env.*.example
 
 # IDE state (canonical shared settings are explicitly retained)
 .vscode/*
 !.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+.idea/
 
-# Build
-build/
-dist/
-
-# Caches
+# Test, coverage, and tool output
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -29,20 +33,41 @@ dist/
 .coverage.*
 htmlcov/
 coverage.xml
+coverage.json
+coverage.lcov
+junit.xml
+.benchmarks/
+*.prof
 
 # Logs
 *.log
+*.pid
 
 # Local generated data
 *.dump
+*.pgdump
 *.sql.gz
 *.bak
 *.tmp
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
 .local-media/
 .cache/
+/benchmark-results/
+/backend/benchmark-results/
+/checkpoints/
+/tmp/
+/temp/
+/*.zip
+/*.tar
+/*.tar.gz
+/*.7z
 
-# Windows
+# Operating-system metadata
 Thumbs.db
 Desktop.ini
-
-*.egg-info/
+.DS_Store
+._*

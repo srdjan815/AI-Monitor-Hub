@@ -4,6 +4,7 @@ import uuid
 
 import httpx
 import pytest
+from app.core.security import create_access_token
 
 
 API_ROOT = "http://localhost:8000/api/v1"
@@ -11,7 +12,11 @@ API_ROOT = "http://localhost:8000/api/v1"
 
 @pytest.fixture
 def api_client() -> httpx.Client:
-    with httpx.Client(base_url=API_ROOT, timeout=10.0) as client:
+    with httpx.Client(
+        base_url=API_ROOT,
+        timeout=10.0,
+        headers={"Authorization": f"Bearer {create_access_token('pytest')}"},
+    ) as client:
         yield client
 
 
@@ -160,9 +165,7 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
         receipt_data = receipt.json()
         assert receipt_data["movement_type"] == "RECEIPT"
         assert receipt_data["movement_number"].startswith("MOV-")
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 100
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 100
 
         conflicting_retry = create_movement(
             api_client,
@@ -173,9 +176,7 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
             external_reference=external_reference,
         )
         assert conflicting_retry.status_code == 409
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 100
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 100
 
         idempotent = create_movement(
             api_client,
@@ -187,9 +188,7 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
         )
         assert idempotent.status_code == 201
         assert idempotent.json()["id"] == receipt_data["id"]
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 100
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 100
 
         issue = create_movement(
             api_client,
@@ -199,13 +198,9 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
             quantity=10,
         )
         assert issue.status_code == 201
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 90
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 90
         assert reverse(api_client, issue.json()["id"]).status_code == 201
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 100
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 100
 
         adjustment_out = create_movement(
             api_client,
@@ -215,10 +210,7 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
             quantity=5,
         )
         assert adjustment_out.status_code == 201
-        assert (
-            reverse(api_client, adjustment_out.json()["id"]).status_code
-            == 201
-        )
+        assert reverse(api_client, adjustment_out.json()["id"]).status_code == 201
 
         adjustment_in = create_movement(
             api_client,
@@ -228,13 +220,8 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
             quantity=5,
         )
         assert adjustment_in.status_code == 201
-        assert (
-            reverse(api_client, adjustment_in.json()["id"]).status_code
-            == 201
-        )
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 100
+        assert reverse(api_client, adjustment_in.json()["id"]).status_code == 201
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 100
 
         transfer = create_movement(
             api_client,
@@ -245,19 +232,11 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
             quantity=20,
         )
         assert transfer.status_code == 201
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 80
-        assert balance(api_client, warehouse_b, product_id)[
-            "quantity_on_hand"
-        ] == 20
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 80
+        assert balance(api_client, warehouse_b, product_id)["quantity_on_hand"] == 20
         assert reverse(api_client, transfer.json()["id"]).status_code == 201
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 100
-        assert balance(api_client, warehouse_b, product_id)[
-            "quantity_on_hand"
-        ] == 0
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 100
+        assert balance(api_client, warehouse_b, product_id)["quantity_on_hand"] == 0
 
         insufficient = create_movement(
             api_client,
@@ -287,9 +266,7 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
             json={"quantity_reserved": 0},
         )
 
-        fetched = api_client.get(
-            f"/inventory/movements/{receipt_data['id']}"
-        )
+        fetched = api_client.get(f"/inventory/movements/{receipt_data['id']}")
         assert fetched.status_code == 200
         assert fetched.json()["id"] == receipt_data["id"]
         assert (
@@ -300,9 +277,7 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
             == 405
         )
         assert (
-            api_client.delete(
-                f"/inventory/movements/{receipt_data['id']}"
-            ).status_code
+            api_client.delete(f"/inventory/movements/{receipt_data['id']}").status_code
             == 405
         )
 
@@ -322,9 +297,7 @@ def test_inventory_movement_ledger(api_client: httpx.Client) -> None:
 
         receipt_reversal = reverse(api_client, receipt_data["id"])
         assert receipt_reversal.status_code == 201
-        assert balance(api_client, warehouse_a, product_id)[
-            "quantity_on_hand"
-        ] == 0
+        assert balance(api_client, warehouse_a, product_id)["quantity_on_hand"] == 0
         assert reverse(api_client, receipt_data["id"]).status_code == 409
 
         rollback_receipt = create_movement(

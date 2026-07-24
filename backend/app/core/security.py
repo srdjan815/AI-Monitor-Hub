@@ -1,0 +1,522 @@
+from __future__ import annotations
+
+import binascii
+import contextvars
+import hashlib
+import hmac
+import json
+import time
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import Annotated, Any, Final, NoReturn, Protocol
+
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.core.base64url import decode_base64url, encode_base64url
+from app.core.config import Settings, settings
+
+
+CATALOG_READ = "catalog.read"
+CATALOG_WRITE = "catalog.write"
+CATALOG_SEED = "catalog.seed"
+ATTRIBUTES_READ = "attributes.read"
+ATTRIBUTES_WRITE = "attributes.write"
+ATTRIBUTES_APPROVE = "attributes.approve"
+CONTENT_READ = "content.read"
+CONTENT_WRITE = "content.write"
+CONTENT_APPROVE = "content.approve"
+CONTENT_RAW_PREVIEW = "content.raw_preview"
+CONTENT_PROMPT_MANAGE = "content.prompt_manage"
+CONTENT_SCORING_MANAGE = "content.scoring_manage"
+INVENTORY_READ = "inventory.read"
+INVENTORY_WRITE = "inventory.write"
+INVENTORY_ADJUST = "inventory.adjust"
+EXECUTION_READ = "execution.read"
+EXECUTION_SUBMIT = "execution.submit"
+EXECUTION_MANAGE = "execution.manage"
+ADMIN_ACCESS = "admin.access"
+
+ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
+    {
+        CATALOG_READ,
+        CATALOG_WRITE,
+        CATALOG_SEED,
+        ATTRIBUTES_READ,
+        ATTRIBUTES_WRITE,
+        ATTRIBUTES_APPROVE,
+        CONTENT_READ,
+        CONTENT_WRITE,
+        CONTENT_APPROVE,
+        CONTENT_RAW_PREVIEW,
+        CONTENT_PROMPT_MANAGE,
+        CONTENT_SCORING_MANAGE,
+        INVENTORY_READ,
+        INVENTORY_WRITE,
+        INVENTORY_ADJUST,
+        EXECUTION_READ,
+        EXECUTION_SUBMIT,
+        EXECUTION_MANAGE,
+        ADMIN_ACCESS,
+    }
+)
+
+ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
+    "system_admin": ALL_PERMISSIONS,
+    "catalog_admin": frozenset(
+        {
+            CATALOG_READ,
+            CATALOG_WRITE,
+            CATALOG_SEED,
+            ATTRIBUTES_READ,
+            ATTRIBUTES_WRITE,
+            ATTRIBUTES_APPROVE,
+        }
+    ),
+    "content_editor": frozenset(
+        {
+            CATALOG_READ,
+            ATTRIBUTES_READ,
+            CONTENT_READ,
+            CONTENT_WRITE,
+        }
+    ),
+    "content_approver": frozenset(
+        {CATALOG_READ, ATTRIBUTES_READ, CONTENT_READ, CONTENT_WRITE, CONTENT_APPROVE}
+    ),
+    "inventory_operator": frozenset(
+        {CATALOG_READ, INVENTORY_READ, INVENTORY_WRITE, INVENTORY_ADJUST}
+    ),
+    "execution_operator": frozenset(
+        {EXECUTION_READ, EXECUTION_SUBMIT, EXECUTION_MANAGE}
+    ),
+    "read_only": frozenset(
+        {CATALOG_READ, ATTRIBUTES_READ, CONTENT_READ, INVENTORY_READ, EXECUTION_READ}
+    ),
+    "internal_service": ALL_PERMISSIONS,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Principal:
+    subject: str
+    roles: tuple[str, ...]
+    permissions: frozenset[str]
+    actor_type: str = "user"
+    token_id: str | None = None
+    token_version: int = 0
+    key_id: str | None = None
+
+
+_principal: contextvars.ContextVar[Principal | None] = contextvars.ContextVar(
+    "authenticated_principal", default=None
+)
+bearer = HTTPBearer(auto_error=False, scheme_name="BearerAuth")
+
+
+def current_principal() -> Principal | None:
+    return _principal.get()
+
+
+def current_actor_id() -> str | None:
+    principal = current_principal()
+    return principal.subject if principal else None
+
+
+def require_current_permission(permission: str) -> Principal:
+    principal = current_principal()
+    if principal is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Bearer token required",
+            },
+        )
+    if permission not in principal.permissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "PERMISSION_DENIED",
+                "message": f"Permission required: {permission}",
+            },
+        )
+    return principal
+
+
+def _b64encode(value: bytes) -> str:
+    return encode_base64url(value)
+
+
+def _b64decode(value: str) -> bytes:
+    return decode_base64url(value)
+
+
+class AuthenticationAdapter(Protocol):
+    """Replaceable token boundary for a future OIDC-backed implementation."""
+
+    def issue_token(
+        self,
+        subject: str,
+        roles: tuple[str, ...] = ("system_admin",),
+        *,
+        expires_in: int | None = None,
+        actor_type: str = "user",
+        not_before_in: int | None = None,
+        token_id: str | None = None,
+        include_token_id: bool = True,
+    ) -> str: ...
+
+    def authenticate(self, token: str) -> Principal: ...
+
+
+class LocalHMACAuthenticationAdapter:
+    """Strict local token adapter with additive legacy-token verification."""
+
+    algorithm: Final[str] = "HS256"
+    token_type: Final[str] = "JWT"
+    maximum_token_length: Final[int] = 16_384
+
+    def __init__(self, config: Settings) -> None:
+        self.config = config
+
+    @property
+    def verification_keys(self) -> dict[str, str]:
+        return {
+            **self.config.auth_previous_keys,
+            self.config.auth_key_id: self.config.auth_secret,
+        }
+
+    @staticmethod
+    def _json_segment(value: str) -> dict[str, Any]:
+        decoded = json.loads(_b64decode(value))
+        if not isinstance(decoded, dict):
+            raise ValueError("token segment is not an object")
+        return decoded
+
+    @staticmethod
+    def _invalid() -> NoReturn:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Invalid or expired bearer token",
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    def issue_token(
+        self,
+        subject: str,
+        roles: tuple[str, ...] = ("system_admin",),
+        *,
+        expires_in: int | None = None,
+        actor_type: str = "user",
+        not_before_in: int | None = None,
+        token_id: str | None = None,
+        include_token_id: bool = True,
+    ) -> str:
+        now = int(time.time())
+        lifetime = (
+            self.config.auth_token_ttl_seconds if expires_in is None else expires_in
+        )
+        header = {
+            "alg": self.algorithm,
+            "kid": self.config.auth_key_id,
+            "typ": self.token_type,
+        }
+        payload: dict[str, Any] = {
+            "aud": self.config.auth_audience,
+            "exp": now + lifetime,
+            "iat": now,
+            "iss": self.config.auth_issuer,
+            "roles": list(roles),
+            "sub": subject,
+            "type": actor_type,
+            "ver": self.config.auth_token_version,
+        }
+        if not_before_in is not None:
+            payload["nbf"] = now + not_before_in
+        if include_token_id:
+            payload["jti"] = (
+                token_id
+                or hashlib.sha256(
+                    f"{subject}:{now}:{time.time_ns()}".encode()
+                ).hexdigest()[:32]
+            )
+        encoded_header = _b64encode(
+            json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
+        )
+        encoded_payload = _b64encode(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        )
+        signing_input = f"{encoded_header}.{encoded_payload}"
+        signature = hmac.new(
+            self.config.auth_secret.encode(),
+            signing_input.encode(),
+            hashlib.sha256,
+        ).digest()
+        return f"{signing_input}.{_b64encode(signature)}"
+
+    def _verify_current(self, parts: list[str]) -> tuple[dict[str, Any], str]:
+        encoded_header, encoded_payload, supplied_signature = parts
+        header = self._json_segment(encoded_header)
+        if header.get("alg") != self.algorithm or header.get("typ") != self.token_type:
+            raise ValueError("unsupported token header")
+        key_id = header.get("kid")
+        if not isinstance(key_id, str) or key_id not in self.verification_keys:
+            raise ValueError("unknown signing key")
+        signing_input = f"{encoded_header}.{encoded_payload}"
+        expected = hmac.new(
+            self.verification_keys[key_id].encode(),
+            signing_input.encode(),
+            hashlib.sha256,
+        ).digest()
+        if not hmac.compare_digest(expected, _b64decode(supplied_signature)):
+            raise ValueError("invalid signature")
+        return self._json_segment(encoded_payload), key_id
+
+    def _verify_legacy(self, parts: list[str]) -> tuple[dict[str, Any], str]:
+        if not self.config.auth_allow_legacy_tokens:
+            raise ValueError("legacy tokens are disabled")
+        encoded_payload, supplied_signature = parts
+        decoded_signature = _b64decode(supplied_signature)
+        verified_key_id: str | None = None
+        for key_id, secret in self.verification_keys.items():
+            expected = hmac.new(
+                secret.encode(), encoded_payload.encode(), hashlib.sha256
+            ).digest()
+            if hmac.compare_digest(expected, decoded_signature):
+                verified_key_id = key_id
+        if verified_key_id is None:
+            raise ValueError("invalid signature")
+        return self._json_segment(encoded_payload), verified_key_id
+
+    @staticmethod
+    def _integer_claim(payload: dict[str, Any], name: str) -> int:
+        value = payload.get(name)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"invalid {name}")
+        return value
+
+    def _validate_time_and_protocol(
+        self,
+        payload: dict[str, Any],
+        *,
+        legacy: bool,
+    ) -> int:
+        now = int(time.time())
+        skew = self.config.auth_clock_skew_seconds
+        issued_at = self._integer_claim(payload, "iat")
+        expires_at = self._integer_claim(payload, "exp")
+        not_before = payload.get("nbf", issued_at)
+        if isinstance(not_before, bool) or not isinstance(not_before, int):
+            raise ValueError("invalid nbf")
+        if issued_at > now + skew or not_before > now + skew:
+            raise ValueError("token is not active")
+        if now >= expires_at + skew or expires_at <= issued_at:
+            raise ValueError("expired")
+        if not legacy:
+            if payload.get("iss") != self.config.auth_issuer:
+                raise ValueError("invalid issuer")
+            if payload.get("aud") != self.config.auth_audience:
+                raise ValueError("invalid audience")
+            version = self._integer_claim(payload, "ver")
+            if version != self.config.auth_token_version:
+                raise ValueError("unsupported token version")
+        else:
+            version = 0
+        return version
+
+    @staticmethod
+    def _identity_claims(
+        payload: dict[str, Any],
+    ) -> tuple[str, tuple[str, ...], str, str | None]:
+        subject_value = payload.get("sub")
+        roles_value = payload.get("roles")
+        actor_type_value = payload.get("type", "user")
+        if (
+            not isinstance(subject_value, str)
+            or not subject_value.strip()
+            or len(subject_value) > 255
+            or not isinstance(roles_value, list)
+            or not roles_value
+            or len(roles_value) > 32
+            or not all(isinstance(role, str) for role in roles_value)
+            or len(set(roles_value)) != len(roles_value)
+            or any(role not in ROLE_PERMISSIONS for role in roles_value)
+            or not isinstance(actor_type_value, str)
+            or not actor_type_value
+            or len(actor_type_value) > 64
+        ):
+            raise ValueError("invalid principal")
+        token_id_value = payload.get("jti")
+        if token_id_value is not None and (
+            not isinstance(token_id_value, str)
+            or not token_id_value
+            or len(token_id_value) > 128
+        ):
+            raise ValueError("invalid token identifier")
+        return (
+            subject_value.strip(),
+            tuple(str(role) for role in roles_value),
+            actor_type_value,
+            token_id_value,
+        )
+
+    def _principal(
+        self,
+        payload: dict[str, Any],
+        key_id: str,
+        *,
+        legacy: bool,
+    ) -> Principal:
+        version = self._validate_time_and_protocol(payload, legacy=legacy)
+        subject, roles, actor_type, token_id = self._identity_claims(payload)
+        permissions: set[str] = set()
+        for role in roles:
+            permissions.update(ROLE_PERMISSIONS[role])
+        return Principal(
+            subject=subject,
+            roles=roles,
+            permissions=frozenset(permissions),
+            actor_type=actor_type,
+            token_id=token_id,
+            token_version=version,
+            key_id=key_id,
+        )
+
+    def authenticate(self, token: str) -> Principal:
+        try:
+            if not token or len(token) > self.maximum_token_length:
+                raise ValueError("invalid token length")
+            parts = token.split(".")
+            if len(parts) == 3 and all(parts):
+                payload, key_id = self._verify_current(parts)
+                return self._principal(payload, key_id, legacy=False)
+            if len(parts) == 2 and all(parts):
+                payload, key_id = self._verify_legacy(parts)
+                return self._principal(payload, key_id, legacy=True)
+            raise ValueError("invalid token shape")
+        except (
+            binascii.Error,
+            KeyError,
+            TypeError,
+            UnicodeDecodeError,
+            ValueError,
+            json.JSONDecodeError,
+        ):
+            self._invalid()
+
+
+authentication_adapter: AuthenticationAdapter = LocalHMACAuthenticationAdapter(settings)
+
+
+def create_access_token(
+    subject: str,
+    roles: tuple[str, ...] = ("system_admin",),
+    *,
+    expires_in: int | None = None,
+    actor_type: str = "user",
+    not_before_in: int | None = None,
+    token_id: str | None = None,
+    include_token_id: bool = True,
+) -> str:
+    return authentication_adapter.issue_token(
+        subject,
+        roles,
+        expires_in=expires_in,
+        actor_type=actor_type,
+        not_before_in=not_before_in,
+        token_id=token_id,
+        include_token_id=include_token_id,
+    )
+
+
+def authenticate_token(token: str) -> Principal:
+    return authentication_adapter.authenticate(token)
+
+
+def _content_permission(path: str, method: str, trusted_raw: bool) -> str:
+    write = method not in {"GET", "HEAD", "OPTIONS"}
+    if path.endswith("/preview") and write:
+        return CONTENT_RAW_PREVIEW if trusted_raw else CONTENT_WRITE
+    if "/prompts" in path and write:
+        return CONTENT_PROMPT_MANAGE
+    if "/scoring-policies" in path and write:
+        return CONTENT_SCORING_MANAGE
+    if any(part in path for part in ("/approve", "/workflow")) and write:
+        return CONTENT_APPROVE
+    return CONTENT_WRITE if write else CONTENT_READ
+
+
+def _attribute_permission(path: str, method: str) -> str:
+    write = method not in {"GET", "HEAD", "OPTIONS"}
+    if "/attribute-seed" in path:
+        return CATALOG_SEED
+    if any(part in path for part in ("/approve", "/reject", "/lock")) and write:
+        return ATTRIBUTES_APPROVE
+    return ATTRIBUTES_WRITE if write else ATTRIBUTES_READ
+
+
+def required_permission(request: Request) -> str:
+    path = request.url.path
+    method = request.method.upper()
+    write = method not in {"GET", "HEAD", "OPTIONS"}
+    if "/jobs" in path:
+        if method == "POST" and path.endswith(("/cancel", "/retry")):
+            return EXECUTION_MANAGE
+        return EXECUTION_SUBMIT if method == "POST" else EXECUTION_READ
+    if "/inventory" in path or "/warehouses" in path:
+        if any(part in path for part in ("/movements", "/reservations")) and write:
+            return INVENTORY_ADJUST
+        return INVENTORY_WRITE if write else INVENTORY_READ
+    if "/content" in path:
+        return _content_permission(
+            path,
+            method,
+            request.query_params.get("trusted_raw") == "true",
+        )
+    if "/attribute" in path or "/catalog/" in path:
+        return _attribute_permission(path, method)
+    return CATALOG_WRITE if write else CATALOG_READ
+
+
+async def authorize_request(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> AsyncIterator[Principal]:
+    authorization_headers = [
+        value
+        for name, value in request.scope.get("headers", ())
+        if name.lower() == b"authorization"
+    ]
+    if (
+        len(authorization_headers) != 1
+        or credentials is None
+        or credentials.scheme.lower() != "bearer"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Bearer token required",
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    principal = authenticate_token(credentials.credentials)
+    permission = required_permission(request)
+    if permission not in principal.permissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "PERMISSION_DENIED",
+                "message": f"Permission required: {permission}",
+            },
+        )
+    token = _principal.set(principal)
+    request.state.principal = principal
+    try:
+        yield principal
+    finally:
+        _principal.reset(token)

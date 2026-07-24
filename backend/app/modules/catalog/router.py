@@ -5,9 +5,15 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.limits import MAX_LEGACY_OFFSET
 from app.db.session import get_db
 from app.modules.catalog.repository import CatalogRepository
-from app.modules.catalog.routers import attribute_types, products
+from app.modules.catalog.routers import (
+    attribute_platform,
+    attribute_types,
+    product_attributes,
+    products,
+)
 from app.modules.catalog.schemas import (
     AttributeCreate,
     AttributeList,
@@ -28,6 +34,8 @@ router = APIRouter(tags=["catalog"])
 # Register the sub-routers
 router.include_router(products.router)
 router.include_router(attribute_types.router)
+router.include_router(product_attributes.router)
+router.include_router(attribute_platform.router)
 
 
 @router.post(
@@ -48,7 +56,7 @@ async def list_categories(
     active_only: bool = True,
     parent_id: uuid.UUID | None = None,
     limit: int = Query(default=100, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_LEGACY_OFFSET),
     session: AsyncSession = Depends(get_db),
 ) -> CategoryList:
     rows, total = await CatalogRepository(session).list_categories(
@@ -69,9 +77,10 @@ async def list_categories(
     response_model=list[CategoryTree],
 )
 async def get_category_tree(
+    limit: int = Query(default=2_000, ge=1, le=5_000),
     session: AsyncSession = Depends(get_db),
 ) -> list[CategoryTree]:
-    return await CatalogService(session).get_category_tree()
+    return await CatalogService(session).get_category_tree(limit=limit)
 
 
 @router.get(
@@ -144,10 +153,10 @@ async def create_attribute(
     response_model=AttributeList,
 )
 async def list_attributes(
-    scope: str | None = None,
+    scope: str | None = Query(default=None, max_length=32),
     active_only: bool = True,
     limit: int = Query(default=200, ge=1, le=1000),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_LEGACY_OFFSET),
     session: AsyncSession = Depends(get_db),
 ) -> AttributeList:
     rows, total = await CatalogRepository(session).list_attributes(
@@ -158,10 +167,7 @@ async def list_attributes(
     )
 
     return AttributeList(
-        items=[
-            AttributeRead.model_validate(row)
-            for row in rows
-        ],
+        items=[AttributeRead.model_validate(row) for row in rows],
         total=total,
     )
 
@@ -189,6 +195,9 @@ async def update_attribute(
 )
 async def list_category_attributes(
     category_id: uuid.UUID,
+    active_only: bool = True,
+    offset: int = Query(default=0, ge=0, le=MAX_LEGACY_OFFSET),
+    limit: int = Query(default=100, ge=1, le=500),
     session: AsyncSession = Depends(get_db),
 ) -> list[CategoryAttributeRead]:
     repository = CatalogRepository(session)
@@ -199,7 +208,12 @@ async def list_category_attributes(
             detail="Kategorija nije pronađena",
         )
 
-    links = await repository.list_category_attributes(category_id)
+    links = await repository.list_category_attributes(
+        category_id,
+        active_only=active_only,
+        offset=offset,
+        limit=limit,
+    )
 
     return [
         CategoryAttributeRead(
@@ -218,19 +232,14 @@ async def list_category_attributes(
                 if link.is_visible_override is not None
                 else link.attribute.is_visible
             ),
-            ai_prompt=(
-                link.ai_prompt_override
-                or link.attribute.ai_prompt
-            ),
+            ai_prompt=(link.ai_prompt_override or link.attribute.ai_prompt),
             validation_rules=(
                 link.validation_rules_override
                 if link.validation_rules_override is not None
                 else link.attribute.validation_rules
             ),
             is_active=link.is_active,
-            attribute=AttributeRead.model_validate(
-                link.attribute
-            ),
+            attribute=AttributeRead.model_validate(link.attribute),
         )
         for link in links
     ]

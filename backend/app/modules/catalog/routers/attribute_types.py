@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.limits import MAX_LEGACY_OFFSET
 from app.db.session import get_db
 from app.modules.catalog.schemas import (
     AttributeTypeCreate,
@@ -30,7 +31,7 @@ async def create_attribute_type(
 async def list_attribute_types(
     active_only: bool = True,
     limit: int = Query(default=100, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_LEGACY_OFFSET),
     session: AsyncSession = Depends(get_db),
 ) -> AttributeTypeList:
     rows, total = await CatalogService(session).list_attribute_types(
@@ -50,9 +51,7 @@ async def get_attribute_type(
     attribute_type_id: uuid.UUID,
     session: AsyncSession = Depends(get_db),
 ) -> AttributeTypeRead:
-    attribute_type = await CatalogService(session).get_attribute_type(
-        attribute_type_id
-    )
+    attribute_type = await CatalogService(session).get_attribute_type(attribute_type_id)
 
     return AttributeTypeRead.model_validate(attribute_type)
 

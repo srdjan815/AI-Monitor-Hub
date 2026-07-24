@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.exc import IntegrityError
 
+from app.core.limits import MAX_DB_INTEGER
 from app.modules.inventory.models import InventoryMovement
 from app.modules.inventory.repository import InventoryRepository
 from app.modules.inventory.schemas import (
@@ -77,9 +78,7 @@ async def test_inventory_create_rolls_back_on_failure() -> None:
 @pytest.mark.asyncio
 async def test_movement_rolls_back_when_balance_update_fails() -> None:
     service, session, repository = service_with_mocks()
-    repository.get_product_for_update.return_value = SimpleNamespace(
-        is_active=True
-    )
+    repository.get_product_for_update.return_value = SimpleNamespace(is_active=True)
     service._apply_balance_changes = AsyncMock(
         side_effect=RuntimeError("balance failure")
     )
@@ -89,9 +88,7 @@ async def test_movement_rolls_back_when_balance_update_fails() -> None:
             InventoryMovementCreate(
                 movement_type="RECEIPT",
                 product_id="dfa50789-70ec-4c28-bc7d-db6f9c8d3da5",
-                destination_warehouse_id=(
-                    "e2b00af1-c567-4c1d-b881-3d79fd165365"
-                ),
+                destination_warehouse_id=("e2b00af1-c567-4c1d-b881-3d79fd165365"),
                 quantity=1,
             )
         )
@@ -104,9 +101,7 @@ async def test_movement_rolls_back_when_balance_update_fails() -> None:
 @pytest.mark.asyncio
 async def test_transfer_rolls_back_when_destination_update_fails() -> None:
     service, session, repository = service_with_mocks()
-    repository.get_product_for_update.return_value = SimpleNamespace(
-        is_active=True
-    )
+    repository.get_product_for_update.return_value = SimpleNamespace(is_active=True)
     service._apply_balance_changes = AsyncMock(
         side_effect=RuntimeError("destination failure")
     )
@@ -116,18 +111,69 @@ async def test_transfer_rolls_back_when_destination_update_fails() -> None:
             InventoryMovementCreate(
                 movement_type="TRANSFER",
                 product_id="dfa50789-70ec-4c28-bc7d-db6f9c8d3da5",
-                source_warehouse_id=(
-                    "e2b00af1-c567-4c1d-b881-3d79fd165365"
-                ),
-                destination_warehouse_id=(
-                    "10655c30-d794-425c-bb44-8316b933e488"
-                ),
+                source_warehouse_id=("e2b00af1-c567-4c1d-b881-3d79fd165365"),
+                destination_warehouse_id=("10655c30-d794-425c-bb44-8316b933e488"),
                 quantity=1,
             )
         )
 
     session.rollback.assert_awaited_once()
     session.commit.assert_not_awaited()
+    repository.add_movement.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_movement_accepts_exact_destination_integer_boundary() -> None:
+    service, session, repository = service_with_mocks()
+    repository.get_product_for_update.return_value = SimpleNamespace(is_active=True)
+    repository.get_warehouse_for_update.return_value = SimpleNamespace(is_active=True)
+    destination = SimpleNamespace(
+        quantity_on_hand=MAX_DB_INTEGER - 1,
+        version=1,
+    )
+    repository.get_inventory_for_update.return_value = destination
+
+    await service.create_movement(
+        InventoryMovementCreate(
+            movement_type="RECEIPT",
+            product_id="dfa50789-70ec-4c28-bc7d-db6f9c8d3da5",
+            destination_warehouse_id=("e2b00af1-c567-4c1d-b881-3d79fd165365"),
+            quantity=1,
+        )
+    )
+
+    assert destination.quantity_on_hand == MAX_DB_INTEGER
+    repository.flush_balance.assert_awaited_once_with(destination)
+    session.commit.assert_awaited_once()
+    session.rollback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_movement_rolls_back_before_destination_integer_overflow() -> None:
+    service, session, repository = service_with_mocks()
+    repository.get_product_for_update.return_value = SimpleNamespace(is_active=True)
+    repository.get_warehouse_for_update.return_value = SimpleNamespace(is_active=True)
+    destination = SimpleNamespace(
+        quantity_on_hand=MAX_DB_INTEGER,
+        version=1,
+    )
+    repository.get_inventory_for_update.return_value = destination
+
+    with pytest.raises(HTTPException, match="prekoračila") as error:
+        await service.create_movement(
+            InventoryMovementCreate(
+                movement_type="RECEIPT",
+                product_id="dfa50789-70ec-4c28-bc7d-db6f9c8d3da5",
+                destination_warehouse_id=("e2b00af1-c567-4c1d-b881-3d79fd165365"),
+                quantity=1,
+            )
+        )
+
+    assert error.value.status_code == 422
+    assert destination.quantity_on_hand == MAX_DB_INTEGER
+    session.rollback.assert_awaited_once()
+    session.commit.assert_not_awaited()
+    repository.flush_balance.assert_not_awaited()
     repository.add_movement.assert_not_awaited()
 
 

@@ -1,15 +1,14 @@
-from logging.config import dictConfig
 from functools import lru_cache
+from logging.config import dictConfig
+
+from app.core.config import Settings
 
 # Logging configuration
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "default": {
-            "()": "logging.Formatter",
-            "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s"
-        }
+        "default": {"()": "app.core.observability.JsonFormatter"},
     },
     "handlers": {
         "console": {
@@ -19,14 +18,15 @@ LOGGING_CONFIG = {
     },
     "root": {
         "level": "INFO",
-        "handlers": ["console"]
-    }
+        "handlers": ["console"],
+    },
 }
 
-@lru_cache(maxsize=1)
-def get_settings():
-    from app.core.config import Settings
-    return Settings()
 
-def setup_logging():
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings.model_validate({})
+
+
+def setup_logging() -> None:
     dictConfig(LOGGING_CONFIG)
