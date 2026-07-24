@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.core.config import settings
 from app.modules.catalog.models import Category, Product
 from app.modules.product_content.models import (
     ContentChangeEvent,
@@ -47,7 +48,7 @@ from app.modules.product_content.services import (
 
 DATABASE_URL = os.getenv(
     "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@db:5432/ai_content_integration",
+    settings.database_url,
 )
 
 

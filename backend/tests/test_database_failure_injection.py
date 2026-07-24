@@ -9,12 +9,13 @@ from sqlalchemy import select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.modules.catalog.models import Category
 
 
 DATABASE_URL = os.getenv(
     "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@db:5432/ai_content_integration",
+    settings.database_url,
 )
 
 

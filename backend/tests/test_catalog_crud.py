@@ -82,14 +82,6 @@ def product_ids(
         params["cursor"] = cursor
 
 
-def active_category_id(client: httpx.Client) -> str:
-    response = client.get("/categories", params={"limit": 1})
-    response.raise_for_status()
-    items = response.json()["items"]
-    assert items, "Product CRUD tests require one active category"
-    return items[0]["id"]
-
-
 def test_categories_crud(api_client: httpx.Client) -> None:
     suffix = unique_suffix()
     code = f"category_crud_{suffix}"
@@ -168,12 +160,22 @@ def test_products_crud(api_client: httpx.Client) -> None:
     sku = f"PRODUCT-{suffix}"
     ean = f"99{suffix[:10]}"
     product_id: str | None = None
+    category_id: str | None = None
 
     try:
+        category = api_client.post(
+            "/categories",
+            json={
+                "name": f"Disposable Product Category {suffix}",
+                "code": f"product_category_{suffix}",
+            },
+        )
+        assert category.status_code == 201
+        category_id = category.json()["id"]
         created = api_client.post(
             "/products",
             json={
-                "category_id": active_category_id(api_client),
+                "category_id": category_id,
                 "name": f"Disposable Product {suffix}",
                 "code": code,
                 "sku": sku,
@@ -236,6 +238,8 @@ def test_products_crud(api_client: httpx.Client) -> None:
     finally:
         if product_id is not None:
             api_client.delete(f"/products/{product_id}")
+        if category_id is not None:
+            api_client.delete(f"/categories/{category_id}")
 
 
 def test_attribute_types_crud(api_client: httpx.Client) -> None:

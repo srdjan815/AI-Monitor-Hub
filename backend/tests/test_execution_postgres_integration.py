@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.modules.execution.enums import JobStatus
 from app.modules.execution.models import Job, JobAttempt
 from app.modules.execution.repository import JobLeaseLostError, JobRepository
@@ -18,7 +19,7 @@ from app.modules.execution.service import JobService
 
 DATABASE_URL = os.getenv(
     "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@db:5432/ai_content_integration",
+    settings.database_url,
 )
 
 
