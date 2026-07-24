@@ -43,6 +43,9 @@ SUPPLIER_SOURCES_VALIDATE = "supplier_sources.validate"
 SCHEMA_PROFILES_READ = "schema_profiles.read"
 SCHEMA_PROFILES_WRITE = "schema_profiles.write"
 SCHEMA_PROFILES_ACTIVATE = "schema_profiles.activate"
+MAPPING_PROFILES_READ = "mapping_profiles.read"
+MAPPING_PROFILES_WRITE = "mapping_profiles.write"
+MAPPING_PROFILES_ACTIVATE = "mapping_profiles.activate"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -73,6 +76,9 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         SCHEMA_PROFILES_READ,
         SCHEMA_PROFILES_WRITE,
         SCHEMA_PROFILES_ACTIVATE,
+        MAPPING_PROFILES_READ,
+        MAPPING_PROFILES_WRITE,
+        MAPPING_PROFILES_ACTIVATE,
         ADMIN_ACCESS,
     }
 )
@@ -116,6 +122,9 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SCHEMA_PROFILES_READ,
             SCHEMA_PROFILES_WRITE,
             SCHEMA_PROFILES_ACTIVATE,
+            MAPPING_PROFILES_READ,
+            MAPPING_PROFILES_WRITE,
+            MAPPING_PROFILES_ACTIVATE,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -127,6 +136,22 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
     "schema_profile_activator": frozenset(
         {SUPPLIER_SOURCES_READ, SCHEMA_PROFILES_READ, SCHEMA_PROFILES_ACTIVATE}
     ),
+    "mapping_profile_editor": frozenset(
+        {
+            SUPPLIER_SOURCES_READ,
+            SCHEMA_PROFILES_READ,
+            MAPPING_PROFILES_READ,
+            MAPPING_PROFILES_WRITE,
+        }
+    ),
+    "mapping_profile_activator": frozenset(
+        {
+            SUPPLIER_SOURCES_READ,
+            SCHEMA_PROFILES_READ,
+            MAPPING_PROFILES_READ,
+            MAPPING_PROFILES_ACTIVATE,
+        }
+    ),
     "read_only": frozenset(
         {
             CATALOG_READ,
@@ -137,6 +162,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SUPPLIERS_READ,
             SUPPLIER_SOURCES_READ,
             SCHEMA_PROFILES_READ,
+            MAPPING_PROFILES_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -513,6 +539,10 @@ def required_permission(request: Request) -> str:
         if method == "POST" and path.endswith(("/cancel", "/retry")):
             return EXECUTION_MANAGE
         return EXECUTION_SUBMIT if method == "POST" else EXECUTION_READ
+    if "/mapping-profiles" in path:
+        if method == "POST" and path.endswith(("/activate", "/archive")):
+            return MAPPING_PROFILES_ACTIVATE
+        return MAPPING_PROFILES_WRITE if write else MAPPING_PROFILES_READ
     if "/schema-profiles" in path:
         if method == "POST" and path.endswith(("/activate", "/archive")):
             return SCHEMA_PROFILES_ACTIVATE

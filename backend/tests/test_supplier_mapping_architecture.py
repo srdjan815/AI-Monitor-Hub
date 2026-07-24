@@ -31,19 +31,17 @@ def _imports(name: str) -> set[str]:
     }
 
 
-def test_schema_repository_is_flush_only_and_services_own_transactions() -> None:
-    repository_calls = _calls("schema_profile_repository.py")
-    assert "flush" in repository_calls
-    assert repository_calls.isdisjoint({"commit", "rollback"})
-    for service in ("schema_profile_service.py", "schema_field_service.py"):
-        calls = _calls(service)
-        assert {"commit", "rollback", "refresh"} <= calls
+def test_mapping_repository_is_flush_only_and_services_own_transactions() -> None:
+    calls = _calls("mapping_profile_repository.py")
+    assert "flush" in calls
+    assert calls.isdisjoint({"commit", "rollback"})
+    for service in ("mapping_profile_service.py", "mapping_rule_service.py"):
+        assert {"commit", "rollback", "refresh"} <= _calls(service)
 
 
-def test_schema_routers_have_no_sql_or_transactions() -> None:
-    for router in ("schema_profile_router.py", "schema_field_router.py"):
-        calls = _calls(router)
-        assert calls.isdisjoint(
+def test_mapping_routers_have_no_sql_or_transactions() -> None:
+    for router in ("mapping_profile_router.py", "mapping_rule_router.py"):
+        assert _calls(router).isdisjoint(
             {"add", "commit", "execute", "flush", "rollback", "scalar"}
         )
         assert not any(
@@ -52,46 +50,45 @@ def test_schema_routers_have_no_sql_or_transactions() -> None:
         )
 
 
-def test_schema_chapter_has_no_forbidden_capability() -> None:
-    forbidden_imports = {
-        "aioftp",
+def test_mapping_has_no_execution_catalog_or_future_capability() -> None:
+    forbidden = {
         "aiohttp",
-        "boto3",
+        "app.modules.catalog",
+        "app.modules.execution",
+        "app.modules.inventory",
         "csv",
         "ftplib",
         "httpx",
-        "imaplib",
         "openpyxl",
         "pandas",
-        "paramiko",
         "requests",
         "xml",
     }
-    for path in ROOT.glob("schema_*.py"):
-        assert _imports(path.name).isdisjoint(forbidden_imports), path.name
+    for path in ROOT.glob("mapping_*.py"):
+        assert not any(
+            module in forbidden or module.startswith("app.modules.catalog")
+            for module in _imports(path.name)
+        ), path.name
     route_text = "\n".join(
-        path.read_text(encoding="utf-8") for path in ROOT.glob("schema_*_router.py")
+        path.read_text(encoding="utf-8") for path in ROOT.glob("mapping_*_router.py")
     )
     for endpoint in (
-        "discover",
-        "download",
+        "execute",
         "import",
-        "infer",
-        "mapping",
-        "parse",
         "preview",
+        "run",
         "snapshot",
-        "upload",
+        "transform",
     ):
         assert f'"/{endpoint}' not in route_text
 
 
-def test_schema_openapi_surface_and_serbian_descriptions() -> None:
+def test_mapping_openapi_surface_and_serbian_descriptions() -> None:
     specification = app.openapi()
     paths = {
         path: item
         for path, item in specification["paths"].items()
-        if "/schema-profiles" in path and "/mapping-profiles" not in path
+        if "/mapping-profiles" in path
     }
     assert len(paths) == 7
     operations = [
@@ -102,11 +99,11 @@ def test_schema_openapi_surface_and_serbian_descriptions() -> None:
     ]
     assert len(operations) == 13
     assert {tag for op in operations for tag in op["tags"]} == {
-        "supplier-schema-profiles"
+        "supplier-mapping-profiles"
     }
     assert all(op.get("description") for op in operations)
 
 
-def test_schema_files_respect_foundation_line_limit() -> None:
-    for path in ROOT.glob("schema_*.py"):
+def test_mapping_files_respect_foundation_line_limit() -> None:
+    for path in ROOT.glob("mapping_*.py"):
         assert len(path.read_text(encoding="utf-8").splitlines()) <= 350, path.name

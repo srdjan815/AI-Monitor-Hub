@@ -8,6 +8,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.security import current_actor_id
 from app.modules.suppliers.errors import supplier_error
+from app.modules.suppliers.mapping_profile_repository import SupplierMappingRepository
 from app.modules.suppliers.schema_profile_models import (
     SupplierSchemaField,
     SupplierSchemaProfile,
@@ -191,6 +192,9 @@ class SupplierSchemaProfileService(SupplierSchemaServiceSupport):
         current = await self.repository.active_profile(source_id, for_update=True)
         try:
             if current is not None and current.id != profile.id:
+                await SupplierMappingRepository(self.session).archive_active_for_schema(
+                    current.id
+                )
                 await self.repository.mutate(
                     current,
                     {"status": "ARCHIVED", "version": current.version + 1},
@@ -227,6 +231,9 @@ class SupplierSchemaProfileService(SupplierSchemaServiceSupport):
         profile = await self._profile(source_id, profile_id, for_update=True)
         self._version(profile.version, data.version)
         if profile.status != "ARCHIVED":
+            await SupplierMappingRepository(self.session).archive_active_for_schema(
+                profile.id
+            )
             await self._mutate_commit(profile, {"status": "ARCHIVED"})
         return profile
 
@@ -240,6 +247,9 @@ class SupplierSchemaProfileService(SupplierSchemaServiceSupport):
         profile = await self._profile(source_id, profile_id, for_update=True)
         if not profile.is_active:
             return
+        await SupplierMappingRepository(self.session).archive_active_for_schema(
+            profile.id
+        )
         await self._mutate_commit(
             profile,
             {"is_active": False, "status": "ARCHIVED"},

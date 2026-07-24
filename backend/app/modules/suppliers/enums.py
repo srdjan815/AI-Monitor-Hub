@@ -63,6 +63,26 @@ class SchemaFieldDataType(StrEnum):
     BINARY = "BINARY"
 
 
+class MappingProfileStatus(StrEnum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
+
+
+class MappingTransformationType(StrEnum):
+    NONE = "NONE"
+    COPY = "COPY"
+    DEFAULT_VALUE = "DEFAULT_VALUE"
+    CONSTANT = "CONSTANT"
+    CONCAT = "CONCAT"
+    SPLIT = "SPLIT"
+    TRIM = "TRIM"
+    UPPERCASE = "UPPERCASE"
+    LOWERCASE = "LOWERCASE"
+    REPLACE = "REPLACE"
+    REGEX = "REGEX"
+
+
 __all__ = [
     "SupplierContactType",
     "SupplierSourceStatus",

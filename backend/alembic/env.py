@@ -22,6 +22,7 @@ from app.modules.catalog import models as catalog_models  # noqa: F401
 from app.modules.inventory import models as inventory_models  # noqa: F401
 from app.modules.product_content import models as product_content_models  # noqa: F401
 from app.modules.suppliers import models as supplier_models  # noqa: F401
+from app.modules.suppliers import mapping_profile_models  # noqa: F401
 from app.modules.suppliers import schema_profile_models  # noqa: F401
 
 # --------------------------------------------------------------------
