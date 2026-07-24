@@ -56,11 +56,11 @@ Pre-change environments:
 
 | Path | Python | State | Packages |
 |---|---|---|---|
-| `C:\AI-Monitor-Hub\.venv` | configured for 3.12.10 | broken base interpreter reference | project runtime/dev set |
-| `C:\AI-Monitor-Hub\.venv-1` | configured for 3.12.10 | broken base interpreter reference | same project set |
+| `<repository-root>\.venv` | configured for 3.12.10 | broken base interpreter reference | project runtime/dev set |
+| `<repository-root>\.venv-1` | configured for 3.12.10 | broken base interpreter reference | same project set |
 
 Both `pyvenv.cfg` files referenced
-`C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe`, which was
+`%LOCALAPPDATA%\Programs\Python\Python312\python.exe`, which was
 missing. Neither environment was tracked. Docker did not reference either.
 
 Package comparison found no unique application dependency in `.venv-1`.
@@ -73,7 +73,7 @@ and `certifi`; all required top-level packages are represented by
 Canonical environment:
 
 ```text
-C:\AI-Monitor-Hub\.venv
+<repository-root>\.venv
 ```
 
 Actions:

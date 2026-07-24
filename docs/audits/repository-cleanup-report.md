@@ -125,7 +125,7 @@ uncertain data.
 ### Duplicate virtual environments
 
 Both `.venv/` and `.venv-1/` exist and are ignored. The configured
-`C:\AI-Monitor-Hub\.venv` interpreter currently reports a broken base-Python
+`<repository-root>\.venv` interpreter currently reports a broken base-Python
 path, while Docker validation works. Neither environment was removed because
 they may contain user-installed dependencies.
 

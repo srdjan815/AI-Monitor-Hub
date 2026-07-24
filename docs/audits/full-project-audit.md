@@ -1,7 +1,7 @@
 # Full project audit
 
 Audit date: 2026-07-23
-Repository: `C:\AI-Monitor-Hub`
+Repository: `<repository-root>`
 Branch: `feature/product-core`
 
 ## 1. Executive summary
@@ -92,7 +92,7 @@ treated as disposable simply because Git reports them as untracked.
 ## 3. Repository structure
 
 ```text
-C:\AI-Monitor-Hub
+<repository-root>
 ├── backend/                    active Python/FastAPI application
 │   ├── alembic/versions/       seven-revision migration chain
 │   ├── app/

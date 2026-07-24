@@ -12,8 +12,14 @@ invoicing, and accounting remain responsibilities of the external ERP.
 The implemented backend contains:
 
 - Catalog categories, products, attribute definitions, and category attributes;
-- a PostgreSQL-backed execution/job foundation;
-- frozen optional Inventory, Movement, and Reservation APIs.
+- the Product Attribute platform, including normalized values, formulas,
+  templates, families, dependencies, prompts, and resolved projections;
+- the Product Content platform, including revisions, templates, quality
+  scoring, references, and approval-oriented lifecycle operations;
+- Inventory, Movement, and Reservation APIs;
+- a fenced PostgreSQL-backed execution/job worker foundation;
+- authentication, request boundaries, signed cursor pagination, rate limiting,
+  structured logging, and Prometheus-compatible metrics.
 
 Supplier Feed, Import, Matching, Pricing, AI, Scraper, Media, and Publishing
 are future modules and are not implemented yet.
@@ -23,27 +29,41 @@ are future modules and are not implemented yet.
 ```text
 backend/                 FastAPI application, Alembic, and tests
 docs/architecture/       enforced module boundaries
-docs/development/        canonical development instructions
+docs/development/        concise local setup entry point
+docs/operations/         onboarding, release, and runbooks
+docs/security/           security and deployment contracts
 docs/audits/             repository health records
 docker-compose.yml       API, worker, PostgreSQL, and Redis
 .env.example             local configuration template
 ```
 
-The canonical host virtual environment is `.venv`. Docker is independent from
-the host environment and bind-mounts `backend/` into `/app`.
+The canonical Windows virtual environment is the ignored, repository-local
+`.venv`. The checked Docker image uses a digest-pinned Python 3.12 base and the
+same exact dependency lock. The default Compose file is a development workflow:
+it bind-mounts `backend/` into `/app`. A release image must be built from the
+validated commit and run without replacing its application source.
 
 ## Quick start
 
+Run these commands from the repository root in Windows PowerShell 5.1:
+
 ```powershell
 Copy-Item .env.example .env
-C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".\backend[dev]"
-docker compose up -d
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install pip==26.1.2
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.lock
+.\.venv\Scripts\python.exe -m pip install --no-build-isolation --no-deps -e backend
+docker compose config --quiet
+docker compose up --build -d
 ```
 
 Swagger is available at `http://localhost:8000/docs`.
 
-Canonical setup, validation, and migration commands are documented in
+If `python` is not on `PATH`, use the interpreter-discovery instructions in
+[the cross-platform environment guide](docs/operations/cross-platform-python-environment.md).
+The complete workflow is in
+[developer onboarding](docs/operations/developer-onboarding.md), while the
+short setup entry point remains at
 [docs/development/local-setup.md](docs/development/local-setup.md). Architecture
-rules are documented in
+rules are in
 [docs/architecture/module-boundaries.md](docs/architecture/module-boundaries.md).
