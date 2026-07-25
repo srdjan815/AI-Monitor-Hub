@@ -1,5 +1,11 @@
 """Supplier Administration bounded context."""
 
+from app.modules.suppliers.acquisition_models import (
+    SupplierAcquisitionIssue,
+    SupplierAcquisitionRun,
+    SupplierStagedRecord,
+)
+from app.modules.suppliers.acquisition_service import SupplierAcquisitionService
 from app.modules.suppliers.contact_service import SupplierContactService
 from app.modules.suppliers.mapping_profile_models import (
     SupplierMappingProfile,
@@ -20,6 +26,9 @@ from app.modules.suppliers.source_service import SupplierSourceService
 
 __all__ = [
     "Supplier",
+    "SupplierAcquisitionIssue",
+    "SupplierAcquisitionRun",
+    "SupplierAcquisitionService",
     "SupplierContact",
     "SupplierContactService",
     "SupplierMappingProfile",
@@ -34,4 +43,5 @@ __all__ = [
     "SupplierService",
     "SupplierSource",
     "SupplierSourceService",
+    "SupplierStagedRecord",
 ]

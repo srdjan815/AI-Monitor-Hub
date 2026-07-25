@@ -46,6 +46,10 @@ SCHEMA_PROFILES_ACTIVATE = "schema_profiles.activate"
 MAPPING_PROFILES_READ = "mapping_profiles.read"
 MAPPING_PROFILES_WRITE = "mapping_profiles.write"
 MAPPING_PROFILES_ACTIVATE = "mapping_profiles.activate"
+ACQUISITIONS_READ = "acquisitions.read"
+ACQUISITIONS_EXECUTE = "acquisitions.execute"
+ACQUISITIONS_UPLOAD = "acquisitions.upload"
+ACQUISITIONS_CANCEL = "acquisitions.cancel"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -79,6 +83,10 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         MAPPING_PROFILES_READ,
         MAPPING_PROFILES_WRITE,
         MAPPING_PROFILES_ACTIVATE,
+        ACQUISITIONS_READ,
+        ACQUISITIONS_EXECUTE,
+        ACQUISITIONS_UPLOAD,
+        ACQUISITIONS_CANCEL,
         ADMIN_ACCESS,
     }
 )
@@ -125,6 +133,10 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             MAPPING_PROFILES_READ,
             MAPPING_PROFILES_WRITE,
             MAPPING_PROFILES_ACTIVATE,
+            ACQUISITIONS_READ,
+            ACQUISITIONS_EXECUTE,
+            ACQUISITIONS_UPLOAD,
+            ACQUISITIONS_CANCEL,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -152,6 +164,18 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             MAPPING_PROFILES_ACTIVATE,
         }
     ),
+    "acquisition_operator": frozenset(
+        {
+            SUPPLIERS_READ,
+            SUPPLIER_SOURCES_READ,
+            SCHEMA_PROFILES_READ,
+            MAPPING_PROFILES_READ,
+            ACQUISITIONS_READ,
+            ACQUISITIONS_EXECUTE,
+            ACQUISITIONS_UPLOAD,
+            ACQUISITIONS_CANCEL,
+        }
+    ),
     "read_only": frozenset(
         {
             CATALOG_READ,
@@ -163,6 +187,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SUPPLIER_SOURCES_READ,
             SCHEMA_PROFILES_READ,
             MAPPING_PROFILES_READ,
+            ACQUISITIONS_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -539,6 +564,14 @@ def required_permission(request: Request) -> str:
         if method == "POST" and path.endswith(("/cancel", "/retry")):
             return EXECUTION_MANAGE
         return EXECUTION_SUBMIT if method == "POST" else EXECUTION_READ
+    if "/acquisitions" in path:
+        if method == "POST" and path.endswith("/upload"):
+            return ACQUISITIONS_UPLOAD
+        if method == "POST" and path.endswith("/cancel"):
+            return ACQUISITIONS_CANCEL
+        if method == "POST":
+            return ACQUISITIONS_EXECUTE
+        return ACQUISITIONS_READ
     if "/mapping-profiles" in path:
         if method == "POST" and path.endswith(("/activate", "/archive")):
             return MAPPING_PROFILES_ACTIVATE

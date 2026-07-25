@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     backend_allowed_hosts: list[str] = ["*"]
     cors_allow_credentials: bool = False
     max_request_body_bytes: int = 2_097_152
+    acquisition_artifact_root: str = "/tmp/ai-monitor-hub-acquisitions"
+    acquisition_max_artifact_bytes: int = Field(
+        default=50 * 1024 * 1024,
+        ge=65_536,
+        le=1024 * 1024 * 1024,
+    )
+    acquisition_max_records: int = Field(default=100_000, ge=1, le=1_000_000)
 
     # Environment
     app_env: Literal["development", "test", "production"] = "development"

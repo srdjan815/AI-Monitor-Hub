@@ -83,6 +83,31 @@ class MappingTransformationType(StrEnum):
     REGEX = "REGEX"
 
 
+class AcquisitionTriggerType(StrEnum):
+    MANUAL = "MANUAL"
+    API_REQUEST = "API_REQUEST"
+    MANUAL_UPLOAD = "MANUAL_UPLOAD"
+
+
+class AcquisitionStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    PARTIALLY_SUCCEEDED = "PARTIALLY_SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class AcquisitionRecordStatus(StrEnum):
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
+class AcquisitionIssueSeverity(StrEnum):
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
 __all__ = [
     "SupplierContactType",
     "SupplierSourceStatus",

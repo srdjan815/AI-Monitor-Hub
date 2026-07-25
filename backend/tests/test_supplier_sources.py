@@ -482,7 +482,9 @@ def test_supplier_source_openapi_and_scope() -> None:
     source_paths = {
         path
         for path in schema["paths"]
-        if "/sources" in path and "/schema-profiles" not in path
+        if "/sources" in path
+        and "/schema-profiles" not in path
+        and "/acquisitions" not in path
     }
     assert source_paths == {
         "/api/v1/suppliers/{supplier_id}/sources",

@@ -1,6 +1,12 @@
 from fastapi import APIRouter
 
 from app.modules.suppliers.contact_router import router as contact_router
+from app.modules.suppliers.acquisition_execution_router import (
+    router as acquisition_execution_router,
+)
+from app.modules.suppliers.acquisition_query_router import (
+    router as acquisition_query_router,
+)
 from app.modules.suppliers.mapping_profile_router import (
     router as mapping_profile_router,
 )
@@ -18,5 +24,7 @@ router.include_router(schema_profile_router)
 router.include_router(schema_field_router)
 router.include_router(mapping_profile_router)
 router.include_router(mapping_rule_router)
+router.include_router(acquisition_execution_router)
+router.include_router(acquisition_query_router)
 
 __all__ = ["router"]
