@@ -108,6 +108,26 @@ class AcquisitionIssueSeverity(StrEnum):
     ERROR = "ERROR"
 
 
+class SnapshotStatus(StrEnum):
+    BUILDING = "BUILDING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
+class SnapshotStorageState(StrEnum):
+    ONLINE = "ONLINE"
+    ARCHIVED = "ARCHIVED"
+    RESTORING = "RESTORING"
+
+
+class SnapshotArchiveStatus(StrEnum):
+    EXPORTING = "EXPORTING"
+    VERIFIED = "VERIFIED"
+    FAILED = "FAILED"
+    OFFLOADED = "OFFLOADED"
+    RESTORED = "RESTORED"
+
+
 __all__ = [
     "SupplierContactType",
     "SupplierSourceStatus",

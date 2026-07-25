@@ -485,6 +485,7 @@ def test_supplier_source_openapi_and_scope() -> None:
         if "/sources" in path
         and "/schema-profiles" not in path
         and "/acquisitions" not in path
+        and "/snapshots" not in path
     }
     assert source_paths == {
         "/api/v1/suppliers/{supplier_id}/sources",

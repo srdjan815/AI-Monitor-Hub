@@ -6,6 +6,12 @@ from app.modules.suppliers.acquisition_models import (
     SupplierStagedRecord,
 )
 from app.modules.suppliers.acquisition_service import SupplierAcquisitionService
+from app.modules.suppliers.snapshot_models import (
+    SupplierSnapshot,
+    SupplierSnapshotArchiveOperation,
+    SupplierSnapshotItem,
+)
+from app.modules.suppliers.snapshot_service import SupplierSnapshotService
 from app.modules.suppliers.contact_service import SupplierContactService
 from app.modules.suppliers.mapping_profile_models import (
     SupplierMappingProfile,
@@ -29,6 +35,10 @@ __all__ = [
     "SupplierAcquisitionIssue",
     "SupplierAcquisitionRun",
     "SupplierAcquisitionService",
+    "SupplierSnapshot",
+    "SupplierSnapshotArchiveOperation",
+    "SupplierSnapshotItem",
+    "SupplierSnapshotService",
     "SupplierContact",
     "SupplierContactService",
     "SupplierMappingProfile",

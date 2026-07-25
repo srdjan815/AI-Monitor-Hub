@@ -23,6 +23,15 @@ class Settings(BaseSettings):
         le=1024 * 1024 * 1024,
     )
     acquisition_max_records: int = Field(default=100_000, ge=1, le=1_000_000)
+    snapshot_archive_root: str = "/tmp/ai-monitor-hub-snapshot-archives"
+    snapshot_archive_max_bytes: int = Field(
+        default=2 * 1024 * 1024 * 1024,
+        ge=1_048_576,
+        le=10 * 1024 * 1024 * 1024,
+    )
+    snapshot_batch_size: int = Field(default=1000, ge=10, le=10_000)
+    snapshot_archive_candidate_limit: int = Field(default=500, ge=1, le=5000)
+    snapshot_image_url_max_length: int = Field(default=4096, ge=256, le=16_384)
 
     # Environment
     app_env: Literal["development", "test", "production"] = "development"

@@ -50,6 +50,12 @@ ACQUISITIONS_READ = "acquisitions.read"
 ACQUISITIONS_EXECUTE = "acquisitions.execute"
 ACQUISITIONS_UPLOAD = "acquisitions.upload"
 ACQUISITIONS_CANCEL = "acquisitions.cancel"
+SNAPSHOTS_READ = "snapshots.read"
+SNAPSHOTS_CREATE = "snapshots.create"
+SNAPSHOTS_VERIFY = "snapshots.verify"
+SNAPSHOTS_ARCHIVE = "snapshots.archive"
+SNAPSHOTS_OFFLOAD = "snapshots.offload"
+SNAPSHOTS_RESTORE = "snapshots.restore"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -87,6 +93,12 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         ACQUISITIONS_EXECUTE,
         ACQUISITIONS_UPLOAD,
         ACQUISITIONS_CANCEL,
+        SNAPSHOTS_READ,
+        SNAPSHOTS_CREATE,
+        SNAPSHOTS_VERIFY,
+        SNAPSHOTS_ARCHIVE,
+        SNAPSHOTS_OFFLOAD,
+        SNAPSHOTS_RESTORE,
         ADMIN_ACCESS,
     }
 )
@@ -137,6 +149,12 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             ACQUISITIONS_EXECUTE,
             ACQUISITIONS_UPLOAD,
             ACQUISITIONS_CANCEL,
+            SNAPSHOTS_READ,
+            SNAPSHOTS_CREATE,
+            SNAPSHOTS_VERIFY,
+            SNAPSHOTS_ARCHIVE,
+            SNAPSHOTS_OFFLOAD,
+            SNAPSHOTS_RESTORE,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -176,6 +194,18 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             ACQUISITIONS_CANCEL,
         }
     ),
+    "snapshot_operator": frozenset(
+        {
+            SUPPLIERS_READ,
+            SUPPLIER_SOURCES_READ,
+            ACQUISITIONS_READ,
+            SNAPSHOTS_READ,
+            SNAPSHOTS_CREATE,
+            SNAPSHOTS_VERIFY,
+            SNAPSHOTS_ARCHIVE,
+            SNAPSHOTS_RESTORE,
+        }
+    ),
     "read_only": frozenset(
         {
             CATALOG_READ,
@@ -188,6 +218,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SCHEMA_PROFILES_READ,
             MAPPING_PROFILES_READ,
             ACQUISITIONS_READ,
+            SNAPSHOTS_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -572,6 +603,18 @@ def required_permission(request: Request) -> str:
         if method == "POST":
             return ACQUISITIONS_EXECUTE
         return ACQUISITIONS_READ
+    if "/snapshots" in path:
+        if method == "POST" and path.endswith("/verify"):
+            return SNAPSHOTS_VERIFY
+        if method == "POST" and path.endswith(("/archive", "/archive-bulk")):
+            return SNAPSHOTS_ARCHIVE
+        if method == "POST" and path.endswith("/offload"):
+            return SNAPSHOTS_OFFLOAD
+        if method == "POST" and path.endswith("/restore"):
+            return SNAPSHOTS_RESTORE
+        if method == "POST":
+            return SNAPSHOTS_CREATE
+        return SNAPSHOTS_READ
     if "/mapping-profiles" in path:
         if method == "POST" and path.endswith(("/activate", "/archive")):
             return MAPPING_PROFILES_ACTIVATE
