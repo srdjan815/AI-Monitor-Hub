@@ -12,6 +12,12 @@ from app.modules.suppliers.snapshot_models import (
     SupplierSnapshotItem,
 )
 from app.modules.suppliers.snapshot_service import SupplierSnapshotService
+from app.modules.suppliers.delta_models import (
+    SupplierDeltaFieldChange,
+    SupplierDeltaItem,
+    SupplierDeltaRun,
+)
+from app.modules.suppliers.delta_service import SupplierDeltaService
 from app.modules.suppliers.contact_service import SupplierContactService
 from app.modules.suppliers.mapping_profile_models import (
     SupplierMappingProfile,
@@ -39,6 +45,10 @@ __all__ = [
     "SupplierSnapshotArchiveOperation",
     "SupplierSnapshotItem",
     "SupplierSnapshotService",
+    "SupplierDeltaFieldChange",
+    "SupplierDeltaItem",
+    "SupplierDeltaRun",
+    "SupplierDeltaService",
     "SupplierContact",
     "SupplierContactService",
     "SupplierMappingProfile",

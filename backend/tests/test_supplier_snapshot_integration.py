@@ -30,6 +30,11 @@ from app.modules.suppliers.snapshot_models import (
     SupplierSnapshotArchiveOperation,
     SupplierSnapshotItem,
 )
+from app.modules.suppliers.delta_models import (
+    SupplierDeltaFieldChange,
+    SupplierDeltaItem,
+    SupplierDeltaRun,
+)
 
 API_ROOT = "http://localhost:8000/api/v1"
 
@@ -66,6 +71,35 @@ async def _purge(supplier_id: str) -> None:
             )
         )
         if snapshot_ids:
+            delta_ids = list(
+                await session.scalars(
+                    select(SupplierDeltaRun.id).where(
+                        SupplierDeltaRun.supplier_id == identifier
+                    )
+                )
+            )
+            if delta_ids:
+                delta_item_ids = list(
+                    await session.scalars(
+                        select(SupplierDeltaItem.id).where(
+                            SupplierDeltaItem.delta_run_id.in_(delta_ids)
+                        )
+                    )
+                )
+                if delta_item_ids:
+                    await session.execute(
+                        delete(SupplierDeltaFieldChange).where(
+                            SupplierDeltaFieldChange.delta_item_id.in_(delta_item_ids)
+                        )
+                    )
+                await session.execute(
+                    delete(SupplierDeltaItem).where(
+                        SupplierDeltaItem.delta_run_id.in_(delta_ids)
+                    )
+                )
+                await session.execute(
+                    delete(SupplierDeltaRun).where(SupplierDeltaRun.id.in_(delta_ids))
+                )
             await session.execute(
                 delete(SupplierSnapshotArchiveOperation).where(
                     SupplierSnapshotArchiveOperation.snapshot_id.in_(snapshot_ids)

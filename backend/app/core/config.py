@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     snapshot_batch_size: int = Field(default=1000, ge=10, le=10_000)
     snapshot_archive_candidate_limit: int = Field(default=500, ge=1, le=5000)
     snapshot_image_url_max_length: int = Field(default=4096, ge=256, le=16_384)
+    delta_batch_size: int = Field(default=1000, ge=10, le=10_000)
+    delta_max_comparison_items: int = Field(default=250_000, ge=100, le=2_000_000)
+    delta_max_changed_fields_per_item: int = Field(default=2000, ge=10, le=10_000)
+    delta_ratio_signal_minimum_items: int = Field(default=10, ge=1, le=100_000)
+    delta_high_removal_ratio: float = Field(default=0.5, ge=0, le=1)
+    delta_high_addition_ratio: float = Field(default=0.5, ge=0, le=1)
+    delta_unusual_modified_ratio: float = Field(default=0.8, ge=0, le=1)
 
     # Environment
     app_env: Literal["development", "test", "production"] = "development"

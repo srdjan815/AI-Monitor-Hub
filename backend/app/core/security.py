@@ -56,6 +56,9 @@ SNAPSHOTS_VERIFY = "snapshots.verify"
 SNAPSHOTS_ARCHIVE = "snapshots.archive"
 SNAPSHOTS_OFFLOAD = "snapshots.offload"
 SNAPSHOTS_RESTORE = "snapshots.restore"
+DELTAS_READ = "deltas.read"
+DELTAS_CALCULATE = "deltas.calculate"
+DELTAS_CANCEL = "deltas.cancel"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -99,6 +102,9 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         SNAPSHOTS_ARCHIVE,
         SNAPSHOTS_OFFLOAD,
         SNAPSHOTS_RESTORE,
+        DELTAS_READ,
+        DELTAS_CALCULATE,
+        DELTAS_CANCEL,
         ADMIN_ACCESS,
     }
 )
@@ -155,6 +161,9 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SNAPSHOTS_ARCHIVE,
             SNAPSHOTS_OFFLOAD,
             SNAPSHOTS_RESTORE,
+            DELTAS_READ,
+            DELTAS_CALCULATE,
+            DELTAS_CANCEL,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -204,6 +213,9 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SNAPSHOTS_VERIFY,
             SNAPSHOTS_ARCHIVE,
             SNAPSHOTS_RESTORE,
+            DELTAS_READ,
+            DELTAS_CALCULATE,
+            DELTAS_CANCEL,
         }
     ),
     "read_only": frozenset(
@@ -219,6 +231,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             MAPPING_PROFILES_READ,
             ACQUISITIONS_READ,
             SNAPSHOTS_READ,
+            DELTAS_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -615,6 +628,12 @@ def required_permission(request: Request) -> str:
         if method == "POST":
             return SNAPSHOTS_CREATE
         return SNAPSHOTS_READ
+    if "/deltas" in path:
+        if method == "POST" and path.endswith("/cancel"):
+            return DELTAS_CANCEL
+        if method == "POST":
+            return DELTAS_CALCULATE
+        return DELTAS_READ
     if "/mapping-profiles" in path:
         if method == "POST" and path.endswith(("/activate", "/archive")):
             return MAPPING_PROFILES_ACTIVATE

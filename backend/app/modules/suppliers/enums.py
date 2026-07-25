@@ -128,6 +128,28 @@ class SnapshotArchiveStatus(StrEnum):
     RESTORED = "RESTORED"
 
 
+class DeltaStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class DeltaChangeType(StrEnum):
+    ADDED = "ADDED"
+    REMOVED = "REMOVED"
+    MODIFIED = "MODIFIED"
+
+
+class DeltaFieldChangeType(StrEnum):
+    VALUE_CHANGED = "VALUE_CHANGED"
+    VALUE_ADDED = "VALUE_ADDED"
+    VALUE_REMOVED = "VALUE_REMOVED"
+    TYPE_CHANGED = "TYPE_CHANGED"
+    ARRAY_CHANGED = "ARRAY_CHANGED"
+
+
 __all__ = [
     "SupplierContactType",
     "SupplierSourceStatus",

@@ -22,6 +22,7 @@ from app.modules.suppliers.snapshot_execution_router import (
 )
 from app.modules.suppliers.snapshot_query_router import router as snapshot_query_router
 from app.modules.suppliers.supplier_router import router as supplier_router
+from app.modules.suppliers.delta_router import router as delta_router
 
 router = APIRouter()
 router.include_router(supplier_router)
@@ -36,5 +37,6 @@ router.include_router(acquisition_query_router)
 router.include_router(snapshot_execution_router)
 router.include_router(snapshot_archive_router)
 router.include_router(snapshot_query_router)
+router.include_router(delta_router)
 
 __all__ = ["router"]
