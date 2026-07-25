@@ -18,6 +18,16 @@ from app.modules.suppliers.delta_models import (
     SupplierDeltaRun,
 )
 from app.modules.suppliers.delta_service import SupplierDeltaService
+from app.modules.suppliers.incident_models import (
+    SupplierIncident,
+    SupplierIncidentComment,
+    SupplierIncidentEvent,
+    SupplierIncidentLink,
+    SupplierIncidentRule,
+)
+from app.modules.suppliers.incident_rule_service import SupplierIncidentRuleService
+from app.modules.suppliers.incident_service import SupplierIncidentService
+from app.modules.suppliers.incident_sync_service import SupplierIncidentSyncService
 from app.modules.suppliers.contact_service import SupplierContactService
 from app.modules.suppliers.mapping_profile_models import (
     SupplierMappingProfile,
@@ -49,6 +59,14 @@ __all__ = [
     "SupplierDeltaItem",
     "SupplierDeltaRun",
     "SupplierDeltaService",
+    "SupplierIncident",
+    "SupplierIncidentComment",
+    "SupplierIncidentEvent",
+    "SupplierIncidentLink",
+    "SupplierIncidentRule",
+    "SupplierIncidentRuleService",
+    "SupplierIncidentService",
+    "SupplierIncidentSyncService",
     "SupplierContact",
     "SupplierContactService",
     "SupplierMappingProfile",

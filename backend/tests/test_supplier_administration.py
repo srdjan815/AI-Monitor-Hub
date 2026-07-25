@@ -482,10 +482,9 @@ def test_supplier_openapi_contract_and_chapter_scope() -> None:
         for path in paths
         for token in (
             "/supplier-sources",
-            "/supplier-products",
-            "/supplier-snapshots",
-            "/supplier-incidents",
-        )
+                "/supplier-products",
+                "/supplier-snapshots",
+            )
     )
     supplier_schema = schema["components"]["schemas"]["SupplierRead"]
     assert (

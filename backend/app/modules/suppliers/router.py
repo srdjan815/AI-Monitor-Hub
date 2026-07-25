@@ -23,6 +23,12 @@ from app.modules.suppliers.snapshot_execution_router import (
 from app.modules.suppliers.snapshot_query_router import router as snapshot_query_router
 from app.modules.suppliers.supplier_router import router as supplier_router
 from app.modules.suppliers.delta_router import router as delta_router
+from app.modules.suppliers.incident_router import router as incident_router
+from app.modules.suppliers.incident_rule_router import router as incident_rules_router
+from app.modules.suppliers.incident_sync_router import router as incident_sync_router
+from app.modules.suppliers.incident_workflow_router import (
+    router as incident_workflow_router,
+)
 
 router = APIRouter()
 router.include_router(supplier_router)
@@ -38,5 +44,9 @@ router.include_router(snapshot_execution_router)
 router.include_router(snapshot_archive_router)
 router.include_router(snapshot_query_router)
 router.include_router(delta_router)
+router.include_router(incident_router)
+router.include_router(incident_workflow_router)
+router.include_router(incident_sync_router)
+router.include_router(incident_rules_router)
 
 __all__ = ["router"]

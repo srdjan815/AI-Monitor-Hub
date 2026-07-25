@@ -59,6 +59,17 @@ SNAPSHOTS_RESTORE = "snapshots.restore"
 DELTAS_READ = "deltas.read"
 DELTAS_CALCULATE = "deltas.calculate"
 DELTAS_CANCEL = "deltas.cancel"
+INCIDENTS_READ = "incidents.read"
+INCIDENTS_CREATE = "incidents.create"
+INCIDENTS_ACKNOWLEDGE = "incidents.acknowledge"
+INCIDENTS_ASSIGN = "incidents.assign"
+INCIDENTS_MANAGE = "incidents.manage"
+INCIDENTS_RESOLVE = "incidents.resolve"
+INCIDENTS_DISMISS = "incidents.dismiss"
+INCIDENTS_SUPPRESS = "incidents.suppress"
+INCIDENTS_COMMENT = "incidents.comment"
+INCIDENT_RULES_READ = "incident_rules.read"
+INCIDENT_RULES_MANAGE = "incident_rules.manage"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -105,6 +116,17 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         DELTAS_READ,
         DELTAS_CALCULATE,
         DELTAS_CANCEL,
+        INCIDENTS_READ,
+        INCIDENTS_CREATE,
+        INCIDENTS_ACKNOWLEDGE,
+        INCIDENTS_ASSIGN,
+        INCIDENTS_MANAGE,
+        INCIDENTS_RESOLVE,
+        INCIDENTS_DISMISS,
+        INCIDENTS_SUPPRESS,
+        INCIDENTS_COMMENT,
+        INCIDENT_RULES_READ,
+        INCIDENT_RULES_MANAGE,
         ADMIN_ACCESS,
     }
 )
@@ -164,6 +186,17 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             DELTAS_READ,
             DELTAS_CALCULATE,
             DELTAS_CANCEL,
+            INCIDENTS_READ,
+            INCIDENTS_CREATE,
+            INCIDENTS_ACKNOWLEDGE,
+            INCIDENTS_ASSIGN,
+            INCIDENTS_MANAGE,
+            INCIDENTS_RESOLVE,
+            INCIDENTS_DISMISS,
+            INCIDENTS_SUPPRESS,
+            INCIDENTS_COMMENT,
+            INCIDENT_RULES_READ,
+            INCIDENT_RULES_MANAGE,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -216,6 +249,16 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             DELTAS_READ,
             DELTAS_CALCULATE,
             DELTAS_CANCEL,
+            INCIDENTS_READ,
+            INCIDENTS_CREATE,
+            INCIDENTS_ACKNOWLEDGE,
+            INCIDENTS_ASSIGN,
+            INCIDENTS_MANAGE,
+            INCIDENTS_RESOLVE,
+            INCIDENTS_DISMISS,
+            INCIDENTS_SUPPRESS,
+            INCIDENTS_COMMENT,
+            INCIDENT_RULES_READ,
         }
     ),
     "read_only": frozenset(
@@ -232,6 +275,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             ACQUISITIONS_READ,
             SNAPSHOTS_READ,
             DELTAS_READ,
+            INCIDENTS_READ,
+            INCIDENT_RULES_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -634,6 +679,26 @@ def required_permission(request: Request) -> str:
         if method == "POST":
             return DELTAS_CALCULATE
         return DELTAS_READ
+    if "/supplier-incident-rules" in path:
+        return INCIDENT_RULES_READ if method in {"GET", "HEAD", "OPTIONS"} else INCIDENT_RULES_MANAGE
+    if "/supplier-incidents" in path:
+        if method in {"GET", "HEAD", "OPTIONS"}:
+            return INCIDENTS_READ
+        if path.endswith("/acknowledge"):
+            return INCIDENTS_ACKNOWLEDGE
+        if path.endswith(("/assign", "/unassign")):
+            return INCIDENTS_ASSIGN
+        if path.endswith("/resolve"):
+            return INCIDENTS_RESOLVE
+        if path.endswith("/dismiss"):
+            return INCIDENTS_DISMISS
+        if path.endswith(("/suppress", "/reopen")):
+            return INCIDENTS_SUPPRESS
+        if path.endswith("/comments"):
+            return INCIDENTS_COMMENT
+        if path.endswith(("/priority", "/due-date", "/start", "/links")):
+            return INCIDENTS_MANAGE
+        return INCIDENTS_CREATE
     if "/mapping-profiles" in path:
         if method == "POST" and path.endswith(("/activate", "/archive")):
             return MAPPING_PROFILES_ACTIVATE

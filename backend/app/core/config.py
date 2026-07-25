@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     delta_high_removal_ratio: float = Field(default=0.5, ge=0, le=1)
     delta_high_addition_ratio: float = Field(default=0.5, ge=0, le=1)
     delta_unusual_modified_ratio: float = Field(default=0.8, ge=0, le=1)
+    incident_max_synchronized_per_source: int = Field(default=100, ge=1, le=1000)
+    incident_due_hours_p1: int = Field(default=4, ge=1, le=720)
+    incident_due_hours_p2: int = Field(default=24, ge=1, le=720)
+    incident_due_hours_p3: int = Field(default=72, ge=1, le=2160)
+    incident_due_hours_p4: int = Field(default=168, ge=1, le=4320)
 
     # Environment
     app_env: Literal["development", "test", "production"] = "development"
