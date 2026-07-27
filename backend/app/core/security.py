@@ -70,6 +70,8 @@ INCIDENTS_SUPPRESS = "incidents.suppress"
 INCIDENTS_COMMENT = "incidents.comment"
 INCIDENT_RULES_READ = "incident_rules.read"
 INCIDENT_RULES_MANAGE = "incident_rules.manage"
+SUPPLIER_PLATFORM_OVERVIEW = "supplier_platform.overview"
+SUPPLIER_PLATFORM_SEARCH = "supplier_platform.search"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -127,6 +129,8 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         INCIDENTS_COMMENT,
         INCIDENT_RULES_READ,
         INCIDENT_RULES_MANAGE,
+        SUPPLIER_PLATFORM_OVERVIEW,
+        SUPPLIER_PLATFORM_SEARCH,
         ADMIN_ACCESS,
     }
 )
@@ -197,6 +201,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             INCIDENTS_COMMENT,
             INCIDENT_RULES_READ,
             INCIDENT_RULES_MANAGE,
+            SUPPLIER_PLATFORM_OVERVIEW,
+            SUPPLIER_PLATFORM_SEARCH,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -259,6 +265,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             INCIDENTS_SUPPRESS,
             INCIDENTS_COMMENT,
             INCIDENT_RULES_READ,
+            SUPPLIER_PLATFORM_OVERVIEW,
+            SUPPLIER_PLATFORM_SEARCH,
         }
     ),
     "read_only": frozenset(
@@ -277,6 +285,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             DELTAS_READ,
             INCIDENTS_READ,
             INCIDENT_RULES_READ,
+            SUPPLIER_PLATFORM_OVERVIEW,
+            SUPPLIER_PLATFORM_SEARCH,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -649,6 +659,40 @@ def required_permission(request: Request) -> str:
     path = request.url.path
     method = request.method.upper()
     write = method not in {"GET", "HEAD", "OPTIONS"}
+    if "/suppliers/platform/overview" in path:
+        return SUPPLIER_PLATFORM_OVERVIEW
+    if "/suppliers/platform/search" in path:
+        return SUPPLIER_PLATFORM_SEARCH
+    if "/suppliers/platform/bulk/incidents/assign" in path:
+        return INCIDENTS_ASSIGN
+    if "/suppliers/platform/bulk/incidents/priority" in path:
+        return INCIDENTS_MANAGE
+    if "/suppliers/platform/incidents" in path:
+        return INCIDENTS_READ
+    if "/supplier-incident-rules" in path:
+        return (
+            INCIDENT_RULES_READ
+            if method in {"GET", "HEAD", "OPTIONS"}
+            else INCIDENT_RULES_MANAGE
+        )
+    if "/supplier-incidents" in path:
+        if method in {"GET", "HEAD", "OPTIONS"}:
+            return INCIDENTS_READ
+        if path.endswith("/acknowledge"):
+            return INCIDENTS_ACKNOWLEDGE
+        if path.endswith(("/assign", "/unassign")):
+            return INCIDENTS_ASSIGN
+        if path.endswith("/resolve"):
+            return INCIDENTS_RESOLVE
+        if path.endswith("/dismiss"):
+            return INCIDENTS_DISMISS
+        if path.endswith(("/suppress", "/reopen")):
+            return INCIDENTS_SUPPRESS
+        if path.endswith("/comments"):
+            return INCIDENTS_COMMENT
+        if path.endswith(("/priority", "/due-date", "/start", "/links")):
+            return INCIDENTS_MANAGE
+        return INCIDENTS_CREATE
     if "/jobs" in path:
         if method == "POST" and path.endswith(("/cancel", "/retry")):
             return EXECUTION_MANAGE
@@ -679,26 +723,6 @@ def required_permission(request: Request) -> str:
         if method == "POST":
             return DELTAS_CALCULATE
         return DELTAS_READ
-    if "/supplier-incident-rules" in path:
-        return INCIDENT_RULES_READ if method in {"GET", "HEAD", "OPTIONS"} else INCIDENT_RULES_MANAGE
-    if "/supplier-incidents" in path:
-        if method in {"GET", "HEAD", "OPTIONS"}:
-            return INCIDENTS_READ
-        if path.endswith("/acknowledge"):
-            return INCIDENTS_ACKNOWLEDGE
-        if path.endswith(("/assign", "/unassign")):
-            return INCIDENTS_ASSIGN
-        if path.endswith("/resolve"):
-            return INCIDENTS_RESOLVE
-        if path.endswith("/dismiss"):
-            return INCIDENTS_DISMISS
-        if path.endswith(("/suppress", "/reopen")):
-            return INCIDENTS_SUPPRESS
-        if path.endswith("/comments"):
-            return INCIDENTS_COMMENT
-        if path.endswith(("/priority", "/due-date", "/start", "/links")):
-            return INCIDENTS_MANAGE
-        return INCIDENTS_CREATE
     if "/mapping-profiles" in path:
         if method == "POST" and path.endswith(("/activate", "/archive")):
             return MAPPING_PROFILES_ACTIVATE

@@ -473,7 +473,7 @@ def test_every_legacy_offset_has_an_exact_compatibility_ceiling() -> None:
         for parameter in operation.get("parameters", [])
         if parameter.get("in") == "query" and parameter.get("name") == "offset"
     ]
-    assert len(offset_schemas) == 52
+    assert len(offset_schemas) == 57
     assert all(schema.get("maximum") == MAX_LEGACY_OFFSET for schema in offset_schemas)
 
     offset_adapter = TypeAdapter(Annotated[int, Field(ge=0, le=MAX_LEGACY_OFFSET)])

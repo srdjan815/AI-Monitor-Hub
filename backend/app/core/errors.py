@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import contextvars
+import logging
+import re
 import uuid
 from typing import Any
 
@@ -15,6 +17,11 @@ from sqlalchemy.orm.exc import StaleDataError
 _request_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "request_id", default=None
 )
+_correlation_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "correlation_id", default=None
+)
+_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+logger = logging.getLogger("app.errors")
 
 
 class ErrorResponse(BaseModel):
@@ -41,6 +48,15 @@ def current_request_id() -> str | None:
     return _request_id.get()
 
 
+def current_correlation_id() -> str | None:
+    return _correlation_id.get()
+
+
+def _safe_identifier(value: str, fallback: str) -> str:
+    candidate = value.strip()
+    return candidate if _SAFE_IDENTIFIER.fullmatch(candidate) else fallback
+
+
 class RequestContextMiddleware:
     def __init__(self, app: Any) -> None:
         self.app = app
@@ -50,10 +66,17 @@ class RequestContextMiddleware:
             await self.app(scope, receive, send)
             return
         headers = {key.lower(): value for key, value in scope.get("headers", [])}
-        request_id = headers.get(b"x-request-id", b"").decode().strip()
-        if not request_id or len(request_id) > 128:
-            request_id = str(uuid.uuid4())
-        token = _request_id.set(request_id)
+        generated = str(uuid.uuid4())
+        request_id = _safe_identifier(
+            headers.get(b"x-request-id", b"").decode(errors="replace"),
+            generated,
+        )
+        correlation_id = _safe_identifier(
+            headers.get(b"x-correlation-id", b"").decode(errors="replace"),
+            request_id,
+        )
+        request_token = _request_id.set(request_id)
+        correlation_token = _correlation_id.set(correlation_id)
 
         async def send_with_request_id(message: dict[str, Any]) -> None:
             if message["type"] == "http.response.start":
@@ -65,17 +88,40 @@ class RequestContextMiddleware:
         try:
             await self.app(scope, receive, send_with_request_id)
         finally:
-            _request_id.reset(token)
+            _correlation_id.reset(correlation_token)
+            _request_id.reset(request_token)
 
 
-def _payload(status_code: int, detail: Any) -> dict[str, Any]:
+def _payload(
+    status_code: int,
+    detail: Any,
+    *,
+    canonical: bool = False,
+) -> dict[str, Any]:
     request_id = current_request_id() or str(uuid.uuid4())
+    correlation_id = current_correlation_id() or request_id
     embedded_code = detail.get("code") if isinstance(detail, dict) else None
-    return {
+    code = embedded_code or STATUS_CODES.get(status_code, "HTTP_ERROR")
+    message = (
+        detail.get("message", code)
+        if isinstance(detail, dict)
+        else str(detail)
+    )
+    field_errors = detail if status_code == 422 and isinstance(detail, list) else []
+    payload = {
         "detail": detail,
-        "code": embedded_code or STATUS_CODES.get(status_code, "HTTP_ERROR"),
+        "code": code,
         "request_id": request_id,
     }
+    if canonical:
+        payload["correlation_id"] = correlation_id
+        payload["error"] = {
+            "code": code,
+            "message": message,
+            "details": None if field_errors else detail,
+            "field_errors": field_errors,
+        }
+    return payload
 
 
 async def http_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -83,7 +129,11 @@ async def http_error_handler(request: Request, exc: Exception) -> JSONResponse:
         raise exc
     return JSONResponse(
         status_code=exc.status_code,
-        content=_payload(exc.status_code, exc.detail),
+        content=_payload(
+            exc.status_code,
+            exc.detail,
+            canonical=request.url.path.startswith("/api/v1/suppliers/platform"),
+        ),
         headers=exc.headers,
     )
 
@@ -93,7 +143,15 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
         raise exc
     return JSONResponse(
         status_code=422,
-        content=jsonable_encoder(_payload(422, exc.errors())),
+        content=jsonable_encoder(
+            _payload(
+                422,
+                exc.errors(),
+                canonical=request.url.path.startswith(
+                    "/api/v1/suppliers/platform"
+                ),
+            )
+        ),
     )
 
 
@@ -108,6 +166,32 @@ async def stale_data_error_handler(request: Request, exc: Exception) -> JSONResp
                 "code": "CONCURRENT_MODIFICATION",
                 "message": "The resource changed during this operation",
             },
+        ),
+    )
+
+
+async def internal_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception(
+        "http.request.internal_error",
+        extra={
+            "event_data": {
+                "event": "http.request.internal_error",
+                "request_id": current_request_id(),
+                "correlation_id": current_correlation_id(),
+                "path": request.url.path,
+                "exception_type": type(exc).__name__,
+            }
+        },
+    )
+    return JSONResponse(
+        status_code=500,
+        content=_payload(
+            500,
+            {
+                "code": "INTERNAL_ERROR",
+                "message": "Došlo je do interne greške",
+            },
+            canonical=request.url.path.startswith("/api/v1/suppliers/platform"),
         ),
     )
 

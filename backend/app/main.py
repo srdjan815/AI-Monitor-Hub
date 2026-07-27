@@ -14,6 +14,7 @@ from app.core.errors import (
     DEFAULT_ERROR_RESPONSES,
     RequestContextMiddleware,
     http_error_handler,
+    internal_error_handler,
     stale_data_error_handler,
     validation_error_handler,
 )
@@ -64,6 +65,7 @@ app = FastAPI(
 app.add_exception_handler(HTTPException, http_error_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.add_exception_handler(StaleDataError, stale_data_error_handler)
+app.add_exception_handler(Exception, internal_error_handler)
 
 app.add_middleware(
     RequestSizeLimitMiddleware,

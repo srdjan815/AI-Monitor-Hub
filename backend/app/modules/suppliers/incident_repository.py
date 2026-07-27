@@ -171,6 +171,8 @@ class SupplierIncidentRepository:
         search: str | None,
         limit: int,
         offset: int,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
     ) -> tuple[list[SupplierIncident], int]:
         filters: list[Any] = []
         for column, value in (
@@ -206,17 +208,26 @@ class SupplierIncidentRepository:
                 or_(
                     SupplierIncident.incident_code.ilike(pattern),
                     SupplierIncident.title.ilike(pattern),
-                    SupplierIncident.description.ilike(pattern),
-                    SupplierIncident.correlation_key.ilike(pattern),
                 )
             )
+        sort_columns = {
+            "created_at": SupplierIncident.created_at,
+            "updated_at": SupplierIncident.updated_at,
+            "incident_code": SupplierIncident.incident_code,
+            "severity": SupplierIncident.severity,
+            "priority": SupplierIncident.priority,
+            "status": SupplierIncident.status,
+            "due_at": SupplierIncident.due_at,
+        }
+        primary = sort_columns[sort_by]
+        ordering = primary.asc() if sort_order == "asc" else primary.desc()
         total = await self.session.scalar(
             select(func.count(SupplierIncident.id)).where(*filters)
         )
         rows = await self.session.execute(
             select(SupplierIncident)
             .where(*filters)
-            .order_by(SupplierIncident.created_at.desc(), SupplierIncident.id.desc())
+            .order_by(ordering, SupplierIncident.id.asc() if sort_order == "asc" else SupplierIncident.id.desc())
             .limit(limit)
             .offset(offset)
         )

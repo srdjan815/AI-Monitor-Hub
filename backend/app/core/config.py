@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     rate_limit_trusted_proxy_cidrs: list[str] = Field(default_factory=list)
     metrics_enabled: bool = True
     structured_logging: bool = True
+    supplier_api_max_page_size: int = Field(default=100, ge=1, le=500)
+    supplier_api_max_search_results: int = Field(default=50, ge=1, le=100)
+    supplier_api_max_bulk_items: int = Field(default=50, ge=1, le=100)
 
     # Database configuration
     database_url: str

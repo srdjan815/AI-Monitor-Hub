@@ -29,8 +29,11 @@ from app.modules.suppliers.incident_sync_router import router as incident_sync_r
 from app.modules.suppliers.incident_workflow_router import (
     router as incident_workflow_router,
 )
+from app.modules.suppliers.api_router import router as supplier_api_router
+from app.modules.suppliers.api_schemas import CANONICAL_ERROR_RESPONSES
 
 router = APIRouter()
+router.include_router(supplier_api_router)
 router.include_router(supplier_router)
 router.include_router(contact_router)
 router.include_router(source_router)
@@ -44,9 +47,46 @@ router.include_router(snapshot_execution_router)
 router.include_router(snapshot_archive_router)
 router.include_router(snapshot_query_router)
 router.include_router(delta_router)
-router.include_router(incident_router)
-router.include_router(incident_workflow_router)
-router.include_router(incident_sync_router)
-router.include_router(incident_rules_router)
+router.include_router(
+    incident_router,
+    deprecated=True,
+)
+router.include_router(
+    incident_workflow_router,
+    deprecated=True,
+)
+router.include_router(
+    incident_sync_router,
+    deprecated=True,
+)
+router.include_router(
+    incident_rules_router,
+    deprecated=True,
+)
+
+router.include_router(
+    incident_router,
+    prefix="/suppliers/platform",
+    tags=["supplier-platform-incidents"],
+    responses=CANONICAL_ERROR_RESPONSES,
+)
+router.include_router(
+    incident_workflow_router,
+    prefix="/suppliers/platform",
+    tags=["supplier-platform-incidents"],
+    responses=CANONICAL_ERROR_RESPONSES,
+)
+router.include_router(
+    incident_sync_router,
+    prefix="/suppliers/platform",
+    tags=["supplier-platform-incidents"],
+    responses=CANONICAL_ERROR_RESPONSES,
+)
+router.include_router(
+    incident_rules_router,
+    prefix="/suppliers/platform",
+    tags=["supplier-platform-incident-rules"],
+    responses=CANONICAL_ERROR_RESPONSES,
+)
 
 __all__ = ["router"]

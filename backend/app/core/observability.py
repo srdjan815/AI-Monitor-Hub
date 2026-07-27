@@ -9,7 +9,11 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
 
-from app.core.errors import STATUS_CODES, current_request_id
+from app.core.errors import (
+    STATUS_CODES,
+    current_correlation_id,
+    current_request_id,
+)
 from app.core.security import Principal
 
 
@@ -193,11 +197,7 @@ class RequestObservabilityMiddleware:
         started_at = time.perf_counter()
         status_code = 500
         response_started = False
-        headers = {key.lower(): value for key, value in scope.get("headers", [])}
-        correlation_id = _identifier(
-            headers.get(b"x-correlation-id", b"").decode(errors="replace"),
-            current_request_id() or "unavailable",
-        )
+        correlation_id = current_correlation_id() or current_request_id() or "unavailable"
 
         async def observed_send(message: dict[str, Any]) -> None:
             nonlocal response_started, status_code
