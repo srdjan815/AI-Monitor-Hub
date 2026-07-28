@@ -23,6 +23,8 @@ class Settings(BaseSettings):
         le=1024 * 1024 * 1024,
     )
     acquisition_max_records: int = Field(default=100_000, ge=1, le=1_000_000)
+    supplier_warning_hours: int = Field(default=24, ge=1, le=8760)
+    supplier_article_drop_ratio: float = Field(default=0.5, ge=0.01, le=0.99)
     snapshot_archive_root: str = "/tmp/ai-monitor-hub-snapshot-archives"
     snapshot_archive_max_bytes: int = Field(
         default=2 * 1024 * 1024 * 1024,

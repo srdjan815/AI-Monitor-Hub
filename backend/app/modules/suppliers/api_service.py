@@ -17,6 +17,7 @@ from app.core.security import (
     SUPPLIER_SOURCES_READ,
     current_principal,
 )
+from app.modules.suppliers.api_process_service import SupplierProcessOverviewService
 from app.modules.suppliers.api_repository import SupplierApiRepository
 from app.modules.suppliers.api_schemas import (
     BulkIncidentAssignRequest,
@@ -29,9 +30,8 @@ from app.modules.suppliers.api_schemas import (
     SupplierPlatformSearchResponse,
     SupplierPlatformSearchResult,
 )
-from app.modules.suppliers.incident_service import SupplierIncidentService
 from app.modules.suppliers.incident_models import SupplierIncident
-
+from app.modules.suppliers.incident_service import SupplierIncidentService
 
 _RESOURCE_PERMISSIONS = {
     "supplier": SUPPLIERS_READ,
@@ -41,15 +41,11 @@ _RESOURCE_PERMISSIONS = {
     "delta": DELTAS_READ,
     "incident": INCIDENTS_READ,
 }
-BulkCallable = Callable[
-    [SupplierIncidentService],
-    Awaitable[SupplierIncident],
-]
+BulkCallable = Callable[[SupplierIncidentService], Awaitable[SupplierIncident]]
 
 
 def _assign_operation(
-    incident_id: uuid.UUID,
-    assigned_user_id: str,
+    incident_id: uuid.UUID, assigned_user_id: str
 ) -> BulkCallable:
     async def execute(service: SupplierIncidentService) -> SupplierIncident:
         return await service.assign(incident_id, assigned_user_id)
@@ -57,10 +53,7 @@ def _assign_operation(
     return execute
 
 
-def _priority_operation(
-    incident_id: uuid.UUID,
-    priority: str,
-) -> BulkCallable:
+def _priority_operation(incident_id: uuid.UUID, priority: str) -> BulkCallable:
     async def execute(service: SupplierIncidentService) -> SupplierIncident:
         return await service.priority(incident_id, priority)
 
@@ -88,20 +81,14 @@ class SupplierApiService:
         self, query: str, *, limit: int
     ) -> SupplierPlatformSearchResponse:
         rows = await self.repository.search(
-            query.strip(),
-            allowed=self.allowed_resources(),
-            limit=limit,
+            query.strip(), allowed=self.allowed_resources(), limit=limit
         )
         has_more = len(rows) > limit
         items = [
-            SupplierPlatformSearchResult.model_validate(row)
-            for row in rows[:limit]
+            SupplierPlatformSearchResult.model_validate(row) for row in rows[:limit]
         ]
         return SupplierPlatformSearchResponse(
-            items=items,
-            total=len(items),
-            limit=limit,
-            has_more=has_more,
+            items=items, total=len(items), limit=limit, has_more=has_more
         )
 
     async def overview(
@@ -129,27 +116,21 @@ class SupplierApiService:
                 },
             )
         counts = await self.repository.overview_counts(
-            range_from=start,
-            range_to=end,
+            range_from=start, range_to=end
         )
         allowed = self.allowed_resources()
         operation_types = allowed & {"acquisition", "snapshot", "delta"}
         latest = await self.repository.operations(
-            allowed=operation_types,
-            failed_only=False,
-            limit=10,
+            allowed=operation_types, failed_only=False, limit=10
         )
         failures = await self.repository.operations(
-            allowed=operation_types,
-            failed_only=True,
-            limit=10,
+            allowed=operation_types, failed_only=True, limit=10
         )
 
         def visible(name: str, resource: str) -> SupplierPlatformCount:
             permitted = resource in allowed
             return SupplierPlatformCount(
-                value=counts[name] if permitted else None,
-                permitted=permitted,
+                value=counts[name] if permitted else None, permitted=permitted
             )
 
         return SupplierPlatformOverview(
@@ -173,6 +154,9 @@ class SupplierApiService:
             recent_failures=[
                 SupplierPlatformOperation.model_validate(row) for row in failures
             ],
+            supplier_processes=await SupplierProcessOverviewService(
+                self.repository
+            ).rows(),
         )
 
     async def bulk_assign(
@@ -204,8 +188,7 @@ class SupplierApiService:
         )
 
     async def _bulk(
-        self,
-        operations: list[tuple[str, uuid.UUID, BulkCallable]],
+        self, operations: list[tuple[str, uuid.UUID, BulkCallable]]
     ) -> BulkOperationResponse:
         if len(operations) > settings.supplier_api_max_bulk_items:
             raise HTTPException(
@@ -246,7 +229,9 @@ class SupplierApiService:
                         status="FAILED",
                         resource_id=resource_id,
                         error_code=str(detail.get("code", "OPERATION_FAILED")),
-                        message=str(detail.get("message", "Operacija nije uspela")),
+                        message=str(
+                            detail.get("message", "Operacija nije uspela")
+                        ),
                     )
                 )
             else:

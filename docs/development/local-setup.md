@@ -49,6 +49,17 @@ and persistent named volumes. PostgreSQL remains canonical for every domain.
 Redis is optional non-canonical infrastructure for the shared multi-instance
 rate limiter; the in-memory limiter remains available for local development.
 
+### Supplier source credentials in development
+
+Supplier Source credentials are intentionally stored only in the API process
+memory during development. The database stores an opaque `secret:runtime/...`
+reference, never the credential value. Restarting or replacing the API
+container clears the in-memory values, so every affected Source Connection must
+receive its credentials again and pass Probe again. The Source API exposes
+availability only as a boolean; responses, UI messages and logs must never
+expose the opaque reference or credential values. Production fails closed until
+an approved external secret provider is configured.
+
 ## Quality and tests
 
 ```powershell

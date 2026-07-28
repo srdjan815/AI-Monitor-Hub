@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, TypedDict
 
 from sqlalchemy import Select, String, case, cast, func, literal, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +10,17 @@ from app.modules.suppliers.acquisition_models import SupplierAcquisitionRun
 from app.modules.suppliers.delta_models import SupplierDeltaRun
 from app.modules.suppliers.incident_models import SupplierIncident
 from app.modules.suppliers.models import Supplier, SupplierSource
+from app.modules.suppliers.mapping_profile_models import SupplierMappingProfile
+from app.modules.suppliers.schema_profile_models import SupplierSchemaProfile
 from app.modules.suppliers.snapshot_models import SupplierSnapshot
+
+
+class SupplierProcessRows(TypedDict):
+    suppliers: list[Supplier]
+    sources: list[SupplierSource]
+    schemas: list[SupplierSchemaProfile]
+    mappings: list[SupplierMappingProfile]
+    runs: list[SupplierAcquisitionRun]
 
 
 class SupplierApiRepository:
@@ -69,6 +79,72 @@ class SupplierApiRepository:
         return {
             name: await self.scalar_count(query)
             for name, query in queries.items()
+        }
+
+    async def supplier_process_rows(self) -> SupplierProcessRows:
+        suppliers = list(
+            (
+                await self.session.execute(
+                    select(Supplier)
+                    .where(Supplier.is_active.is_(True))
+                    .order_by(Supplier.company_name, Supplier.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        sources = list(
+            (
+                await self.session.execute(
+                    select(SupplierSource)
+                    .where(SupplierSource.is_active.is_(True))
+                    .order_by(SupplierSource.updated_at.desc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        schemas = list(
+            (
+                await self.session.execute(
+                    select(SupplierSchemaProfile).where(
+                        SupplierSchemaProfile.is_active.is_(True),
+                        SupplierSchemaProfile.status == "ACTIVE",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        mappings = list(
+            (
+                await self.session.execute(
+                    select(SupplierMappingProfile).where(
+                        SupplierMappingProfile.is_active.is_(True),
+                        SupplierMappingProfile.status == "ACTIVE",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        runs = list(
+            (
+                await self.session.execute(
+                    select(SupplierAcquisitionRun).order_by(
+                        SupplierAcquisitionRun.created_at.desc()
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return {
+            "suppliers": suppliers,
+            "sources": sources,
+            "schemas": schemas,
+            "mappings": mappings,
+            "runs": runs,
         }
 
     @staticmethod

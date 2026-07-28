@@ -78,7 +78,7 @@ def test_supplier_source_crud_lifecycle_and_isolation(
             "name": f"Primary API {suffix}",
             "source_type": "API",
             "configuration": {
-                "base_url": "https://supplier.example",
+                "base_url": "http://localhost:8000/health",
                 "authentication_type": "BEARER",
             },
         }
@@ -148,20 +148,28 @@ def test_supplier_source_crud_lifecycle_and_isolation(
             missing_secret.json()["code"] == "supplier_source_missing_secret_reference"
         )
 
+        configured = api_client.put(
+            f"{path}/{source['id']}/credentials",
+            json={
+                "placement": "HEADER",
+                "token": "disposable-test-token",
+            },
+        )
+        assert configured.status_code == 200, configured.text
+        probed = api_client.post(f"{path}/{source['id']}/probe")
+        assert probed.status_code == 200, probed.text
+        assert probed.json()["successful"] is True
+        source = api_client.get(f"{path}/{source['id']}").json()
         activated = api_client.patch(
             f"{path}/{source['id']}",
-            json={
-                "version": source["version"],
-                "status": "ACTIVE",
-                "secret_reference": f"secret:supplier-source/{source['id']}",
-            },
+            json={"version": source["version"], "status": "ACTIVE"},
         )
         assert activated.status_code == 200, activated.text
         active = activated.json()
         assert active["status"] == "ACTIVE"
         assert active["has_secret_reference"] is True
         assert "secret_reference" not in active
-        assert "secret:supplier-source" not in activated.text
+        assert "disposable-test-token" not in activated.text
 
         valid = api_client.post(f"{path}/{source['id']}/validate")
         assert valid.status_code == 200
@@ -491,6 +499,9 @@ def test_supplier_source_openapi_and_scope() -> None:
     assert source_paths == {
         "/api/v1/suppliers/{supplier_id}/sources",
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}",
+        "/api/v1/suppliers/{supplier_id}/sources/{source_id}/credentials",
+        "/api/v1/suppliers/{supplier_id}/sources/{source_id}/probe",
+        "/api/v1/suppliers/{supplier_id}/sources/{source_id}/probe-upload",
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}/validate",
     }
     assert not any(

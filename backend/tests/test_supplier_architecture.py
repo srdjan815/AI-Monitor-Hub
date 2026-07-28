@@ -154,8 +154,9 @@ def test_supplier_service_responsibilities_are_decomposed() -> None:
         "get_source",
         "list_sources",
         "update_source",
-        "validate_source",
-    }
+            "validate_source",
+            "write_credentials",
+        }
 
 
 def test_supplier_sources_have_no_network_or_future_chapter_surface() -> None:

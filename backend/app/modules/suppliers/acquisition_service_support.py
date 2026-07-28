@@ -11,11 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.config import settings
-from app.modules.suppliers.acquisition_adapters import (
-    RejectingSecretResolver,
-    SourceAdapterRegistry,
-    UrllibHttpClient,
-)
+from app.modules.suppliers.acquisition_adapters import SourceAdapterRegistry, UrllibHttpClient
 from app.modules.suppliers.acquisition_context import (
     AcquisitionContext,
     AcquisitionContextResolver,
@@ -26,6 +22,7 @@ from app.modules.suppliers.acquisition_parsers import ParserRegistry
 from app.modules.suppliers.acquisition_processing import AcquisitionProcessor
 from app.modules.suppliers.acquisition_repository import SupplierAcquisitionRepository
 from app.modules.suppliers.acquisition_storage import LocalArtifactStorage
+from app.modules.suppliers.source_secrets import source_secret_provider
 from app.modules.suppliers.errors import supplier_error
 
 TERMINAL = {"SUCCEEDED", "PARTIALLY_SUCCEEDED", "FAILED", "CANCELLED"}
@@ -50,7 +47,7 @@ class SupplierAcquisitionServiceSupport:
         )
         self.adapters = adapters or SourceAdapterRegistry(
             UrllibHttpClient(),
-            RejectingSecretResolver(),
+            source_secret_provider,
             settings.acquisition_max_artifact_bytes,
         )
 

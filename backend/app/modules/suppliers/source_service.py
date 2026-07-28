@@ -20,6 +20,11 @@ from app.modules.suppliers.source_schemas import (
     SupplierSourceUpdate,
     SupplierSourceValidationResponse,
 )
+from app.modules.suppliers.source_probe_schemas import (
+    SourceCredentialState,
+    SourceCredentialWrite,
+)
+from app.modules.suppliers.source_secrets import source_secret_provider
 from app.modules.suppliers.source_service_support import (
     SupplierSourceServiceSupport,
 )
@@ -152,6 +157,16 @@ class SupplierSourceService(SupplierSourceServiceSupport):
                 target_configuration,
                 target_secret if isinstance(target_secret, str) else None,
             )
+            if (
+                source.last_validation_status
+                != SupplierSourceValidationStatus.VALID.value
+                or not (source.last_validation_message or "").startswith("PROBE_OK:")
+            ):
+                supplier_error(
+                    409,
+                    "supplier_source_probe_required",
+                    "Konekcija mora uspešno probno preuzeti cenovnik pre aktivacije",
+                )
 
         changes = {
             field: value
@@ -175,6 +190,49 @@ class SupplierSourceService(SupplierSourceServiceSupport):
             raise
         await self.session.refresh(source)
         return source
+
+    async def write_credentials(
+        self,
+        supplier_id: uuid.UUID,
+        source_id: uuid.UUID,
+        data: SourceCredentialWrite,
+    ) -> SourceCredentialState:
+        await self._usable_supplier(supplier_id)
+        source = await self.repository.get_source(
+            supplier_id, source_id, for_update=True
+        )
+        if source is None:
+            supplier_error(404, "supplier_source_not_found", "Konekcija nije pronađena")
+        if not source.is_active:
+            supplier_error(409, "supplier_source_inactive", "Arhivirana konekcija se ne može menjati")
+        prefix = "query:" if data.placement == "QUERY" else "header:"
+        values: dict[str, str] = {}
+        if data.username:
+            values[f"{prefix}{data.username_parameter}"] = data.username
+        if data.password:
+            values[f"{prefix}{data.password_parameter}"] = data.password
+        if data.token:
+            token = f"Bearer {data.token}" if data.placement == "HEADER" else data.token
+            values[f"{prefix}{data.token_parameter}"] = token
+        if data.api_key:
+            values[f"{prefix}{data.api_key_parameter}"] = data.api_key
+        reference = source_secret_provider.write(values)
+        try:
+            await self.repository.update_source(
+                source,
+                {
+                    "secret_reference": reference,
+                    "last_validation_at": None,
+                    "last_validation_status": None,
+                    "last_validation_message": None,
+                    "version": source.version + 1,
+                },
+            )
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
+        return SourceCredentialState(configured=True)
 
     async def deactivate_source(
         self,

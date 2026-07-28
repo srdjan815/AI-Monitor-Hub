@@ -4,6 +4,7 @@ import asyncio
 import ssl
 import urllib.parse
 import urllib.request
+from urllib.error import HTTPError, URLError
 
 from app.modules.suppliers.acquisition_contracts import (
     AcquiredPayload,
@@ -73,10 +74,18 @@ class UrllibHttpClient:
                     content=response.read(),
                     content_type=content_type,
                 )
-        except Exception as exc:
+        except HTTPError as exc:
+            if exc.code in {401, 403}:
+                message = "Podaci za prijavu nisu prihvaćeni"
+            elif exc.code == 404:
+                message = "Cenovnik nije pronađen na unetoj adresi"
+            else:
+                message = f"Server dobavljača je vratio status {exc.code}"
+            raise AcquisitionFailure("acquisition_http_failed", message) from exc
+        except (TimeoutError, URLError) as exc:
             raise AcquisitionFailure(
                 "acquisition_http_failed",
-                "Spoljni izvor nije dostupan",
+                "Server dobavljača nije odgovorio ili nije dostupan",
             ) from exc
 
 
@@ -118,13 +127,20 @@ class HttpSourceAdapter:
         else:
             url = str(config["url"])
         headers = self._string_mapping(config.get("request_headers"))
+        query = self._string_mapping(config.get("query_parameters"))
         if source.secret_reference:
-            headers.update(self.secrets.resolve(source.secret_reference))
+            for key, value in self.secrets.resolve(source.secret_reference).items():
+                if key.startswith("query:"):
+                    query[key.removeprefix("query:")] = value
+                elif key.startswith("header:"):
+                    headers[key.removeprefix("header:")] = value
+                else:
+                    headers[key] = value
         response = await self.client.request(
             url=url,
             method=str(config.get("http_method", "GET")),
             headers={str(k): str(v) for k, v in headers.items()},
-            query=self._string_mapping(config.get("query_parameters")),
+            query=query,
             timeout_seconds=int(str(config.get("timeout_seconds", 30))),
             verify_tls=bool(config.get("verify_tls", True)),
         )
@@ -142,7 +158,10 @@ class HttpSourceAdapter:
             content=response.content,
             content_type=response.content_type,
             original_filename=response.filename,
-            source_metadata={"transport": source.source_type},
+            source_metadata={
+                "transport": source.source_type,
+                "http_status": response.status_code,
+            },
         )
 
     @staticmethod

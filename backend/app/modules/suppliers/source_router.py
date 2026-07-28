@@ -3,13 +3,15 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.keyset_pagination import encode_time_keyset, resolve_time_keyset
 from app.core.limits import MAX_CURSOR_CHARS, MAX_LEGACY_OFFSET
 from app.core.pagination import InvalidCursorError
 from app.db.session import get_db
+from app.modules.suppliers.acquisition_contracts import AcquiredPayload
 from app.modules.suppliers.enums import SupplierSourceStatus, SupplierSourceType
 from app.modules.suppliers.source_schemas import (
     SupplierSourceCreate,
@@ -19,6 +21,12 @@ from app.modules.suppliers.source_schemas import (
     SupplierSourceValidationResponse,
 )
 from app.modules.suppliers.source_service import SupplierSourceService
+from app.modules.suppliers.source_probe_schemas import (
+    SourceCredentialState,
+    SourceCredentialWrite,
+    SourceProbeResult,
+)
+from app.modules.suppliers.source_probe_service import SupplierSourceProbeService
 
 router = APIRouter(
     prefix="/suppliers/{supplier_id}/sources",
@@ -227,6 +235,74 @@ async def validate_source(
     return await SupplierSourceService(session).validate_source(
         supplier_id,
         source_id,
+    )
+
+
+@router.put(
+    "/{source_id}/credentials",
+    response_model=SourceCredentialState,
+    summary="Promeni pristupne podatke",
+    description="Čuva pristupne podatke van Source konfiguracije i ne vraća njihove vrednosti.",
+)
+async def write_source_credentials(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    payload: SourceCredentialWrite,
+    session: AsyncSession = Depends(get_db),
+) -> SourceCredentialState:
+    return await SupplierSourceService(session).write_credentials(
+        supplier_id, source_id, payload
+    )
+
+
+@router.post(
+    "/{source_id}/probe",
+    response_model=SourceProbeResult,
+    summary="Probno preuzmi cenovnik",
+    description="Proverava konekciju bez Schema, Mapping, Snapshot ili Catalog izmena.",
+)
+async def probe_source(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SourceProbeResult:
+    return await SupplierSourceProbeService(session).probe(supplier_id, source_id)
+
+
+@router.post(
+    "/{source_id}/probe-upload",
+    response_model=SourceProbeResult,
+    summary="Probno učitaj cenovnik",
+    description=(
+        "Analizira probni fajl u memoriji bez Acquisition Run-a, Snapshot-a, "
+        "mapiranja ili izmene kataloga."
+    ),
+)
+async def probe_uploaded_source(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    request: Request,
+    filename: str = Query(min_length=1, max_length=500),
+    session: AsyncSession = Depends(get_db),
+) -> SourceProbeResult:
+    content = await request.body()
+    if len(content) > settings.acquisition_max_artifact_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "supplier_source_probe_file_too_large",
+                "message": "Probni fajl prelazi dozvoljenu veličinu",
+            },
+        )
+    return await SupplierSourceProbeService(session).probe(
+        supplier_id,
+        source_id,
+        AcquiredPayload(
+            content=content,
+            content_type=request.headers.get("content-type"),
+            original_filename=filename,
+            source_metadata={"transport": "probe-upload"},
+        ),
     )
 
 

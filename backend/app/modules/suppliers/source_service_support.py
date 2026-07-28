@@ -44,8 +44,14 @@ class SupplierSourceServiceSupport:
                 source.source_type,
                 data.configuration,
             )
+            proposed["last_validation_at"] = None
+            proposed["last_validation_status"] = None
+            proposed["last_validation_message"] = None
         if "secret_reference" in supplied:
             proposed["secret_reference"] = data.secret_reference
+            proposed["last_validation_at"] = None
+            proposed["last_validation_status"] = None
+            proposed["last_validation_message"] = None
         if "description" in supplied:
             proposed["description"] = self._optional(data.description)
         if "status" in supplied:

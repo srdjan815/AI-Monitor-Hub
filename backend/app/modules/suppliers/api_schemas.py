@@ -90,6 +90,22 @@ class SupplierPlatformOperation(BaseModel):
     resource_path: str
 
 
+class SupplierProcessStatus(BaseModel):
+    supplier_id: uuid.UUID
+    supplier_name: str
+    source_id: uuid.UUID | None
+    source_name: str | None
+    source_format: str | None
+    connection_status: str
+    schema_status: str
+    mapping_status: str
+    acquisition_status: str
+    last_success_at: datetime | None
+    article_count: int | None
+    content_changed: bool | None
+    warning: str | None
+
+
 class SupplierPlatformOverview(BaseModel):
     range_from: datetime
     range_to: datetime
@@ -105,6 +121,7 @@ class SupplierPlatformOverview(BaseModel):
     unassigned_incidents: SupplierPlatformCount
     latest_operations: list[SupplierPlatformOperation]
     recent_failures: list[SupplierPlatformOperation]
+    supplier_processes: list[SupplierProcessStatus]
 
 
 class BulkIncidentAssignItem(BaseModel):

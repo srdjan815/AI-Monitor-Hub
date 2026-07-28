@@ -4,7 +4,7 @@ import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.limits import MAX_DB_INTEGER
 from app.modules.suppliers.enums import (
@@ -12,6 +12,8 @@ from app.modules.suppliers.enums import (
     SupplierSourceType,
     SupplierSourceValidationStatus,
 )
+from app.modules.suppliers.models import SupplierSource
+from app.modules.suppliers.source_secrets import source_secret_provider
 
 _REFERENCE_PATTERN = re.compile(r"^(?:vault|env|secret):[A-Za-z0-9_./:-]+$")
 
@@ -130,6 +132,12 @@ class SupplierSourceRead(BaseModel):
     has_secret_reference: bool = Field(
         description="Pokazuje da li postoji referenca bez otkrivanja njene vrednosti."
     )
+    credentials_available: bool = Field(
+        description=(
+            "Pokazuje da li su referencirani pristupni podaci trenutno dostupni "
+            "runtime provideru, bez otkrivanja reference ili vrednosti."
+        )
+    )
     description: str | None
     last_validation_at: datetime | None
     last_validation_status: SupplierSourceValidationStatus | None
@@ -137,6 +145,21 @@ class SupplierSourceRead(BaseModel):
     version: int
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_runtime_credential_state(cls, value: object) -> object:
+        if not isinstance(value, SupplierSource):
+            return value
+        return {
+            field: getattr(value, field)
+            for field in cls.model_fields
+            if field != "credentials_available"
+        } | {
+            "credentials_available": source_secret_provider.available(
+                value.secret_reference
+            )
+        }
 
 
 class SupplierSourceListResponse(BaseModel):

@@ -215,10 +215,18 @@ def _pipeline(client: httpx.Client, suffix: str) -> tuple[str, str, str]:
     )
     assert source_response.status_code == 201, source_response.text
     source = source_response.json()
-    validated = client.post(f"{sources}/{source['id']}/validate")
+    probe = client.post(
+        f"{sources}/{source['id']}/probe-upload",
+        params={"filename": "snapshot.csv"},
+        content=b"supplier_sku,name\nSKU-1,Monitor\n",
+        headers={"Content-Type": "text/csv"},
+    )
+    assert probe.status_code == 200, probe.text
+    assert probe.json()["successful"] is True
+    source = client.get(f"{sources}/{source['id']}").json()
     activated_source = client.patch(
         f"{sources}/{source['id']}",
-        json={"version": validated.json()["version"], "status": "ACTIVE"},
+        json={"version": source["version"], "status": "ACTIVE"},
     )
     assert activated_source.status_code == 200, activated_source.text
 
