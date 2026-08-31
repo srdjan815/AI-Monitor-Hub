@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import ast
+import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock
+
+import pytest
+from fastapi import HTTPException
 
 from app.core.security import ROLE_PERMISSIONS
 from app.main import app
@@ -10,6 +15,7 @@ from app.modules.suppliers.snapshot_models import (
     SupplierSnapshotArchiveOperation,
     SupplierSnapshotItem,
 )
+from app.modules.suppliers.snapshot_service import SupplierSnapshotService
 
 ROOT = Path(__file__).parents[1]
 SUPPLIERS = ROOT / "app" / "modules" / "suppliers"
@@ -88,3 +94,30 @@ def test_snapshot_permissions_separate_export_and_offload() -> None:
     assert "snapshots.archive" in ROLE_PERMISSIONS["snapshot_operator"]
     assert "snapshots.offload" not in ROLE_PERMISSIONS["snapshot_operator"]
     assert ROLE_PERMISSIONS["read_only"].intersection(required) == {"snapshots.read"}
+
+
+@pytest.mark.asyncio
+async def test_snapshot_rejects_an_older_acquisition() -> None:
+    supplier_id = uuid.uuid4()
+    source_id = uuid.uuid4()
+    requested = Mock(id=uuid.uuid4(), status="SUCCEEDED")
+    latest = Mock(id=uuid.uuid4())
+    service = SupplierSnapshotService(Mock())
+    service.repository.acquisition_for_update = AsyncMock(return_value=requested)
+    service.repository.by_acquisition = AsyncMock(return_value=None)
+    service.repository.latest_acquisition = AsyncMock(return_value=latest)
+
+    with pytest.raises(HTTPException) as error:
+        await service.create(
+            supplier_id,
+            source_id,
+            requested.id,
+            retention_class="STANDARD",
+            archive_after_days=None,
+            preserve_online=False,
+            legal_hold=False,
+            archive_notes=None,
+        )
+
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "snapshot_acquisition_not_latest"

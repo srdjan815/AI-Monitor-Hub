@@ -5,10 +5,75 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from urllib.parse import urlparse
 
 from app.modules.suppliers.schema_profile_models import SupplierSchemaField
+
+MINIMUM_TEXT_LENGTHS = {
+    "code": 255,
+    "productcode": 255,
+    "sku": 255,
+    "sifra": 255,
+    "partnumber": 255,
+    "manufacturercode": 255,
+    "acname": 255,
+    "artikal": 255,
+    "name": 255,
+    "naziv": 255,
+    "productname": 255,
+    "acdept": 25,
+    "brand": 25,
+    "manufacturer": 25,
+    "proizvodjac": 25,
+    "accategory": 45,
+    "acmaincategory": 45,
+    "category": 45,
+    "grupa": 45,
+    "itemgroup": 45,
+    "nadgrupa": 45,
+    "acsubcategory": 50,
+    "podkategorija": 50,
+    "subcategory": 50,
+    "acinlinespecification": 150_000,
+    "acproductdescription": 150_000,
+    "description": 150_000,
+    "opis": 150_000,
+    "attributes": 150_000,
+    "imageurl": 150_000,
+    "imageurls": 150_000,
+    "urlimages": 150_000,
+}
+
+IDENTIFIER_TEXT_CODES = {
+    "ean",
+    "ean8",
+    "ean13",
+    "upc",
+    "upca",
+    "upce",
+    "gtin",
+    "gtin13",
+    "gtin14",
+    "barcode",
+    "barkod",
+    "acean",
+}
+
+PRICE_CODES = {
+    "cena",
+    "mpcena",
+    "price",
+    "pricenotax",
+    "retailprice",
+    "promotionprice",
+    "oldprice",
+    "anprice",
+    "anoldprice",
+    "anretailprice",
+    "anrecommendedretailprice",
+    "anpromoprice",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +98,9 @@ class SchemaRecordValidator:
         self,
         record: dict[str, object],
         fields: list[SupplierSchemaField],
+        *,
+        validate_unknown_fields: bool = True,
+        strict_field_ids: set[uuid.UUID] | None = None,
     ) -> ValidatedRow:
         values: dict[uuid.UUID, object] = {}
         problems: list[RowProblem] = []
@@ -43,6 +111,14 @@ class SchemaRecordValidator:
             found, value, source_name = self._resolve(record, field)
             if source_name:
                 consumed.add(source_name)
+            if strict_field_ids is not None and field.id not in strict_field_ids:
+                values[field.id] = value if found else None
+                text_value = None if value is None else str(value)
+                if field.is_key:
+                    key = text_value
+                if field.is_identifier:
+                    identifier = text_value
+                continue
             if not found or value is None or value == "":
                 if field.default_value is not None:
                     value = field.default_value
@@ -66,6 +142,7 @@ class SchemaRecordValidator:
                     continue
                 else:
                     value = None
+            value = self._normalized_value(value, field)
             problem = self._validate_value(value, field)
             if problem:
                 problems.append(problem)
@@ -77,7 +154,7 @@ class SchemaRecordValidator:
             if field.is_identifier:
                 identifier = text_value
         unknown = sorted(set(record) - consumed)
-        if unknown:
+        if validate_unknown_fields and unknown:
             problems.append(
                 RowProblem(
                     "acquisition_unknown_fields",
@@ -85,6 +162,33 @@ class SchemaRecordValidator:
                 )
             )
         return ValidatedRow(values, key, identifier, problems)
+
+    @classmethod
+    def _normalized_value(
+        cls,
+        value: object,
+        field: SupplierSchemaField,
+    ) -> object:
+        code = cls._semantic_code(field)
+        if value is None:
+            return value
+        if code in IDENTIFIER_TEXT_CODES:
+            return str(value).strip()
+        scale = 2 if code in PRICE_CODES or field.is_price else field.scale
+        if field.data_type != "DECIMAL" and code not in PRICE_CODES:
+            return value
+        if scale is None:
+            return value
+        try:
+            decimal = Decimal(cls._decimal_text(str(value)))
+            exponent = decimal.as_tuple().exponent
+            current_scale = max(0, -exponent) if isinstance(exponent, int) else 0
+            if current_scale <= scale:
+                return format(decimal, "f") if code in PRICE_CODES else value
+            quantum = Decimal(1).scaleb(-scale)
+            return format(decimal.quantize(quantum, rounding=ROUND_HALF_UP), "f")
+        except (InvalidOperation, TypeError, ValueError):
+            return value
 
     @staticmethod
     def _resolve(
@@ -119,7 +223,19 @@ class SchemaRecordValidator:
         if value is None:
             return None
         text = str(value)
-        if field.max_length is not None and len(text) > field.max_length:
+        normalized_code = self._semantic_code(field)
+        configured_max = field.max_length
+        policy_minimum = (
+            64
+            if normalized_code in IDENTIFIER_TEXT_CODES
+            else MINIMUM_TEXT_LENGTHS.get(normalized_code)
+        )
+        effective_max = (
+            max(configured_max or 0, policy_minimum)
+            if policy_minimum is not None
+            else configured_max
+        )
+        if effective_max is not None and len(text) > effective_max:
             return self._problem(
                 "acquisition_max_length", "Vrednost je predugačka", field
             )
@@ -133,17 +249,28 @@ class SchemaRecordValidator:
             )
         return None
 
-    @staticmethod
+    @classmethod
     def _type_check(
+        cls,
         value: object,
         text: str,
         field: SupplierSchemaField,
     ) -> None:
+        code = cls._semantic_code(field)
+        if code in IDENTIFIER_TEXT_CODES:
+            if re.fullmatch(r"\d+", text) is None:
+                raise ValueError("identifier")
+            return
+        if code in PRICE_CODES or field.is_price:
+            decimal = Decimal(cls._decimal_text(text))
+            if not decimal.is_finite() or len(decimal.as_tuple().digits) > 38:
+                raise ValueError("precision")
+            return
         kind = field.data_type
         if kind == "INTEGER":
             int(text)
         elif kind == "DECIMAL":
-            decimal = Decimal(text)
+            decimal = Decimal(SchemaRecordValidator._decimal_text(text))
             digits = len(decimal.as_tuple().digits)
             exponent = decimal.as_tuple().exponent
             scale = max(0, -exponent) if isinstance(exponent, int) else 0
@@ -178,6 +305,25 @@ class SchemaRecordValidator:
             json.loads(value)
         elif kind == "BINARY" and not isinstance(value, (bytes, str)):
             raise ValueError("binary")
+
+    @staticmethod
+    def _semantic_code(field: SupplierSchemaField) -> str:
+        return re.sub(r"[^a-z0-9]+", "", field.field_code.casefold())
+
+    @staticmethod
+    def _decimal_text(value: str) -> str:
+        compact = value.strip().replace(" ", "")
+        comma = compact.rfind(",")
+        dot = compact.rfind(".")
+        if comma >= 0 and dot >= 0:
+            decimal_separator = "," if comma > dot else "."
+            thousands_separator = "." if decimal_separator == "," else ","
+            return compact.replace(thousands_separator, "").replace(
+                decimal_separator, "."
+            )
+        if comma >= 0:
+            return compact.replace(".", "").replace(",", ".")
+        return compact.replace(",", "")
 
     @staticmethod
     def _problem(

@@ -22,7 +22,12 @@ RUN pip install --no-cache-dir -r requirements.lock \
 RUN adduser --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser /app
 
-USER appuser
+COPY docker-entrypoint.sh /usr/local/bin/ai-monitor-entrypoint
+RUN chmod 0755 /usr/local/bin/ai-monitor-entrypoint
+
+USER root
+
+ENTRYPOINT ["/usr/local/bin/ai-monitor-entrypoint"]
 
 # API port
 EXPOSE 8000

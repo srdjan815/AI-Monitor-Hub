@@ -99,6 +99,18 @@ class SchemaProfileRead(BaseModel):
         description="False označava soft-deleted zapis koji ostaje u istoriji.",
     )
     field_count: int = Field(description="Broj aktivnih metadata polja u verziji.")
+    detected_format: str | None = Field(
+        description="Prepoznati format preuzetog cenovnika."
+    )
+    baseline_artifact_id: uuid.UUID | None = Field(
+        description="Sačuvani originalni cenovnik iz kog je analiza nastala."
+    )
+    baseline_record_count: int | None = Field(
+        description="Broj pronađenih proizvoda u preuzetom cenovniku."
+    )
+    last_analyzed_at: datetime | None = Field(
+        description="Vreme poslednje uspešne analize cenovnika."
+    )
     version: int = Field(description="Optimistička verzija samog zapisa.")
     created_at: datetime
     updated_at: datetime

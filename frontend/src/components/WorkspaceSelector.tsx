@@ -30,7 +30,7 @@ export function WorkspaceSelector({ requireSource = true }: { requireSource?: bo
 
   return (
     <Stack gap={1.5} mb={2}>
-      {!workspace.supplierId && (
+      {requireSource && !workspace.supplierId && (
         <Alert severity="info">
           Izaberite dobavljača da biste otvorili njegov operativni radni prostor.
         </Alert>
@@ -50,6 +50,9 @@ export function WorkspaceSelector({ requireSource = true }: { requireSource?: bo
               value={workspace.supplierId}
               onChange={(event) => workspace.setSupplierId(event.target.value)}
             >
+              <MenuItem value="">
+                <em>Svi dobavljači</em>
+              </MenuItem>
               {suppliers.data?.items.map((supplier) => (
                 <MenuItem key={supplier.id} value={supplier.id}>
                   {supplier.supplier_code} · {supplier.company_name}

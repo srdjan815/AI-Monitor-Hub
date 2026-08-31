@@ -156,6 +156,7 @@ class SupplierApiRepository:
         path_prefix: str,
         *,
         failed_only: bool,
+        error_count_column: Any | None = None,
     ) -> Select[Any]:
         query = select(
             literal(resource_type).label("resource_type"),
@@ -166,6 +167,21 @@ class SupplierApiRepository:
             (literal(path_prefix) + cast(model.id, String)).label(
                 "resource_path"
             ),
+            Supplier.company_name.label("supplier_name"),
+            SupplierSource.name.label("source_name"),
+            model.failure_code.label("failure_code"),
+            model.failure_message.label("failure_message"),
+            (
+                error_count_column
+                if error_count_column is not None
+                else literal(None)
+            ).label("error_count"),
+        ).join(
+            Supplier,
+            Supplier.id == model.supplier_id,
+        ).join(
+            SupplierSource,
+            SupplierSource.id == model.source_connection_id,
         )
         if failed_only:
             query = query.where(status_column == "FAILED")
@@ -185,6 +201,7 @@ class SupplierApiRepository:
                 SupplierAcquisitionRun.acquisition_code,
                 SupplierAcquisitionRun.status,
                 "/api/v1/suppliers/platform/acquisitions/",
+                SupplierAcquisitionRun.error_count,
             ),
             (
                 SupplierSnapshot,
@@ -192,6 +209,7 @@ class SupplierApiRepository:
                 SupplierSnapshot.snapshot_code,
                 SupplierSnapshot.status,
                 "/api/v1/suppliers/platform/snapshots/",
+                None,
             ),
             (
                 SupplierDeltaRun,
@@ -199,10 +217,15 @@ class SupplierApiRepository:
                 SupplierDeltaRun.delta_code,
                 SupplierDeltaRun.status,
                 "/api/v1/suppliers/platform/deltas/",
+                SupplierDeltaRun.error_count,
             ),
         )
         queries = [
-            self._operation_query(*definition, failed_only=failed_only)
+            self._operation_query(
+                *definition[:5],
+                failed_only=failed_only,
+                error_count_column=definition[5],
+            )
             for definition in definitions
             if definition[1] in allowed
         ]

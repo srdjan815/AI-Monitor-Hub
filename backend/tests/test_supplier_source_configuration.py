@@ -162,6 +162,51 @@ def test_api_and_transport_secret_requirements_are_explicit() -> None:
         )
 
 
+def test_ewe_api_is_the_only_approved_public_http_endpoint() -> None:
+    normalized = SupplierSourceValidationService.normalize_configuration(
+        SupplierSourceType.API,
+        {
+            "base_url": "http://apicatalog.ewe.rs:5001/api/",
+            "authentication_type": "BASIC",
+            "query_parameters": {
+                "images": "1",
+                "currency": "rsd",
+                "pdv": "0",
+            },
+        },
+    )
+    assert normalized["base_url"] == "http://apicatalog.ewe.rs:5001/api/"
+
+    rejected_urls = (
+        "http://supplier.example/api/",
+        "http://apicatalog.ewe.rs/api/",
+        "http://apicatalog.ewe.rs:5001/other/",
+        "http://sub.apicatalog.ewe.rs:5001/api/",
+    )
+    for url in rejected_urls:
+        with pytest.raises(HTTPException) as error:
+            SupplierSourceValidationService.normalize_configuration(
+                SupplierSourceType.API,
+                {"base_url": url, "authentication_type": "NONE"},
+            )
+        assert error.value.detail["code"] == "supplier_source_invalid_configuration"
+
+
+def test_ewe_base_url_rejects_embedded_query_and_credentials() -> None:
+    unsafe_urls = (
+        "http://user:secret@apicatalog.ewe.rs:5001/api/",
+        "http://apicatalog.ewe.rs:5001/api/?user=secret",
+        "http://apicatalog.ewe.rs:5001/api/#secret",
+    )
+    for url in unsafe_urls:
+        with pytest.raises(HTTPException) as error:
+            SupplierSourceValidationService.normalize_configuration(
+                SupplierSourceType.API,
+                {"base_url": url, "authentication_type": "BASIC"},
+            )
+        assert error.value.detail["code"] == "supplier_source_invalid_configuration"
+
+
 @pytest.mark.parametrize(
     ("source_type", "field"),
     [

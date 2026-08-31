@@ -67,6 +67,7 @@ class SupplierMappingRuleService(SupplierMappingServiceSupport):
         )
         self._draft(profile)
         await self._field(schema_profile_id, data.schema_field_id)
+        await self._configured_fields(schema_profile_id, data)
         values = self._values(data)
         await self._conflicts(mapping_profile_id, values)
         rule = SupplierMappingRule(mapping_profile_id=mapping_profile_id, **values)
@@ -128,6 +129,7 @@ class SupplierMappingRuleService(SupplierMappingServiceSupport):
         current.update(supplied)
         validated = MappingRuleCreate.model_validate(current)
         await self._field(schema_profile_id, validated.schema_field_id)
+        await self._configured_fields(schema_profile_id, validated)
         values = self._values(validated)
         await self._conflicts(mapping_profile_id, values, rule.id)
         changes = {
@@ -242,6 +244,39 @@ class SupplierMappingRuleService(SupplierMappingServiceSupport):
         if conflicts:
             code, message = errors[sorted(conflicts)[0]]
             supplier_error(409, code, message)
+
+    async def _configured_fields(
+        self,
+        schema_profile_id: uuid.UUID,
+        data: MappingRuleCreate,
+    ) -> None:
+        config = data.transformation_config or {}
+        raw_ids = config.get("field_ids")
+        if data.transformation_type.value != "CONCAT" or raw_ids is None:
+            return
+        if not isinstance(raw_ids, list) or not raw_ids:
+            supplier_error(
+                422,
+                "mapping_concat_fields_invalid",
+                "Sastavljeno mapiranje zahteva najmanje jedno izvorno polje",
+            )
+        parsed: list[uuid.UUID] = []
+        try:
+            parsed = [uuid.UUID(str(value)) for value in raw_ids]
+        except (TypeError, ValueError):
+            supplier_error(
+                422,
+                "mapping_concat_fields_invalid",
+                "Sastavljeno mapiranje sadrži neispravno izvorno polje",
+            )
+        if len(parsed) != len(set(parsed)):
+            supplier_error(
+                422,
+                "mapping_concat_fields_duplicate",
+                "Isto izvorno polje ne može biti dodato više puta",
+            )
+        for field_id in parsed:
+            await self._field(schema_profile_id, field_id)
 
     @staticmethod
     def _values(data: MappingRuleCreate) -> dict[str, object]:

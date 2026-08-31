@@ -1,4 +1,5 @@
 import { alpha, createTheme } from "@mui/material/styles";
+import { tooltipPopperModifiers } from "./tooltipBehavior";
 
 export function createAppTheme(mode: "light" | "dark") {
   const navy = "#123047";
@@ -45,7 +46,22 @@ export function createAppTheme(mode: "light" | "dark") {
         }
       },
       MuiButton: { defaultProps: { disableElevation: true } },
-      MuiTooltip: { defaultProps: { arrow: true, enterDelay: 450 } }
+      MuiTooltip: {
+        defaultProps: {
+          arrow: true,
+          enterDelay: 450,
+          placement: "top",
+          disableFocusListener: true,
+          disableInteractive: true,
+          slotProps: {
+            popper: {
+              disablePortal: false,
+              modifiers: tooltipPopperModifiers,
+              sx: { pointerEvents: "none" }
+            }
+          }
+        }
+      }
     }
   });
 }

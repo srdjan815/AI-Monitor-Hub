@@ -38,6 +38,7 @@ class SupplierSnapshotService:
         preserve_online: bool,
         legal_hold: bool,
         archive_notes: str | None,
+        pipeline_run_id: uuid.UUID | None = None,
     ) -> SupplierSnapshot:
         run = await self.repository.acquisition_for_update(
             supplier_id, source_id, acquisition_run_id
@@ -57,6 +58,13 @@ class SupplierSnapshotService:
                 "snapshot_acquisition_ineligible",
                 "Snapshot zahteva uspešan ili delimično uspešan Acquisition Run",
             )
+        latest = await self.repository.latest_acquisition(supplier_id, source_id)
+        if latest is None or latest.id != run.id:
+            supplier_error(
+                409,
+                "snapshot_acquisition_not_latest",
+                "Snapshot se može kreirati samo iz poslednjeg importa",
+            )
         records = await self.repository.accepted_records(run.id)
         if len(records) != run.accepted_record_count or not records:
             supplier_error(
@@ -69,6 +77,7 @@ class SupplierSnapshotService:
             supplier_id=run.supplier_id,
             source_connection_id=run.source_connection_id,
             acquisition_run_id=run.id,
+            pipeline_run_id=pipeline_run_id,
             schema_profile_id=run.schema_profile_id,
             mapping_profile_id=run.mapping_profile_id,
             schema_version_reference=run.schema_version_reference,

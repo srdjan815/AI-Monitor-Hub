@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import base64
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -21,6 +30,9 @@ from app.modules.suppliers.source_schemas import (
     SupplierSourceValidationResponse,
 )
 from app.modules.suppliers.source_service import SupplierSourceService
+from app.modules.suppliers.source_certificate_service import (
+    SupplierSourceCertificateService,
+)
 from app.modules.suppliers.source_probe_schemas import (
     SourceCredentialState,
     SourceCredentialWrite,
@@ -250,6 +262,23 @@ async def write_source_credentials(
     payload: SourceCredentialWrite,
     session: AsyncSession = Depends(get_db),
 ) -> SourceCredentialState:
+    if payload.certificate_base64 is not None:
+        certificate = base64.b64decode(payload.certificate_base64, validate=True)
+        if len(certificate) > settings.max_request_body_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "code": "supplier_source_certificate_too_large",
+                    "message": "Sertifikat prelazi dozvoljenu veličinu",
+                },
+            )
+        result = await SupplierSourceCertificateService(session).write_certificate(
+            supplier_id,
+            source_id,
+            certificate,
+            payload.password or "",
+        )
+        return SourceCredentialState(configured=result.configured)
     return await SupplierSourceService(session).write_credentials(
         supplier_id, source_id, payload
     )

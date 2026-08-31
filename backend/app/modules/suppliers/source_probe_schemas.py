@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -8,11 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class SourceCredentialWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    placement: str = Field(pattern="^(HEADER|QUERY)$")
+    placement: str = Field(pattern="^(HEADER|QUERY|PORTAL_FORM|SOAP_BODY)$")
     username: str | None = Field(default=None, min_length=1, max_length=500)
     password: str | None = Field(default=None, min_length=1, max_length=2000)
     token: str | None = Field(default=None, min_length=1, max_length=4000)
     api_key: str | None = Field(default=None, min_length=1, max_length=4000)
+    certificate_base64: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=2_000_000,
+    )
     username_parameter: str = Field(default="username", min_length=1, max_length=128)
     password_parameter: str = Field(default="password", min_length=1, max_length=128)
     token_parameter: str = Field(default="Authorization", min_length=1, max_length=128)
@@ -20,13 +26,26 @@ class SourceCredentialWrite(BaseModel):
 
     @model_validator(mode="after")
     def at_least_one_secret(self) -> SourceCredentialWrite:
-        if not any((self.password, self.token, self.api_key)):
-            raise ValueError("Unesite lozinku, token ili API ključ")
+        if not any((self.password, self.token, self.api_key, self.certificate_base64)):
+            raise ValueError("Unesite lozinku, token, API ključ ili sertifikat")
+        if self.certificate_base64:
+            if not self.password:
+                raise ValueError("Unesite lozinku klijentskog sertifikata")
+            try:
+                base64.b64decode(self.certificate_base64, validate=True)
+            except (ValueError, TypeError) as exc:
+                raise ValueError("Klijentski sertifikat nije ispravno kodiran") from exc
         return self
 
 
 class SourceCredentialState(BaseModel):
     configured: bool
+
+
+class SourceCertificateState(BaseModel):
+    configured: bool
+    expires_at: datetime
+    common_name: str | None = None
 
 
 class SourceProbeStep(BaseModel):
@@ -51,6 +70,7 @@ class SourceProbeResult(BaseModel):
 
 __all__ = [
     "SourceCredentialState",
+    "SourceCertificateState",
     "SourceCredentialWrite",
     "SourceProbeResult",
     "SourceProbeStep",

@@ -2,78 +2,26 @@ import type { ApiError, JsonObject } from "../types";
 
 const API_ROOT = "/api/v1";
 
-let accessToken = sessionStorage.getItem("amh.access_token") ?? "";
-
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  system_admin: ["*"],
-  supplier_admin: [
-    "suppliers.read", "suppliers.write",
-    "supplier_sources.read", "supplier_sources.write", "supplier_sources.validate",
-    "schema_profiles.read", "schema_profiles.write", "schema_profiles.activate",
-    "mapping_profiles.read", "mapping_profiles.write", "mapping_profiles.activate",
-    "acquisitions.read", "acquisitions.execute", "acquisitions.upload", "acquisitions.cancel",
-    "snapshots.read", "snapshots.create", "snapshots.verify", "snapshots.archive",
-    "snapshots.offload", "snapshots.restore",
-    "deltas.read", "deltas.calculate", "deltas.cancel",
-    "incidents.read", "incidents.create", "incidents.acknowledge", "incidents.assign",
-    "incidents.manage", "incidents.resolve", "incidents.dismiss", "incidents.suppress",
-    "incidents.comment", "incident_rules.read", "incident_rules.manage",
-    "supplier_platform.overview", "supplier_platform.search"
-  ],
-  supplier_source_validator: ["supplier_sources.read", "supplier_sources.validate"],
-  schema_profile_editor: ["supplier_sources.read", "schema_profiles.read", "schema_profiles.write"],
-  schema_profile_activator: ["supplier_sources.read", "schema_profiles.read", "schema_profiles.activate"],
-  mapping_profile_editor: [
-    "supplier_sources.read", "schema_profiles.read",
-    "mapping_profiles.read", "mapping_profiles.write"
-  ],
-  mapping_profile_activator: [
-    "supplier_sources.read", "schema_profiles.read",
-    "mapping_profiles.read", "mapping_profiles.activate"
-  ],
-  acquisition_operator: [
-    "suppliers.read", "supplier_sources.read", "schema_profiles.read",
-    "mapping_profiles.read", "acquisitions.read", "acquisitions.execute",
-    "acquisitions.upload", "acquisitions.cancel"
-  ],
-  read_only: [
-    "suppliers.read", "supplier_sources.read", "schema_profiles.read",
-    "mapping_profiles.read", "acquisitions.read", "snapshots.read",
-    "deltas.read", "incidents.read", "incident_rules.read",
-    "supplier_platform.overview", "supplier_platform.search"
-  ],
-  internal_service: ["*"]
-};
+const TOKEN_KEY = "amh.access_token";
+export const AUTHENTICATION_FAILED_EVENT = "amh:authentication-failed";
+let accessToken =
+  localStorage.getItem(TOKEN_KEY) ??
+  sessionStorage.getItem(TOKEN_KEY) ??
+  "";
+if (accessToken) {
+  localStorage.setItem(TOKEN_KEY, accessToken);
+  sessionStorage.removeItem(TOKEN_KEY);
+}
 
 export function setAccessToken(token: string): void {
   accessToken = token.trim().replace(/^Bearer\s+/i, "");
-  if (accessToken) sessionStorage.setItem("amh.access_token", accessToken);
-  else sessionStorage.removeItem("amh.access_token");
+  if (accessToken) localStorage.setItem(TOKEN_KEY, accessToken);
+  else localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
 }
 
 export function getAccessToken(): string {
   return accessToken;
-}
-
-export function decodeTokenPermissions(token = accessToken): string[] {
-  try {
-    const part = token.split(".")[1];
-    if (!part) return [];
-    const normalized = part.replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(atob(normalized)) as {
-      permissions?: string[];
-      roles?: string[];
-    };
-    const permissions = new Set(payload.permissions ?? []);
-    for (const role of payload.roles ?? []) {
-      for (const permission of ROLE_PERMISSIONS[role] ?? []) {
-        permissions.add(permission);
-      }
-    }
-    return [...permissions];
-  } catch {
-    return [];
-  }
 }
 
 function correlationId(): string {
@@ -117,10 +65,19 @@ export async function api<T>(
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(body);
   }
-  const response = await fetch(
-    path.startsWith("/api/") ? path : `${API_ROOT}${path}`,
-    { ...options, headers, body: body as BodyInit | null | undefined }
-  );
+  let response: Response;
+  try {
+    response = await fetch(
+      path.startsWith("/api/") ? path : `${API_ROOT}${path}`,
+      { ...options, headers, body: body as BodyInit | null | undefined }
+    );
+  } catch {
+    throw {
+      status: 0,
+      code: "API_UNAVAILABLE",
+      message: "API još nije spreman ili server nije dostupan."
+    } satisfies ApiError;
+  }
   if (!response.ok) {
     let payload: unknown = {};
     try {
@@ -128,7 +85,11 @@ export async function api<T>(
     } catch {
       payload = { detail: response.statusText };
     }
-    throw apiError(response.status, payload);
+    const error = apiError(response.status, payload);
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent(AUTHENTICATION_FAILED_EVENT));
+    }
+    throw error;
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;

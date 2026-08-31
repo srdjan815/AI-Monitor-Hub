@@ -126,6 +126,11 @@ class SupplierApiService:
         failures = await self.repository.operations(
             allowed=operation_types, failed_only=True, limit=10
         )
+        latest_acquisition = await self.repository.operations(
+            allowed=allowed & {"acquisition"},
+            failed_only=False,
+            limit=1,
+        )
 
         def visible(name: str, resource: str) -> SupplierPlatformCount:
             permitted = resource in allowed
@@ -154,6 +159,11 @@ class SupplierApiService:
             recent_failures=[
                 SupplierPlatformOperation.model_validate(row) for row in failures
             ],
+            latest_acquisition=(
+                SupplierPlatformOperation.model_validate(latest_acquisition[0])
+                if latest_acquisition
+                else None
+            ),
             supplier_processes=await SupplierProcessOverviewService(
                 self.repository
             ).rows(),

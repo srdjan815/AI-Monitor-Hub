@@ -172,7 +172,12 @@ class SupplierMappingProfileService(SupplierMappingServiceSupport):
         mapping_profile_id: uuid.UUID,
         data: MappingProfileAction,
     ) -> SupplierMappingProfile:
-        await self._usable_schema(supplier_id, source_id, schema_profile_id)
+        await self._usable_schema(
+            supplier_id,
+            source_id,
+            schema_profile_id,
+            require_active=True,
+        )
         profile = await self._profile(
             schema_profile_id,
             mapping_profile_id,

@@ -27,12 +27,16 @@ const ArchivePage = lazy(() =>
 const AdministrationPage = lazy(() =>
   import("./pages/AdministrationPage").then((module) => ({ default: module.AdministrationPage }))
 );
+const AutomationPage = lazy(() =>
+  import("./pages/AutomationPage").then((module) => ({ default: module.AutomationPage }))
+);
 const ScopedResourcePage = lazy(() =>
   import("./pages/ScopedResourcePage").then((module) => ({ default: module.ScopedResourcePage }))
 );
 
 function ProtectedRoutes() {
   const auth = useAuth();
+  if (auth.loading) return <Box p={4}><LoadingBlock rows={8} /></Box>;
   if (!auth.authenticated) return <LoginPage />;
   return (
     <Routes>
@@ -61,6 +65,7 @@ function ProtectedRoutes() {
         <Route path="/incidents" element={<IncidentsPage />} />
         <Route path="/archive" element={<ArchivePage />} />
         <Route path="/administration" element={<AdministrationPage />} />
+        <Route path="/automation" element={<AutomationPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
@@ -72,8 +77,8 @@ function resource(key: string) {
   const values = {
     schemas: {
       resource: "schema-profiles",
-      title: "Schema Profiles",
-      description: "Verzije očekivane strukture, aktivacija, polja i validacija.",
+      title: "Analiza cenovnika",
+      description: "Pronađena polja i priprema cenovnika za mapiranje.",
       codeField: "schema_code",
       permissionRead: "schema_profiles.read",
       permissionWrite: "schema_profiles.write",
@@ -88,13 +93,14 @@ function resource(key: string) {
     },
     acquisitions: {
       resource: "acquisitions",
-      title: "Acquisition Runs",
-      description: "Ručno izvršavanje, upload, retry/cancel, greške, statistika i timeline.",
+      title: "Import cenovnika",
+      description: "Pokretanje obrade aktivne Schema i Mapping konfiguracije.",
       codeField: "acquisition_code",
       permissionRead: "acquisitions.read",
       extraColumns: [
         { key: "trigger_type", label: "Trigger", tooltip: "Način pokretanja." },
-        { key: "total_record_count", label: "Zapisi", tooltip: "Ukupan broj source redova." }
+        { key: "total_record_count", label: "Zapisi", tooltip: "Ukupan broj redova pronađenih u cenovniku." },
+        { key: "accepted_record_count", label: "Odobreno", tooltip: "Broj ispravnih zapisa prihvaćenih za dalju obradu." }
       ],
       actions: [
         { name: "retry", label: "Ponovi", tooltip: "Ponovi terminalni Run.", permission: "acquisitions.execute", icon: "retry" as const },

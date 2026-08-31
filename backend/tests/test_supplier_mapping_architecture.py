@@ -90,14 +90,14 @@ def test_mapping_openapi_surface_and_serbian_descriptions() -> None:
         for path, item in specification["paths"].items()
         if "/mapping-profiles" in path
     }
-    assert len(paths) == 7
+    assert len(paths) == 8
     operations = [
         operation
         for item in paths.values()
         for method, operation in item.items()
         if method in {"delete", "get", "patch", "post"}
     ]
-    assert len(operations) == 13
+    assert len(operations) == 14
     assert {tag for op in operations for tag in op["tags"]} == {
         "supplier-mapping-profiles"
     }

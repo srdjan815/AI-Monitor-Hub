@@ -12,4 +12,37 @@ describe("Supplier Admin teme", () => {
     );
     expect(light.components?.MuiCssBaseline).toBeDefined();
   });
+
+  it("primenjuje globalno bezbedno pozicioniranje tooltip-a", () => {
+    const tooltip = createAppTheme("light").components?.MuiTooltip
+      ?.defaultProps;
+    const popper = tooltip?.slotProps?.popper;
+
+    expect(tooltip?.placement).toBe("top");
+    expect(tooltip?.disableFocusListener).toBe(true);
+    expect(tooltip?.disableInteractive).toBe(true);
+    expect(popper).toMatchObject({
+      disablePortal: false,
+      sx: { pointerEvents: "none" },
+      modifiers: [
+        { name: "offset", options: { offset: [0, 10] } },
+        {
+          name: "flip",
+          options: {
+            fallbackPlacements: ["bottom", "right", "left"],
+            padding: 8
+          }
+        },
+        {
+          name: "preventOverflow",
+          options: {
+            altAxis: true,
+            boundary: "viewport",
+            padding: 8,
+            tether: true
+          }
+        }
+      ]
+    });
+  });
 });

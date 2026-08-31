@@ -57,6 +57,29 @@ class SupplierSnapshotRepository:
             )
         ).scalar_one_or_none()
 
+    async def latest_acquisition(
+        self,
+        supplier_id: uuid.UUID,
+        source_id: uuid.UUID,
+    ) -> SupplierAcquisitionRun | None:
+        return (
+            await self.session.execute(
+                select(SupplierAcquisitionRun)
+                .where(
+                    SupplierAcquisitionRun.supplier_id == supplier_id,
+                    SupplierAcquisitionRun.source_connection_id == source_id,
+                    SupplierAcquisitionRun.status.in_(
+                        {"SUCCEEDED", "PARTIALLY_SUCCEEDED"}
+                    ),
+                )
+                .order_by(
+                    SupplierAcquisitionRun.created_at.desc(),
+                    SupplierAcquisitionRun.id.desc(),
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
     async def accepted_records(self, run_id: uuid.UUID) -> list[SupplierStagedRecord]:
         rows = await self.session.execute(
             select(SupplierStagedRecord)

@@ -114,6 +114,12 @@ class SupplierSchemaRepository:
         )
         return list(rows.scalars().all())
 
+    async def deactivate_fields(self, profile_id: uuid.UUID) -> None:
+        for field in await self.list_fields(profile_id):
+            field.is_active = False
+            field.version += 1
+        await self.session.flush()
+
     async def get_field(
         self,
         profile_id: uuid.UUID,

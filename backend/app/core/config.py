@@ -2,7 +2,7 @@ import ipaddress
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,8 +17,9 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = False
     max_request_body_bytes: int = 2_097_152
     acquisition_artifact_root: str = "/tmp/ai-monitor-hub-acquisitions"
+    supplier_artifact_root: str = "/app/data/supplier-artifacts"
     acquisition_max_artifact_bytes: int = Field(
-        default=50 * 1024 * 1024,
+        default=100 * 1024 * 1024,
         ge=65_536,
         le=1024 * 1024 * 1024,
     )
@@ -65,7 +66,11 @@ class Settings(BaseSettings):
     auth_token_ttl_seconds: int = 3600
     auth_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
     auth_allow_legacy_tokens: bool = True
+    auth_mode: Literal["static", "test_jwt"] = "test_jwt"
+    ai_monitor_admin_token: SecretStr | None = None
     docs_enabled: bool = True
+    supplier_secrets_file: str = "/app/config/supplier-secrets.json"
+    supplier_secret_mode: Literal["file", "test_memory"] = "test_memory"
 
     # Request protection and observability.
     rate_limit_enabled: bool = False
@@ -180,8 +185,22 @@ class Settings(BaseSettings):
         self._validate_production_runtime()
         return self
 
+    def validate_runtime_secrets(self) -> None:
+        if self.auth_mode != "static":
+            return
+        token = (
+            self.ai_monitor_admin_token.get_secret_value().strip()
+            if self.ai_monitor_admin_token is not None
+            else ""
+        )
+        if len(token) < 32:
+            raise RuntimeError(
+                "AI_MONITOR_ADMIN_TOKEN nedostaje ili je kraći od 32 znaka; "
+                "podesite C:\\AI-Monitor-Hub\\.env.secrets"
+            )
+
     model_config = SettingsConfigDict(
-        env_file=ROOT_DIR / ".env",
+        env_file=(ROOT_DIR / ".env", ROOT_DIR / ".env.secrets"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

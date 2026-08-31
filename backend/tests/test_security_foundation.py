@@ -46,6 +46,27 @@ async def test_public_and_protected_route_classes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_authenticated_identity_is_backend_authoritative() -> None:
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        unauthenticated = await client.get("/api/v1/auth/me")
+        assert unauthenticated.status_code == 401
+
+        response = await client.get(
+            "/api/v1/auth/me",
+            headers=bearer("supplier-user", "supplier_admin"),
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["subject"] == "supplier-user"
+    assert payload["roles"] == ["supplier_admin"]
+    assert "suppliers.write" in payload["permissions"]
+    assert "supplier_sources.validate" in payload["permissions"]
+    assert "token" not in payload
+
+
+@pytest.mark.asyncio
 async def test_raw_preview_requires_permission_and_server_setting() -> None:
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     url = (

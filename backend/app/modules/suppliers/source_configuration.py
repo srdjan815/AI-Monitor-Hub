@@ -47,7 +47,10 @@ class AuthenticationType(StrEnum):
     API_KEY = "API_KEY"
     BASIC = "BASIC"
     BEARER = "BEARER"
+    PORTAL_FORM = "PORTAL_FORM"
     OAUTH2_CLIENT_CREDENTIALS = "OAUTH2_CLIENT_CREDENTIALS"
+    CLIENT_CERTIFICATE = "CLIENT_CERTIFICATE"
+    SOAP_BODY = "SOAP_BODY"
 
 
 class ExpectedContentType(StrEnum):
@@ -77,6 +80,10 @@ class ManualFileType(StrEnum):
 
 BoundedParameters = Annotated[dict[str, str], Field(max_length=50)]
 
+_APPROVED_INSECURE_HTTP_ENDPOINTS = {
+    ("apicatalog.ewe.rs", 5001, "/api"),
+}
+
 
 def _validate_parameters(values: dict[str, str]) -> dict[str, str]:
     for key, value in values.items():
@@ -97,7 +104,26 @@ def _secure_url(value: str) -> str:
     local = parsed.hostname in {"localhost", "127.0.0.1", "::1"} or (
         parsed.hostname.startswith(("10.", "192.168.", "172."))
     )
-    if parsed.scheme != "https" and not local:
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("URL nije ispravan") from exc
+    normalized_path = parsed.path.rstrip("/") or "/"
+    approved_http_endpoint = (
+        parsed.hostname.lower(),
+        port,
+        normalized_path,
+    ) in _APPROVED_INSECURE_HTTP_ENDPOINTS
+    if approved_http_endpoint and (
+        parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(
+            "EWE URL ne sme sadržati pristupne ili javne parametre"
+        )
+    if parsed.scheme != "https" and not local and not approved_http_endpoint:
         raise ValueError("HTTPS je obavezan za javne adrese")
     if len(value) > 2048:
         raise ValueError("URL je predugačak")
@@ -113,10 +139,78 @@ class ApiSourceConfiguration(StrictConfiguration):
     query_parameters: BoundedParameters = Field(default_factory=dict)
     timeout_seconds: int = Field(default=30, ge=1, le=300)
     verify_tls: bool = True
+    login_url: str | None = None
+    login_submit_url: str | None = None
+    username_field: str | None = Field(default=None, min_length=1, max_length=128)
+    password_field: str | None = Field(default=None, min_length=1, max_length=128)
+    login_form_fields: BoundedParameters = Field(default_factory=dict)
+    integration_profile: Literal[
+        "GENERIC", "KIMTEC_MSAN", "CT_SOAP", "PIN_SOAP"
+    ] = "GENERIC"
+    pin_shop_id: int = Field(default=4, ge=1, le=2_147_483_647)
+    catalog_endpoint_path: str | None = Field(default=None, max_length=1024)
+    price_endpoint_path: str | None = Field(default=None, max_length=1024)
+    barcode_service_url: str | None = None
+    barcode_soap_action: str = Field(
+        default="http://www.msan.hr/B2B/GetProductsBarcodes",
+        min_length=1,
+        max_length=1024,
+    )
 
     _url = field_validator("base_url")(_secure_url)
+    _login_url = field_validator("login_url")(
+        lambda value: _secure_url(value) if value else value
+    )
+    _login_submit_url = field_validator("login_submit_url")(
+        lambda value: _secure_url(value) if value else value
+    )
+    _barcode_service_url = field_validator("barcode_service_url")(
+        lambda value: _secure_url(value) if value else value
+    )
     _headers = field_validator("request_headers")(_validate_parameters)
     _query = field_validator("query_parameters")(_validate_parameters)
+    _form_fields = field_validator("login_form_fields")(_validate_parameters)
+
+    @model_validator(mode="after")
+    def portal_form_is_complete(self) -> ApiSourceConfiguration:
+        if self.authentication_type != AuthenticationType.PORTAL_FORM:
+            return self
+        if not self.login_url or not self.username_field or not self.password_field:
+            raise ValueError(
+                "Portal prijava zahteva login URL i nazive polja za korisnika i lozinku"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def integration_profile_is_complete(self) -> ApiSourceConfiguration:
+        if self.integration_profile in {"CT_SOAP", "PIN_SOAP"}:
+            if self.authentication_type != AuthenticationType.SOAP_BODY:
+                raise ValueError(
+                    "SOAP profil zahteva pristupni podatak u SOAP telu"
+                )
+            if self.http_method != HttpMethod.POST:
+                raise ValueError("SOAP profil zahteva POST metod")
+            if (
+                self.integration_profile == "CT_SOAP"
+                and not self.base_url.casefold().endswith(".asmx")
+            ):
+                raise ValueError("CT SOAP profil zahteva .asmx adresu servisa")
+            return self
+        if self.integration_profile != "KIMTEC_MSAN":
+            return self
+        if self.authentication_type != AuthenticationType.CLIENT_CERTIFICATE:
+            raise ValueError(
+                "KimTec / M SAN profil zahteva klijentski sertifikat"
+            )
+        if (
+            not self.catalog_endpoint_path
+            or not self.price_endpoint_path
+            or not self.barcode_service_url
+        ):
+            raise ValueError(
+                "KimTec / M SAN profil zahteva katalog, cenovnik i barcode servis"
+            )
+        return self
 
 
 class HttpSourceConfiguration(StrictConfiguration):

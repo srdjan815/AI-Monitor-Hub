@@ -28,6 +28,7 @@ from app.modules.suppliers import schema_profile_models  # noqa: F401
 from app.modules.suppliers import snapshot_models  # noqa: F401
 from app.modules.suppliers import delta_models  # noqa: F401
 from app.modules.suppliers import incident_models  # noqa: F401
+from app.modules.suppliers import pipeline_models  # noqa: F401
 
 # --------------------------------------------------------------------
 # Alembic configuration

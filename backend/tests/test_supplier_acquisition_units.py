@@ -8,17 +8,377 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.suppliers.acquisition_adapters import HttpSourceAdapter
+from app.modules.suppliers.acquisition_adapters import (
+    HttpSourceAdapter,
+    UrllibHttpClient,
+)
 from app.modules.suppliers.acquisition_contracts import (
     AcquiredPayload,
     AcquisitionFailure,
     HttpResponse,
 )
-from app.modules.suppliers.acquisition_parsers import ParserRegistry
+from app.modules.suppliers.acquisition_parsers import ParserRegistry, XlsxParser
+from app.modules.suppliers.acquisition_processing import AcquisitionProcessor
 from app.modules.suppliers.acquisition_storage import LocalArtifactStorage
 from app.modules.suppliers.acquisition_transformations import MappingExecutor
+from app.modules.suppliers.acquisition_validation import SchemaRecordValidator
 from app.modules.suppliers.mapping_profile_models import SupplierMappingRule
 from app.modules.suppliers.models import SupplierSource
+from app.modules.suppliers.schema_profile_models import SupplierSchemaField
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("1234,56", "1234.56"),
+        ("1234.56", "1234.56"),
+        ("1.234,56", "1234.56"),
+        ("1,234.56", "1234.56"),
+    ],
+)
+def test_common_supplier_decimal_formats(value: str, expected: str) -> None:
+    assert SchemaRecordValidator._decimal_text(value) == expected
+
+
+def test_supplier_decimal_value_is_rounded_half_up_to_configured_scale() -> None:
+    field = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code="CENA",
+        name="CENA",
+        position=1,
+        data_type="DECIMAL",
+        required=True,
+        nullable=False,
+        precision=9,
+        scale=2,
+        path="CENA",
+        is_active=True,
+        version=1,
+    )
+
+    result = SchemaRecordValidator().validate(
+        {"CENA": "346.469999"},
+        [field],
+    )
+
+    assert result.problems == []
+    assert result.values[field.id] == "346.47"
+
+
+def test_global_price_policy_overrides_narrow_inferred_precision() -> None:
+    field = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code="PRICE",
+        name="PRICE",
+        position=1,
+        data_type="DECIMAL",
+        required=True,
+        nullable=False,
+        precision=8,
+        scale=6,
+        path="PRICE",
+        is_active=True,
+        version=1,
+    )
+
+    result = SchemaRecordValidator().validate({"PRICE": "1234567890.125"}, [field])
+
+    assert result.problems == []
+    assert result.values[field.id] == "1234567890.13"
+
+
+def test_global_ean_policy_treats_legacy_integer_schema_as_text() -> None:
+    field = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code="BARCODE",
+        name="BARCODE",
+        position=1,
+        data_type="INTEGER",
+        required=True,
+        nullable=False,
+        path="BARCODE",
+        is_active=True,
+        version=1,
+    )
+
+    result = SchemaRecordValidator().validate({"BARCODE": "0012345678905"}, [field])
+
+    assert result.problems == []
+    assert result.values[field.id] == "0012345678905"
+
+    invalid = SchemaRecordValidator().validate({"BARCODE": "not-an-ean"}, [field])
+    assert [problem.code for problem in invalid.problems] == [
+        "acquisition_data_type_invalid"
+    ]
+
+
+def test_mapping_preview_can_ignore_unmapped_source_fields() -> None:
+    field = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code="SKU",
+        name="SKU",
+        position=1,
+        data_type="STRING",
+        required=True,
+        nullable=False,
+        path="SKU",
+        is_active=True,
+        version=1,
+    )
+    validator = SchemaRecordValidator()
+
+    strict = validator.validate({"SKU": "A-1", "IGNORED": "value"}, [field])
+    preview = validator.validate(
+        {"SKU": "A-1", "IGNORED": "value"},
+        [field],
+        validate_unknown_fields=False,
+    )
+
+    assert [problem.code for problem in strict.problems] == [
+        "acquisition_unknown_fields"
+    ]
+    assert preview.problems == []
+
+
+def test_business_text_limit_overrides_short_inference_sample() -> None:
+    field = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code="acName",
+        name="acName",
+        position=1,
+        data_type="STRING",
+        required=True,
+        nullable=False,
+        max_length=75,
+        path="acName",
+        is_active=True,
+        version=1,
+    )
+
+    result = SchemaRecordValidator().validate({"acName": "x" * 120}, [field])
+
+    assert result.problems == []
+
+
+def test_acquisition_can_limit_strict_schema_validation_to_ean() -> None:
+    ean = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code="acEan",
+        name="acEan",
+        position=1,
+        data_type="INTEGER",
+        required=True,
+        nullable=False,
+        path="acEan",
+        is_active=True,
+        version=1,
+    )
+    auxiliary = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=ean.schema_profile_id,
+        field_code="acSeoTitle",
+        name="acSeoTitle",
+        position=2,
+        data_type="STRING",
+        required=True,
+        nullable=False,
+        max_length=5,
+        path="acSeoTitle",
+        is_active=True,
+        version=1,
+    )
+
+    accepted = SchemaRecordValidator().validate(
+        {"acEan": "0012345678905", "acSeoTitle": "very long title"},
+        [ean, auxiliary],
+        validate_unknown_fields=False,
+        strict_field_ids={ean.id},
+    )
+    rejected = SchemaRecordValidator().validate(
+        {"acEan": "invalid", "acSeoTitle": "very long title"},
+        [ean, auxiliary],
+        validate_unknown_fields=False,
+        strict_field_ids={ean.id},
+    )
+
+    assert accepted.problems == []
+    assert accepted.values[auxiliary.id] == "very long title"
+    assert [problem.code for problem in rejected.problems] == [
+        "acquisition_data_type_invalid"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("target", "source", "expected"),
+    [
+        ("ean", "0012345678905", "0012345678905"),
+        ("upc", "001234567890", "001234567890"),
+        ("price", "12.345", "12.35"),
+        ("price", "1.234,565", "1234.57"),
+    ],
+)
+def test_mapping_canonicalizes_identifiers_and_prices(
+    target: str,
+    source: str,
+    expected: str,
+) -> None:
+    field_id = uuid.uuid4()
+    rule = SupplierMappingRule(
+        id=uuid.uuid4(),
+        mapping_profile_id=uuid.uuid4(),
+        schema_field_id=field_id,
+        target_attribute=target,
+        transformation_type="COPY",
+        priority=1,
+        required=True,
+        is_active=True,
+    )
+
+    result = MappingExecutor().execute({field_id: source}, [rule])
+
+    assert result.problems == []
+    assert result.mapped[target] == expected
+
+
+def test_xlsx_zero_number_format_preserves_leading_ean_zeroes() -> None:
+    sheet = (
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<sheetData><row r="1"><c r="A1" s="1"><v>12345678905</v></c>'
+        '</row></sheetData></worksheet>'
+    ).encode()
+
+    rows = XlsxParser._rows_with_formats(sheet, [], {1: 13})
+
+    assert rows[1][0] == "0012345678905"
+
+
+@pytest.mark.parametrize(
+    ("mapped", "has_problem"),
+    [
+        ({"product_code": "16617", "ean": ""}, True),
+        ({"product_code": "", "ean": "8606019540128"}, True),
+        ({"product_code": "16617", "ean": "8606019540128"}, False),
+        ({"product_code": "", "ean": ""}, True),
+        ({}, True),
+    ],
+)
+def test_product_requires_code_or_ean(
+    mapped: dict[str, object],
+    has_problem: bool,
+) -> None:
+    problem = AcquisitionProcessor._identifier_problem(mapped)
+
+    assert (problem is not None) is has_problem
+    if problem is not None:
+        assert problem.code == "acquisition_product_identifier_missing"
+
+
+@pytest.mark.parametrize(
+    ("price", "has_problem"),
+    [
+        ("1.00", False),
+        ("0.01", False),
+        ("0.00", True),
+        (0, True),
+        (None, True),
+        ("nije-cena", True),
+    ],
+)
+def test_product_price_must_be_positive(
+    price: object,
+    has_problem: bool,
+) -> None:
+    problem = AcquisitionProcessor._price_problem({"price": price})
+
+    assert (problem is not None) is has_problem
+
+
+def test_concat_mapping_combines_multiple_supplier_note_fields() -> None:
+    action_id = uuid.uuid4()
+    advice_id = uuid.uuid4()
+    discount_id = uuid.uuid4()
+    rule = SupplierMappingRule(
+        id=uuid.uuid4(),
+        mapping_profile_id=uuid.uuid4(),
+        schema_field_id=action_id,
+        target_attribute="promotion_note",
+        transformation_type="CONCAT",
+        transformation_config={
+            "field_ids": [str(action_id), str(advice_id), str(discount_id)],
+            "labels": {
+                str(action_id): "Akcija",
+                str(advice_id): "Preporuka",
+                str(discount_id): "Popust",
+            },
+            "separator": " | ",
+        },
+        priority=1,
+        required=False,
+        is_active=True,
+    )
+
+    result = MappingExecutor().execute(
+        {action_id: 1, advice_id: 0, discount_id: "15"},
+        [rule],
+    )
+
+    assert result.problems == []
+    assert result.mapped["promotion_note"] == "Akcija | Popust: 15"
+
+
+def test_concat_mapping_builds_unlabelled_deduplicated_product_name() -> None:
+    name_id = uuid.uuid4()
+    oem_id = uuid.uuid4()
+    rule = SupplierMappingRule(
+        id=uuid.uuid4(),
+        mapping_profile_id=uuid.uuid4(),
+        schema_field_id=name_id,
+        target_attribute="name",
+        transformation_type="CONCAT",
+        transformation_config={
+            "field_ids": [str(name_id), str(oem_id)],
+            "labels": {},
+            "separator": " — ",
+            "include_labels": False,
+            "deduplicate": True,
+            "skip_contained": True,
+        },
+        priority=1,
+        required=True,
+        is_active=True,
+    )
+
+    result = MappingExecutor().execute(
+        {name_id: "ThinkPad E16", oem_id: "21MA0008YA"},
+        [rule],
+    )
+    already_contains_oem = MappingExecutor().execute(
+        {name_id: "ThinkPad E16 21MA0008YA", oem_id: "21MA0008YA"},
+        [rule],
+    )
+
+    assert result.mapped["name"] == "ThinkPad E16 — 21MA0008YA"
+    assert already_contains_oem.mapped["name"] == "ThinkPad E16 21MA0008YA"
+
+
+def test_http_target_replaces_existing_credential_query_values() -> None:
+    target = UrllibHttpClient._target(
+        "https://supplier.invalid/export?user=old&password=old&format=xml",
+        {"user": "current", "password": "current-secret"},
+    )
+
+    assert target == (
+        "https://supplier.invalid/export?"
+        "user=current&password=current-secret&format=xml"
+    )
+    assert "user=old" not in target
+    assert "password=old" not in target
 
 
 def test_artifact_storage_is_atomic_bounded_and_path_safe(tmp_path: Path) -> None:
@@ -49,6 +409,11 @@ def test_csv_json_xml_parsers_preserve_unicode_quotes_and_large_text() -> None:
         b'{"items":[{"sku":"A-1","name":"Zmaj"}]}', {}
     )
     assert json_rows[0]["name"] == "Zmaj"
+    ewe_rows = registry.resolve("API", "application/json", None, {}).parse(
+        b'{"catalog":[{"acProduct":"SKU-1","acEan":"0012345678905"}]}',
+        {},
+    )
+    assert ewe_rows == [{"acProduct": "SKU-1", "acEan": "0012345678905"}]
     xml_config = {"item_path": "item"}
     xml_rows = registry.resolve("XML", "application/xml", "data.xml", xml_config).parse(
         "<items><item><sku>Č-1</sku></item></items>".encode(), xml_config

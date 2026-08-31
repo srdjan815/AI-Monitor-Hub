@@ -19,6 +19,57 @@ from app.modules.suppliers.acquisition_service_support import (
 
 
 class SupplierAcquisitionService(SupplierAcquisitionServiceSupport):
+    async def execute_artifact(
+        self,
+        supplier_id: uuid.UUID,
+        source_id: uuid.UUID,
+        payload: AcquiredPayload,
+        *,
+        idempotency_key: str,
+    ) -> SupplierAcquisitionRun:
+        context = await self.contexts.resolve(supplier_id, source_id)
+        return await self.execute_artifact_context(
+            context,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    async def execute_artifact_context(
+        self,
+        context: AcquisitionContext,
+        payload: AcquiredPayload,
+        *,
+        idempotency_key: str,
+    ) -> SupplierAcquisitionRun:
+        """Process an Artifact with an already resolved immutable contract."""
+        checksum = hashlib.sha256(payload.content).hexdigest()
+        fingerprint = self._fingerprint(context, "API_REQUEST", checksum)
+        existing = await self._idempotent(
+            context.source.id, idempotency_key, fingerprint
+        )
+        if existing:
+            return existing
+        run, created = await self._create_run(
+            context,
+            "API_REQUEST",
+            idempotency_key,
+            fingerprint,
+        )
+        if not created:
+            return run
+        try:
+            return await self._process(run, context, payload)
+        except AcquisitionFailure as exc:
+            return await self._fail(run, exc)
+        except Exception:
+            return await self._fail(
+                run,
+                AcquisitionFailure(
+                    "acquisition_unexpected_failure",
+                    "Acquisition nije uspeo",
+                ),
+            )
+
     async def execute(
         self,
         supplier_id: uuid.UUID,
@@ -174,13 +225,26 @@ class SupplierAcquisitionService(SupplierAcquisitionServiceSupport):
                 "original_filename": artifact.original_filename,
             },
         )
+        parser_configuration = dict(context.source.configuration)
+        if context.schema.record_path:
+            parser_configuration["item_path"] = context.schema.record_path
+        if context.schema.root_path:
+            parser_configuration["root_path"] = context.schema.root_path
+        if context.schema.encoding:
+            parser_configuration["encoding"] = context.schema.encoding
+        if context.schema.delimiter:
+            parser_configuration["delimiter"] = context.schema.delimiter
+        header_row = context.schema.analysis_metadata.get("header_row")
+        if isinstance(header_row, int):
+            parser_configuration["header_row"] = header_row
+            parser_configuration["data_start_row"] = header_row + 1
         parser = self.parsers.resolve(
             context.source.source_type,
             artifact.content_type,
             artifact.original_filename,
-            context.source.configuration,
+            parser_configuration,
         )
-        rows = parser.parse(payload.content, context.source.configuration)
+        rows = parser.parse(payload.content, parser_configuration)
         if not rows:
             raise AcquisitionFailure(
                 "acquisition_no_records",

@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.limits import MAX_LEGACY_OFFSET
+from app.core.limits import MAX_DB_INTEGER, MAX_LEGACY_OFFSET
 from app.db.session import get_db
 from app.modules.suppliers.enums import MappingProfileStatus
 from app.modules.suppliers.mapping_profile_schemas import (
@@ -19,6 +19,8 @@ from app.modules.suppliers.mapping_profile_schemas import (
 from app.modules.suppliers.mapping_profile_service import (
     SupplierMappingProfileService,
 )
+from app.modules.suppliers.mapping_test_schemas import MappingTestRead
+from app.modules.suppliers.mapping_test_service import SupplierMappingTestService
 
 router = APIRouter(
     prefix=(
@@ -169,6 +171,37 @@ async def clone_profile(
             mapping_profile_id,
             payload,
         )
+    )
+
+
+@router.post(
+    "/{mapping_profile_id}/test",
+    response_model=MappingTestRead,
+    summary="Testiraj mapiranje",
+    description=(
+        "Izvršava mapiranje nad najviše deset zapisa iz Schema Artifact-a. "
+        "Ne kreira Acquisition, Snapshot niti menja Catalog."
+    ),
+)
+async def test_mapping(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    schema_profile_id: uuid.UUID,
+    mapping_profile_id: uuid.UUID,
+    record_number: int | None = Query(default=None, ge=1, le=MAX_DB_INTEGER),
+    session: AsyncSession = Depends(get_db),
+) -> MappingTestRead:
+    await SupplierMappingProfileService(session).get_profile(
+        supplier_id,
+        source_id,
+        schema_profile_id,
+        mapping_profile_id,
+    )
+    return await SupplierMappingTestService(session).test(
+        source_id,
+        schema_profile_id,
+        mapping_profile_id,
+        record_number=record_number,
     )
 
 

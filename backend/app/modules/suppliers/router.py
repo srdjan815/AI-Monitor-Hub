@@ -14,6 +14,7 @@ from app.modules.suppliers.mapping_rule_router import router as mapping_rule_rou
 from app.modules.suppliers.schema_field_router import router as schema_field_router
 from app.modules.suppliers.schema_profile_router import router as schema_profile_router
 from app.modules.suppliers.source_router import router as source_router
+from app.modules.suppliers.schedule_router import router as schedule_router
 from app.modules.suppliers.snapshot_archive_router import (
     router as snapshot_archive_router,
 )
@@ -37,6 +38,7 @@ router.include_router(supplier_api_router)
 router.include_router(supplier_router)
 router.include_router(contact_router)
 router.include_router(source_router)
+router.include_router(schedule_router)
 router.include_router(schema_profile_router)
 router.include_router(schema_field_router)
 router.include_router(mapping_profile_router)

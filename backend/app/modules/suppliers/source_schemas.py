@@ -15,7 +15,9 @@ from app.modules.suppliers.enums import (
 from app.modules.suppliers.models import SupplierSource
 from app.modules.suppliers.source_secrets import source_secret_provider
 
-_REFERENCE_PATTERN = re.compile(r"^(?:vault|env|secret):[A-Za-z0-9_./:-]+$")
+_REFERENCE_PATTERN = re.compile(
+    r"^(?:(?:vault|env|secret):[A-Za-z0-9_./:-]+|supplier/[A-Za-z0-9_./-]+)$"
+)
 
 
 class SupplierSourceCreate(BaseModel):

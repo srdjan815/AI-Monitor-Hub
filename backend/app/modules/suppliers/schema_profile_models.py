@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -14,6 +16,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -81,6 +84,25 @@ class SupplierSchemaProfile(UUIDMixin, TimestampMixin, Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     field_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    detected_format: Mapped[str | None] = mapped_column(String(16))
+    encoding: Mapped[str | None] = mapped_column(String(100))
+    delimiter: Mapped[str | None] = mapped_column(String(10))
+    root_path: Mapped[str | None] = mapped_column(String(500))
+    record_path: Mapped[str | None] = mapped_column(String(500))
+    baseline_artifact_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("supplier_source_artifacts.id", ondelete="RESTRICT")
+    )
+    baseline_checksum: Mapped[str | None] = mapped_column(String(64))
+    baseline_record_count: Mapped[int | None] = mapped_column(Integer)
+    compatibility_policy: Mapped[dict[str, object]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    analysis_metadata: Mapped[dict[str, object]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    last_analyzed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     __mapper_args__ = {
         "version_id_col": version,

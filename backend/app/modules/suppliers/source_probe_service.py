@@ -93,7 +93,10 @@ class SupplierSourceProbeService:
                 payload.original_filename,
             )
             checksum = hashlib.sha256(payload.content).hexdigest()
-            message = "PROBE_OK: Konekcija radi i cenovnik je uspešno preuzet"
+            message = (
+                "PROBE_OK: Konekcija je uspešno testirana. "
+                "Cenovnik nije trajno sačuvan niti obrađen."
+            )
             await self._save_result(source, tested_at, "VALID", message)
             return SourceProbeResult(
                 successful=True,
@@ -239,7 +242,10 @@ class SupplierSourceProbeService:
                 "acquisition_parse_failed",
                 "Preuzeti JSON cenovnik nije ispravan",
             ) from exc
-        rows = value if isinstance(value, list) else [value]
+        if isinstance(value, dict) and isinstance(value.get("products"), list):
+            rows = value["products"]
+        else:
+            rows = value if isinstance(value, list) else [value]
         preview = [row for row in rows[:10] if isinstance(row, dict)]
         if not preview:
             raise AcquisitionFailure(

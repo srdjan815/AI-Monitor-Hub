@@ -7,10 +7,14 @@ import type {
   SearchResult,
   Source,
   SourceProbeResult,
+  SupplierSchedule,
+  PipelineRunQueued,
   Supplier
 } from "../types";
 
 export const supplierApi = {
+  get: <T>(path: string, params: Record<string, unknown> = {}) =>
+    api<T>(`${path}${queryString(params as any)}`),
   overview: () => api<Overview>("/suppliers/platform/overview"),
   search: (query: string, limit = 20) =>
     api<Page<SearchResult>>(
@@ -83,6 +87,62 @@ export const supplierApi = {
     api<{ configured: boolean }>(
       `/suppliers/${supplierId}/sources/${sourceId}/credentials`,
       { method: "PUT", body }
+    ),
+  writeSourceCertificate: (
+    supplierId: string,
+    sourceId: string,
+    certificate: File,
+    password: string
+  ) =>
+    certificate.arrayBuffer().then((buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+      }
+      return api<{ configured: boolean }>(
+        `/suppliers/${supplierId}/sources/${sourceId}/credentials`,
+        {
+          method: "PUT",
+          body: {
+            placement: "HEADER",
+            password,
+            certificate_base64: btoa(binary)
+          }
+        }
+      );
+    }),
+  schedule: (supplierId: string, sourceId: string) =>
+    api<SupplierSchedule | null>(
+      `/suppliers/${supplierId}/sources/${sourceId}/schedule`
+    ),
+  schedules: () =>
+    api<Page<SupplierSchedule>>(
+      "/suppliers/platform/source-schedules?limit=500&offset=0"
+    ),
+  saveSchedule: (
+    supplierId: string,
+    sourceId: string,
+    body: Record<string, unknown>
+  ) =>
+    api<SupplierSchedule>(
+      `/suppliers/${supplierId}/sources/${sourceId}/schedule`,
+      { method: "PUT", body }
+    ),
+  runPipelineNow: (
+    supplierId: string,
+    sourceId: string,
+    automationDepth: string
+  ) =>
+    api<PipelineRunQueued>(
+      `/suppliers/${supplierId}/sources/${sourceId}/pipeline-runs`,
+      {
+        method: "POST",
+        body: {
+          automation_depth: automationDepth,
+          idempotency_key: `manual:${sourceId}:${crypto.randomUUID()}`
+        }
+      }
     ),
   collection: <T = Operation>(
     supplierId: string,

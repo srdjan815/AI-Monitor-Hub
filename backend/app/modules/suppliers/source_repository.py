@@ -20,6 +20,17 @@ class SupplierSourceRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def get_source_by_id(
+        self,
+        source_id: uuid.UUID,
+        *,
+        for_update: bool = False,
+    ) -> SupplierSource | None:
+        query = select(SupplierSource).where(SupplierSource.id == source_id)
+        if for_update:
+            query = query.with_for_update()
+        return (await self.session.execute(query)).scalar_one_or_none()
+
     async def list_sources(
         self,
         supplier_id: uuid.UUID,

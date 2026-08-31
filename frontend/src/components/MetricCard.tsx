@@ -18,16 +18,38 @@ export function MetricCard({
 }) {
   return (
     <Tooltip title={caption}>
-      <Paper sx={{ p: 2.25, minHeight: 132 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="start">
-          <Box>
-            <Typography color="text.secondary" variant="body2" fontWeight={650}>
+      <Paper sx={{ p: 1.15, minHeight: 78, height: "100%", overflow: "hidden" }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              color="text.secondary"
+              variant="caption"
+              fontWeight={700}
+              sx={{
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: 2,
+                overflow: "hidden",
+                lineHeight: 1.2,
+                fontSize: "0.7rem",
+                minHeight: "1.68rem"
+              }}
+            >
               {title}
             </Typography>
             {loading ? (
-              <Skeleton width={72} height={48} />
+              <Skeleton width={36} height={30} />
             ) : (
-              <Typography variant="h1" sx={{ mt: 1 }}>
+              <Typography
+                component="strong"
+                sx={{
+                  display: "block",
+                  mt: 0.25,
+                  fontSize: "1.3rem",
+                  lineHeight: 1,
+                  fontWeight: 750
+                }}
+              >
                 {value ?? "—"}
               </Typography>
             )}
@@ -38,9 +60,15 @@ export function MetricCard({
               bgcolor: `${tone}.main`,
               backgroundImage:
                 "linear-gradient(rgba(255,255,255,.88),rgba(255,255,255,.88))",
-              borderRadius: 2,
-              p: 1,
-              display: "flex"
+              borderRadius: 1.25,
+              p: 0.55,
+              display: "flex",
+              flexShrink: 0,
+              ml: 0.75,
+              "& .MuiSvgIcon-root": { fontSize: 17 },
+              "@media (max-width:360px)": {
+                display: "none"
+              }
             }}
           >
             {icon}

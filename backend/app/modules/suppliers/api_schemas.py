@@ -88,6 +88,11 @@ class SupplierPlatformOperation(BaseModel):
     status: str
     occurred_at: datetime
     resource_path: str
+    supplier_name: str | None = None
+    source_name: str | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    error_count: int | None = None
 
 
 class SupplierProcessStatus(BaseModel):
@@ -121,6 +126,7 @@ class SupplierPlatformOverview(BaseModel):
     unassigned_incidents: SupplierPlatformCount
     latest_operations: list[SupplierPlatformOperation]
     recent_failures: list[SupplierPlatformOperation]
+    latest_acquisition: SupplierPlatformOperation | None
     supplier_processes: list[SupplierProcessStatus]
 
 

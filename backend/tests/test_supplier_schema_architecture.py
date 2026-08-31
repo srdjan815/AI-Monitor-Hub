@@ -35,7 +35,11 @@ def test_schema_repository_is_flush_only_and_services_own_transactions() -> None
     repository_calls = _calls("schema_profile_repository.py")
     assert "flush" in repository_calls
     assert repository_calls.isdisjoint({"commit", "rollback"})
-    for service in ("schema_profile_service.py", "schema_field_service.py"):
+    for service in (
+        "schema_profile_service.py",
+        "schema_field_service.py",
+        "schema_inference_service.py",
+    ):
         calls = _calls(service)
         assert {"commit", "rollback", "refresh"} <= calls
 
@@ -52,12 +56,11 @@ def test_schema_routers_have_no_sql_or_transactions() -> None:
         )
 
 
-def test_schema_chapter_has_no_forbidden_capability() -> None:
+def test_schema_inference_does_not_cross_pipeline_boundaries() -> None:
     forbidden_imports = {
         "aioftp",
         "aiohttp",
         "boto3",
-        "csv",
         "ftplib",
         "httpx",
         "imaplib",
@@ -65,7 +68,6 @@ def test_schema_chapter_has_no_forbidden_capability() -> None:
         "pandas",
         "paramiko",
         "requests",
-        "xml",
     }
     for path in ROOT.glob("schema_*.py"):
         assert _imports(path.name).isdisjoint(forbidden_imports), path.name
@@ -76,9 +78,7 @@ def test_schema_chapter_has_no_forbidden_capability() -> None:
         "discover",
         "download",
         "import",
-        "infer",
         "mapping",
-        "parse",
         "preview",
         "snapshot",
         "upload",
@@ -93,14 +93,14 @@ def test_schema_openapi_surface_and_serbian_descriptions() -> None:
         for path, item in specification["paths"].items()
         if "/schema-profiles" in path and "/mapping-profiles" not in path
     }
-    assert len(paths) == 7
+    assert len(paths) == 10
     operations = [
         operation
         for item in paths.values()
         for method, operation in item.items()
         if method in {"delete", "get", "patch", "post"}
     ]
-    assert len(operations) == 13
+    assert len(operations) == 16
     assert {tag for op in operations for tag in op["tags"]} == {
         "supplier-schema-profiles"
     }

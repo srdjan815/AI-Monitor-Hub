@@ -45,6 +45,7 @@ rate_limit_backend = create_rate_limit_backend(
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     del app
+    settings.validate_runtime_secrets()
     try:
         yield
     finally:

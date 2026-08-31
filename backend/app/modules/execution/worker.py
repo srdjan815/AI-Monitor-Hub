@@ -20,6 +20,7 @@ from app.modules.execution.protocols import (
     RetryableJobError,
 )
 from app.modules.execution.repository import JobLeaseLostError, JobRepository
+from app.modules.suppliers.pipeline_scheduler import SupplierPipelineScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +204,14 @@ async def process_once() -> bool:
     attempt = job.attempt
 
     handler = HANDLERS.get(job.job_type)
+    requested_timeout = job.payload.get("timeout_seconds")
+    timeout_seconds = (
+        float(requested_timeout)
+        if isinstance(requested_timeout, int)
+        and not isinstance(requested_timeout, bool)
+        and 1 <= requested_timeout <= 86400
+        else HANDLER_TIMEOUT_SECONDS
+    )
     context = JobExecutionContext(
         job_id=job.id,
         attempt=attempt,
@@ -210,7 +219,7 @@ async def process_once() -> bool:
         lease_token=lease_token,
         correlation_id=job.correlation_id,
         logical_idempotency_key=job.idempotency_key or str(job.id),
-        timeout_seconds=HANDLER_TIMEOUT_SECONDS,
+        timeout_seconds=timeout_seconds,
     )
     try:
         if handler is None:
@@ -251,9 +260,15 @@ async def process_once() -> bool:
     return True
 
 
+async def dispatch_supplier_schedules() -> int:
+    async with AsyncSessionLocal() as session:
+        return await SupplierPipelineScheduler(session).dispatch_due()
+
+
 async def run() -> None:
     logger.info("Worker started: id=%s queue=%s", WORKER_ID, QUEUE)
     while True:
+        await dispatch_supplier_schedules()
         processed = await process_once()
         if not processed:
             await asyncio.sleep(POLL_SECONDS)

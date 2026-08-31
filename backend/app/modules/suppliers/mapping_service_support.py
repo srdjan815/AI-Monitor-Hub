@@ -40,6 +40,8 @@ class SupplierMappingServiceSupport:
         supplier_id: uuid.UUID,
         source_id: uuid.UUID,
         schema_profile_id: uuid.UUID,
+        *,
+        require_active: bool = False,
     ) -> None:
         source = await self.sources.get_source(supplier_id, source_id)
         if source is None:
@@ -55,11 +57,17 @@ class SupplierMappingServiceSupport:
             supplier_error(
                 404, "schema_profile_not_found", "Schema Profile nije pronađen"
             )
-        if not schema.is_active or schema.status != "ACTIVE":
+        if not schema.is_active or schema.status not in {"DRAFT", "ACTIVE"}:
             supplier_error(
                 409,
                 "mapping_profile_schema_inactive",
-                "Mapping Profile zahteva ACTIVE Schema Profile",
+                "Mapping Profile zahteva DRAFT ili ACTIVE Schema Profile",
+            )
+        if require_active and schema.status != "ACTIVE":
+            supplier_error(
+                409,
+                "mapping_profile_schema_not_active",
+                "Pre aktiviranja Mapping-a prvo aktivirajte Schema Profile.",
             )
 
     async def _profile(

@@ -4,6 +4,7 @@ import asyncio
 import os
 import re
 import uuid
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -16,6 +17,8 @@ from app.modules.suppliers.mapping_profile_models import (
     SupplierMappingProfile,
     SupplierMappingRule,
 )
+from app.modules.suppliers.mapping_test_service import SupplierMappingTestService
+from app.modules.suppliers.schema_inference_engine import DetectedStructure
 from app.modules.suppliers.models import Supplier, SupplierSource
 from app.modules.suppliers.schema_profile_models import (
     SupplierSchemaField,
@@ -27,6 +30,70 @@ DATABASE_URL = os.getenv(
     "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
     settings.database_url,
 )
+
+
+@pytest.mark.asyncio
+async def test_mapping_preview_can_select_record_after_first_100(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    schema_id = uuid.uuid4()
+    field_id = uuid.uuid4()
+    mapping_id = uuid.uuid4()
+    artifact_id = uuid.uuid4()
+    service = SupplierMappingTestService.__new__(SupplierMappingTestService)
+    service.schemas = SimpleNamespace(
+        get_profile=lambda *_: asyncio.sleep(
+            0, result=SimpleNamespace(id=schema_id, baseline_artifact_id=artifact_id)
+        ),
+        list_fields=lambda *_: asyncio.sleep(
+            0,
+            result=[SimpleNamespace(id=field_id, name="SKU")],
+        ),
+    )
+    service.mappings = SimpleNamespace(
+        get_profile=lambda *_: asyncio.sleep(0, result=SimpleNamespace(id=mapping_id)),
+        list_rules=lambda *_: asyncio.sleep(
+            0,
+            result=[
+                SimpleNamespace(
+                    id=uuid.uuid4(),
+                    schema_field_id=field_id,
+                    target_attribute="product_code",
+                    priority=1,
+                )
+            ],
+        ),
+    )
+    service.pipeline = SimpleNamespace(
+        artifact=lambda *_: asyncio.sleep(0, result=SimpleNamespace(id=artifact_id))
+    )
+    service.artifacts = SimpleNamespace(load=lambda _: object())
+    service.validator = SimpleNamespace(
+        validate=lambda *_, **__: SimpleNamespace(values={}, problems=[])
+    )
+    service.executor = SimpleNamespace(
+        execute=lambda *_: SimpleNamespace(mapped={}, problems=[])
+    )
+
+    def detect(_payload: object, *, row_limit: int | None = 100) -> DetectedStructure:
+        assert row_limit is None
+        return DetectedStructure(
+            detected_format="JSON",
+            rows=[{"sku": str(number)} for number in range(150)],
+            record_count=150,
+        )
+
+    monkeypatch.setattr(
+        "app.modules.suppliers.mapping_test_service.SchemaStructureDetector.detect",
+        detect,
+    )
+
+    result = await service.test(
+        uuid.uuid4(), schema_id, mapping_id, record_number=150
+    )
+
+    assert result.tested_records == 1
+    assert result.rows[0].row_number == 150
 
 
 def bearer(subject: str, role: str = "system_admin") -> dict[str, str]:

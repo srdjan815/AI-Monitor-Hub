@@ -15,6 +15,7 @@ import {
   LogoutRounded,
   MenuRounded,
   NotificationsNoneRounded,
+  ScheduleRounded,
   SchemaRounded,
   SettingsBrightnessRounded,
   StorageRounded,
@@ -52,9 +53,10 @@ const items = [
   { path: "/dashboard", label: "Dashboard", icon: DashboardRounded },
   { path: "/suppliers", label: "Dobavljači", icon: BusinessRounded },
   { path: "/sources", label: "Izvori", icon: HubRounded },
-  { path: "/schemas", label: "Schema profili", icon: SchemaRounded },
-  { path: "/mappings", label: "Mapping profili", icon: AccountTreeRounded },
-  { path: "/acquisitions", label: "Acquisitions", icon: SyncRounded },
+  { path: "/automation", label: "Automatski pokretač", icon: ScheduleRounded },
+  { path: "/schemas", label: "Analiza cenovnika", icon: SchemaRounded },
+  { path: "/mappings", label: "Mapiranje polja", icon: AccountTreeRounded },
+  { path: "/acquisitions", label: "Import cenovnika", icon: SyncRounded },
   { path: "/snapshots", label: "Snapshots", icon: StorageRounded },
   { path: "/deltas", label: "Delta Runs", icon: DifferenceRounded },
   { path: "/incidents", label: "Incident centar", icon: ErrorOutlineRounded },
@@ -93,7 +95,6 @@ export function AppShell() {
         {items.map(({ path, label, icon: Icon }) => (
           <Tooltip
             title={preferences.navigationCollapsed ? label : ""}
-            placement="right"
             key={path}
           >
             <ListItemButton

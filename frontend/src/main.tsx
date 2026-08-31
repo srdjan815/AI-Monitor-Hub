@@ -7,6 +7,9 @@ import App from "./App";
 import { AuthProvider } from "./state/AuthContext";
 import { PreferencesProvider } from "./state/PreferencesContext";
 import { WorkspaceProvider } from "./state/WorkspaceContext";
+import { installGlobalTooltipDismissal } from "./tooltipBehavior";
+
+installGlobalTooltipDismissal();
 
 const queryClient = new QueryClient({
   defaultOptions: {

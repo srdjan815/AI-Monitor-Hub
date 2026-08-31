@@ -211,7 +211,7 @@ export function SuppliersPage() {
                   setFormOpen(true);
                 }}
               >
-                Novi dobavljač
+                Dodaj dobavljača
               </Button>
             </Tooltip>
           )

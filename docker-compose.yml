@@ -7,9 +7,17 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - path: .env
+      - path: .env.secrets
+        required: false
     volumes:
       - ./backend:/app
+      - ./config/supplier-secrets.json:/app/config/supplier-secrets.json:rw
+      - supplier_artifacts:/app/data/supplier-artifacts
+    environment:
+      AUTH_MODE: static
+      SUPPLIER_SECRET_MODE: file
+      SUPPLIER_SECRETS_FILE: /app/config/supplier-secrets.json
     command:
       - uvicorn
       - app.main:app
@@ -28,11 +36,18 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+      - path: .env.secrets
+        required: false
     volumes:
       - ./backend:/app
+      - ./config/supplier-secrets.json:/app/config/supplier-secrets.json:rw
+      - supplier_artifacts:/app/data/supplier-artifacts
     command: ["python", "-m", "app.modules.execution.worker"]
     environment:
+      AUTH_MODE: static
+      SUPPLIER_SECRET_MODE: file
+      SUPPLIER_SECRETS_FILE: /app/config/supplier-secrets.json
       WORKER_QUEUE: default
       WORKER_POLL_SECONDS: "1"
       WORKER_STALE_AFTER_SECONDS: "300"
@@ -71,3 +86,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  supplier_artifacts:

@@ -80,6 +80,10 @@ class SupplierSnapshot(UUIDMixin, TimestampMixin, Base):
         ForeignKey("supplier_acquisition_runs.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    pipeline_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("supplier_source_pipeline_runs.id", ondelete="RESTRICT"),
+        unique=True,
+    )
     schema_profile_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("supplier_schema_profiles.id", ondelete="RESTRICT"),
         nullable=False,

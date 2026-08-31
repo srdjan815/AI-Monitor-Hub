@@ -10,8 +10,15 @@ import pytest
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core import security
 from app.core.config import settings
-from app.core.security import create_access_token
+from app.core.security import (
+    SUPPLIER_SOURCES_READ,
+    SUPPLIER_SOURCES_VALIDATE,
+    SUPPLIER_SOURCES_WRITE,
+    LocalHMACAuthenticationAdapter,
+    create_access_token,
+)
 from app.main import app
 from app.modules.suppliers.models import Supplier, SupplierSource
 from app.modules.suppliers.source_schemas import (
@@ -28,6 +35,13 @@ DATABASE_URL = os.getenv(
 
 
 def bearer(subject: str, role: str = "system_admin") -> dict[str, str]:
+    if role == "system_admin" and settings.auth_mode == "static":
+        assert settings.ai_monitor_admin_token is not None
+        return {
+            "Authorization": (
+                f"Bearer {settings.ai_monitor_admin_token.get_secret_value()}"
+            )
+        }
     return {"Authorization": f"Bearer {create_access_token(subject, (role,))}"}
 
 
@@ -66,6 +80,7 @@ def create_supplier(client: httpx.Client, name: str) -> dict:
 
 def test_supplier_source_crud_lifecycle_and_isolation(
     api_client: httpx.Client,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     suffix = uuid.uuid4().hex[:12]
     supplier_ids: list[str] = []
@@ -91,21 +106,43 @@ def test_supplier_source_crud_lifecycle_and_isolation(
         assert "secret_reference" not in source
         assert created_response.headers["location"].endswith(source["id"])
 
-        with httpx.Client(
-            base_url=API_ROOT,
-            timeout=20.0,
-            headers=bearer("source-validator", "supplier_source_validator"),
-        ) as validator_client:
-            permitted_validation = validator_client.post(
-                f"{path}/{source['id']}/validate"
+        async def check_validator_permissions() -> tuple[int, int, int]:
+            monkeypatch.setattr(
+                security,
+                "authentication_adapter",
+                LocalHMACAuthenticationAdapter(settings),
             )
-            assert permitted_validation.status_code == 200
-            source["version"] = permitted_validation.json()["version"]
-            denied_write = validator_client.patch(
-                f"{path}/{source['id']}",
-                json={"version": source["version"], "description": "Forbidden"},
-            )
-            assert denied_write.status_code == 403
+            transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://test/api/v1",
+                headers=bearer(
+                    "source-validator",
+                    "supplier_source_validator",
+                ),
+            ) as validator_client:
+                permitted = await validator_client.post(
+                    f"{path}/{source['id']}/validate"
+                )
+                assert permitted.status_code == 200, permitted.text
+                denied = await validator_client.patch(
+                    f"{path}/{source['id']}",
+                    json={
+                        "version": permitted.json()["version"],
+                        "description": "Forbidden",
+                    },
+                )
+                return (
+                    permitted.status_code,
+                    permitted.json()["version"],
+                    denied.status_code,
+                )
+
+        validation_status, source["version"], write_status = asyncio.run(
+            check_validator_permissions()
+        )
+        assert validation_status == 200
+        assert write_status == 403
 
         duplicate = api_client.post(
             path, json={**payload, "name": payload["name"].upper()}
@@ -369,7 +406,17 @@ def test_archived_supplier_blocks_source_activation_without_cascade(
 
 
 @pytest.mark.asyncio
-async def test_supplier_source_permissions_are_domain_specific() -> None:
+async def test_supplier_source_permissions_are_domain_specific(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Static development authentication intentionally represents only the local
+    # system administrator. Use the production-equivalent signed-token adapter
+    # here so this test continues to exercise every domain role boundary.
+    monkeypatch.setattr(
+        security,
+        "authentication_adapter",
+        LocalHMACAuthenticationAdapter(settings),
+    )
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         anonymous = await client.get(f"/api/v1/suppliers/{uuid.uuid4()}/sources")
@@ -381,9 +428,16 @@ async def test_supplier_source_permissions_are_domain_specific() -> None:
         )
         assert catalog.status_code == 403
 
+        read_only_headers = bearer("reader", "read_only")
+        read_only_token = read_only_headers["Authorization"].removeprefix("Bearer ")
+        read_only_principal = security.authenticate_token(read_only_token)
+        assert SUPPLIER_SOURCES_READ in read_only_principal.permissions
+        assert SUPPLIER_SOURCES_WRITE not in read_only_principal.permissions
+        assert SUPPLIER_SOURCES_VALIDATE not in read_only_principal.permissions
+
         read_only_write = await client.post(
             f"/api/v1/suppliers/{uuid.uuid4()}/sources",
-            headers=bearer("reader", "read_only"),
+            headers=read_only_headers,
             json={
                 "name": "Forbidden",
                 "source_type": "MANUAL_UPLOAD",
@@ -391,11 +445,6 @@ async def test_supplier_source_permissions_are_domain_specific() -> None:
             },
         )
         assert read_only_write.status_code == 403
-        read_only_read = await client.get(
-            f"/api/v1/suppliers/{uuid.uuid4()}/sources",
-            headers=bearer("reader", "read_only"),
-        )
-        assert read_only_read.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -493,8 +542,8 @@ def test_supplier_source_openapi_and_scope() -> None:
         if "/sources" in path
         and "/schema-profiles" not in path
         and "/acquisitions" not in path
-            and "/snapshots" not in path
-            and "/deltas" not in path
+        and "/snapshots" not in path
+        and "/deltas" not in path
     }
     assert source_paths == {
         "/api/v1/suppliers/{supplier_id}/sources",
@@ -503,7 +552,19 @@ def test_supplier_source_openapi_and_scope() -> None:
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}/probe",
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}/probe-upload",
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}/validate",
+        "/api/v1/suppliers/{supplier_id}/sources/{source_id}/pipeline-runs",
+        "/api/v1/suppliers/{supplier_id}/sources/{source_id}/schedule",
     }
+    assert set(
+        schema["paths"][
+            "/api/v1/suppliers/{supplier_id}/sources/{source_id}/pipeline-runs"
+        ]
+    ) == {"post"}
+    assert set(
+        schema["paths"][
+            "/api/v1/suppliers/{supplier_id}/sources/{source_id}/schedule"
+        ]
+    ) == {"get", "put"}
     assert not any(
         token in path
         for path in source_paths

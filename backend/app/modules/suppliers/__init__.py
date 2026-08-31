@@ -46,6 +46,12 @@ from app.modules.suppliers.schema_profile_models import (
 from app.modules.suppliers.schema_profile_service import SupplierSchemaProfileService
 from app.modules.suppliers.service import SupplierService
 from app.modules.suppliers.source_service import SupplierSourceService
+from app.modules.suppliers.pipeline_models import (
+    SupplierSchemaCompatibilityReport,
+    SupplierSourceArtifact,
+    SupplierSourcePipelineRun,
+    SupplierSourceSchedule,
+)
 
 __all__ = [
     "Supplier",
@@ -83,5 +89,9 @@ __all__ = [
     "SupplierService",
     "SupplierSource",
     "SupplierSourceService",
+    "SupplierSchemaCompatibilityReport",
+    "SupplierSourceArtifact",
+    "SupplierSourcePipelineRun",
+    "SupplierSourceSchedule",
     "SupplierStagedRecord",
 ]

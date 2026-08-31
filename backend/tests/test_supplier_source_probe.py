@@ -8,12 +8,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.modules.suppliers.acquisition_adapters import HttpSourceAdapter
+from app.modules.suppliers.acquisition_adapters import (
+    HttpSourceAdapter,
+    _LoginFormParser,
+)
 from app.modules.suppliers.acquisition_contracts import HttpResponse
 from app.modules.suppliers.acquisition_contracts import AcquisitionFailure
 from app.modules.suppliers.models import SupplierSource
 from app.modules.suppliers.api_process_service import SupplierProcessOverviewService
 from app.modules.suppliers.source_probe_service import SupplierSourceProbeService
+from app.modules.suppliers.schema_record_service import SupplierSchemaRecordService
 from app.modules.suppliers.source_secrets import DevelopmentSecretProvider
 
 
@@ -36,6 +40,50 @@ class RecordingHttpClient:
         self.query = query
         self.headers = headers
         return self.response
+
+
+class RecordingPortalClient(RecordingHttpClient):
+    def __init__(self, response: HttpResponse) -> None:
+        super().__init__(response)
+        self.portal_request_data: dict[str, object] = {}
+
+    async def portal_request(self, **kwargs: object) -> HttpResponse:
+        self.portal_request_data = kwargs
+        return self.response
+
+
+def test_portal_login_form_detects_supplier_specific_field_names() -> None:
+    parser = _LoginFormParser("username")
+    parser.feed(
+        """
+        <form action="login.php" method="POST">
+          <input type="text" name="user">
+          <input type="password" name="pass">
+        </form>
+        """
+    )
+
+    assert parser.action == "login.php"
+    assert parser.detected_username_field == "user"
+    assert parser.detected_password_field == "pass"
+
+
+def test_schema_record_preview_recognizes_epi_artikal_as_product_name() -> None:
+    columns = SupplierSchemaRecordService._columns(
+        [
+            {
+                "SIFRA": "16617",
+                "ARTIKAL": "Adapter E-Green DisplayPort - HDMI",
+                "barcode": "8606019540128",
+                "CENA": "2.47",
+            }
+        ]
+    )
+
+    assert columns["manufacturer_code"] == "SIFRA"
+    assert columns["ean"] == "barcode"
+    assert columns["name"] == "ARTIKAL"
+    assert columns["price"] == "CENA"
 
 
 def test_probe_recognizes_xml_and_returns_safe_preview() -> None:
@@ -118,6 +166,44 @@ def test_query_credentials_are_injected_without_entering_public_configuration() 
     adapter = HttpSourceAdapter(client, provider, 1024)
     asyncio.run(adapter.acquire(source))
     assert client.query == {"user": "partner", "pass": "sensitive-value"}
+    assert "sensitive-value" not in str(source.configuration)
+
+
+def test_portal_form_login_uses_ephemeral_credentials_and_download_session() -> None:
+    provider = DevelopmentSecretProvider()
+    reference = provider.write(
+        {
+            "portal:username": "partner",
+            "portal:password": "sensitive-value",
+        }
+    )
+    client = RecordingPortalClient(
+        HttpResponse(
+            status_code=200,
+            content=b"<products><product><sku>1</sku></product></products>",
+            content_type="application/xml",
+            filename="prices.xml",
+        )
+    )
+    source = SupplierSource(
+        supplier_id="00000000-0000-0000-0000-000000000001",
+        name="Portal",
+        source_type="API",
+        status="DRAFT",
+        is_active=True,
+        configuration={
+            "base_url": "https://supplier.invalid/export.xml",
+            "authentication_type": "PORTAL_FORM",
+            "login_url": "https://supplier.invalid/login",
+            "username_field": "user",
+            "password_field": "pass",
+        },
+        secret_reference=reference,
+    )
+    payload = asyncio.run(HttpSourceAdapter(client, provider, 1024).acquire(source))
+    assert payload.content_type == "application/xml"
+    assert client.portal_request_data["username"] == "partner"
+    assert client.portal_request_data["password"] == "sensitive-value"
     assert "sensitive-value" not in str(source.configuration)
 
 

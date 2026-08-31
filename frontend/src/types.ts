@@ -57,6 +57,42 @@ export interface SourceProbeResult {
   checksum?: string | null;
 }
 
+export interface SupplierSchedule {
+  id: string;
+  source_connection_id: string;
+  supplier_id?: string;
+  supplier_name?: string;
+  source_name?: string;
+  source_code?: string;
+  status: "MANUAL" | "ENABLED" | "PAUSED";
+  schedule_type?: "DAILY" | "MULTI_DAILY" | "INTERVAL" | "WEEKDAYS" | "WEEKLY" | null;
+  timezone: string;
+  schedule_configuration: {
+    times?: string[];
+    weekdays?: number[];
+    interval_hours?: number;
+  };
+  automation_depth: "FETCH_ONLY" | "FETCH_AND_ANALYZE" | "FULL_PIPELINE";
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  last_result?: string | null;
+  last_duration_ms?: number | null;
+  consecutive_failures: number;
+  timeout_seconds: number;
+  max_attempts: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PipelineRunQueued {
+  pipeline_run_id: string;
+  pipeline_code: string;
+  job_id: string;
+  status: string;
+  automation_depth: string;
+}
+
 export interface Operation {
   id: string;
   supplier_id: string;
@@ -118,7 +154,25 @@ export interface Overview {
     status: string;
     occurred_at: string;
     resource_path: string;
+    supplier_name?: string | null;
+    source_name?: string | null;
+    failure_code?: string | null;
+    failure_message?: string | null;
+    error_count?: number | null;
   }>;
+  latest_acquisition?: {
+    resource_type: string;
+    id: string;
+    code: string;
+    status: string;
+    occurred_at: string;
+    resource_path: string;
+    supplier_name?: string | null;
+    source_name?: string | null;
+    failure_code?: string | null;
+    failure_message?: string | null;
+    error_count?: number | null;
+  } | null;
   supplier_processes: Array<{
     supplier_id: string;
     supplier_name: string;

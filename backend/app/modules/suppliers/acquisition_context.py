@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from collections.abc import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,9 +27,9 @@ class AcquisitionContext:
     supplier: Supplier
     source: SupplierSource
     schema: SupplierSchemaProfile
-    fields: list[SupplierSchemaField]
+    fields: Sequence[SupplierSchemaField]
     mapping: SupplierMappingProfile
-    rules: list[SupplierMappingRule]
+    rules: Sequence[SupplierMappingRule]
 
 
 class AcquisitionContextResolver:

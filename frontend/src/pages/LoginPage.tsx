@@ -24,8 +24,8 @@ export function LoginPage() {
   const auth = useAuth();
   const preferences = usePreferences();
   const submit = () => {
-    if (token.trim().split(".").length !== 3) {
-      setError("Unesite važeći Foundation Bearer token.");
+    if (!token.trim()) {
+      setError("Unesite administratorski Bearer token.");
       return;
     }
     auth.login(token);
@@ -55,16 +55,16 @@ export function LoginPage() {
               </Typography>
             </Stack>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            <Tooltip title="Token izdaje postojeći Foundation autentikacioni sistem; UI ga ne generiše.">
+            <Tooltip title="Token se podešava u lokalnom .env.secrets fajlu; UI ga ne generiše niti prikazuje.">
               <TextField
                 fullWidth
                 multiline
                 minRows={3}
-                label="Foundation Bearer token"
+                label="Administratorski Bearer token"
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
                 autoFocus
-                helperText="Token se čuva samo u sessionStorage-u ovog taba."
+                helperText="Token se lokalno čuva u ovom browseru i ostaje posle restarta."
                 InputProps={{
                   startAdornment: <KeyRounded color="action" sx={{ mr: 1, alignSelf: "start", mt: 1 }} />
                 }}

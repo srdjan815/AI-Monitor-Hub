@@ -63,7 +63,11 @@ def test_supplier_routers_do_not_perform_sql_or_transactions() -> None:
 
 
 def test_supplier_services_own_mutation_transactions() -> None:
-    for name in ("service.py", "contact_service.py", "source_service.py"):
+    for name in (
+        "service.py",
+        "contact_service.py",
+        "source_management/implementation.py",
+    ):
         calls = _calls(SUPPLIER_ROOT / name)
         assert {"commit", "rollback", "refresh"} <= calls, name
 

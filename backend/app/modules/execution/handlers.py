@@ -10,6 +10,7 @@ from app.modules.execution.protocols import (
     PermanentJobError,
     RetryableJobError,
 )
+from app.modules.suppliers.pipeline_worker import supplier_pipeline_handler
 
 MAX_SYNTHETIC_DURATION_MS = 60_000
 
@@ -87,6 +88,7 @@ async def synthetic(
 
 
 HANDLERS: HandlerRegistry = {
+    "supplier.pipeline": supplier_pipeline_handler,
     "system.health_echo": health_echo,
     "system.synthetic": synthetic,
     "test": test,

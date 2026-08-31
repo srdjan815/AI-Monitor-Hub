@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.limits import MAX_LEGACY_OFFSET
 from app.db.session import get_db
 from app.modules.suppliers.enums import SchemaProfileStatus
+from app.modules.suppliers.schema_inference_schemas import SchemaInferenceRead
+from app.modules.suppliers.schema_analysis_service import (
+    SupplierSchemaAnalysisService,
+)
 from app.modules.suppliers.schema_profile_schemas import (
     SchemaProfileAction,
     SchemaProfileClone,
@@ -17,6 +21,8 @@ from app.modules.suppliers.schema_profile_schemas import (
     SchemaProfileUpdate,
 )
 from app.modules.suppliers.schema_profile_service import SupplierSchemaProfileService
+from app.modules.suppliers.schema_record_schemas import SchemaRecordListResponse
+from app.modules.suppliers.schema_record_service import SupplierSchemaRecordService
 
 router = APIRouter(
     prefix="/suppliers/{supplier_id}/sources/{source_id}/schema-profiles",
@@ -51,6 +57,29 @@ async def create_profile(
         f"schema-profiles/{profile.id}"
     )
     return SchemaProfileRead.model_validate(profile)
+
+
+@router.post(
+    "/analyze",
+    response_model=SchemaInferenceRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Kreiraj Schema Profile analizom izvora",
+    description=(
+        "Preuzima izvor kroz postojeći adapter, prepoznaje strukturu i kreira "
+        "DRAFT profil sa Schema Fields. Ne pokreće Acquisition ili Snapshot."
+    ),
+)
+async def analyze_source(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    payload: SchemaProfileCreate,
+    session: AsyncSession = Depends(get_db),
+) -> SchemaInferenceRead:
+    return await SupplierSchemaAnalysisService(session).analyze(
+        supplier_id,
+        source_id,
+        payload,
+    )
 
 
 @router.get(
@@ -113,6 +142,41 @@ async def get_profile(
     )
 
 
+@router.get(
+    "/{profile_id}/records",
+    response_model=SchemaRecordListResponse,
+    summary="Pregled artikala iz preuzetog cenovnika",
+    description=(
+        "Čita sačuvani originalni Artifact bez novog preuzimanja i omogućava "
+        "pretragu sadržaja. Ne menja Schema, Mapping, Snapshot ili Catalog."
+    ),
+)
+async def list_profile_records(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    profile_id: uuid.UUID,
+    search: str | None = Query(default=None, max_length=200),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=MAX_LEGACY_OFFSET),
+    session: AsyncSession = Depends(get_db),
+) -> SchemaRecordListResponse:
+    rows, total, source_count = await SupplierSchemaRecordService(
+        session
+    ).list_records(
+        supplier_id,
+        source_id,
+        profile_id,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
+    return SchemaRecordListResponse(
+        items=rows,
+        total=total,
+        source_record_count=source_count,
+    )
+
+
 @router.patch(
     "/{profile_id}",
     response_model=SchemaProfileRead,
@@ -163,6 +227,30 @@ async def clone_profile(
             profile_id,
             payload,
         )
+    )
+
+
+@router.post(
+    "/{profile_id}/reanalyze",
+    response_model=SchemaInferenceRead,
+    summary="Ponovo analiziraj izvor",
+    description=(
+        "Zamenjuje aktivna polja postojeće DRAFT verzije novom analizom izvora. "
+        "Ne menja ACTIVE ili ARCHIVED profile i ne pokreće Acquisition."
+    ),
+)
+async def reanalyze_source(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    profile_id: uuid.UUID,
+    payload: SchemaProfileAction,
+    session: AsyncSession = Depends(get_db),
+) -> SchemaInferenceRead:
+    return await SupplierSchemaAnalysisService(session).reanalyze(
+        supplier_id,
+        source_id,
+        profile_id,
+        payload,
     )
 
 
