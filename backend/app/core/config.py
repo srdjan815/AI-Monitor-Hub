@@ -86,7 +86,10 @@ class Settings(BaseSettings):
     ]
     docs_enabled: bool = True
     supplier_secrets_file: str = "/app/config/supplier-secrets.json"
-    supplier_secret_mode: Literal["file", "test_memory"] = "test_memory"
+    supplier_secret_mode: Literal["file", "encrypted_file", "test_memory"] = (
+        "test_memory"
+    )
+    supplier_secrets_key: SecretStr | None = None
 
     # Request protection and observability.
     rate_limit_enabled: bool = False
@@ -213,6 +216,16 @@ class Settings(BaseSettings):
         return self
 
     def validate_runtime_secrets(self) -> None:
+        if self.supplier_secret_mode == "encrypted_file":
+            key = (
+                self.supplier_secrets_key.get_secret_value().strip()
+                if self.supplier_secrets_key is not None
+                else ""
+            )
+            if not key:
+                raise RuntimeError(
+                    "SUPPLIER_SECRETS_KEY nedostaje za encrypted_file provider"
+                )
         if self.auth_mode != "static":
             return
         token = (
