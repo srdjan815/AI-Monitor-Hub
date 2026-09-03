@@ -10,6 +10,7 @@ import {
   DarkModeRounded,
   DifferenceRounded,
   ErrorOutlineRounded,
+  FactCheckRounded,
   HubRounded,
   LightModeRounded,
   LogoutRounded,
@@ -61,6 +62,7 @@ const items = [
   { path: "/snapshots", label: "Snapshots", icon: StorageRounded },
   { path: "/deltas", label: "Delta Runs", icon: DifferenceRounded },
   { path: "/incidents", label: "Incident centar", icon: ErrorOutlineRounded },
+  { path: "/article-reviews", label: "Kontrola artikala", icon: FactCheckRounded },
   { path: "/archive", label: "Arhiva", icon: ArchiveRounded },
   { path: "/administration", label: "Administracija", icon: AdminPanelSettingsRounded }
 ];

@@ -10,7 +10,7 @@ import {
 } from "@mui/icons-material";
 import { Chip, Tooltip } from "@mui/material";
 
-const success = new Set(["ACTIVE", "READY", "SUCCEEDED", "VALID", "RESOLVED"]);
+const success = new Set(["ACTIVE", "READY", "SUCCEEDED", "VALID", "RESOLVED", "MANUALLY_APPROVED", "AUTO_RELEASED"]);
 const error = new Set(["FAILED", "ERROR", "CRITICAL", "INVALID"]);
 const warning = new Set([
   "PARTIALLY_SUCCEEDED",
@@ -19,6 +19,7 @@ const warning = new Set([
   "P1",
   "P2",
   "RESTORING"
+  ,"PENDING_REVIEW"
 ]);
 const muted = new Set([
   "INACTIVE",
@@ -26,14 +27,17 @@ const muted = new Set([
   "DISMISSED",
   "SUPPRESSED",
   "CANCELLED"
+  ,"REJECTED", "SUPERSEDED"
 ]);
 const running = new Set(["RUNNING", "BUILDING", "IN_PROGRESS"]);
 
 export function StatusChip({
   value,
+  label,
   size = "small"
 }: {
   value?: string | null;
+  label?: string;
   size?: "small" | "medium";
 }) {
   const status = value || "NEPOZNATO";
@@ -67,7 +71,7 @@ export function StatusChip({
     <Tooltip title={`Status: ${status}`}>
       <Chip
         icon={<Icon />}
-        label={status.replaceAll("_", " ")}
+        label={label ?? status.replaceAll("_", " ")}
         color={color}
         variant={color === "default" ? "outlined" : "filled"}
         size={size}
