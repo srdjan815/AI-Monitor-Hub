@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.routes.auth import router as auth_router
+from app.api.routes.auth import router as auth_router, session_router
 from app.api.routes.health import router as health_router
 from app.core.security import authorize_request
 from app.modules.execution.router import router as execution_router
@@ -13,6 +13,7 @@ api_router = APIRouter()
 
 # Include all route routers
 api_router.include_router(health_router, prefix="/health", tags=["health"])
+api_router.include_router(session_router)
 protected = [Depends(authorize_request)]
 api_router.include_router(auth_router, dependencies=protected)
 api_router.include_router(execution_router, dependencies=protected)

@@ -18,6 +18,7 @@ PUBLIC_PATHS = {
     "/docs",
     "/redoc",
     "/api/v1/openapi.json",
+    "/api/v1/auth/session",
 }
 UUID_VALUE = "00000000-0000-0000-0000-000000000000"
 INTEGER_PARAMETERS = {
