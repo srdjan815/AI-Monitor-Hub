@@ -166,6 +166,13 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Production previous signing keys must be at least 32 characters"
             )
+        if self.auth_allow_legacy_tokens:
+            raise ValueError("Production must disable legacy authentication tokens")
+        if any(
+            not origin.startswith("https://")
+            for origin in self.auth_session_trusted_origins
+        ):
+            raise ValueError("Production session trusted origins must use HTTPS")
 
     def _validate_production_runtime(self) -> None:
         if not self.rate_limit_enabled:
@@ -186,6 +193,8 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Interactive API documentation must be disabled in production"
             )
+        if self.supplier_secret_mode != "encrypted_file":
+            raise ValueError("Production requires encrypted supplier secrets")
 
     @model_validator(mode="after")
     def validate_security_profile(self) -> "Settings":

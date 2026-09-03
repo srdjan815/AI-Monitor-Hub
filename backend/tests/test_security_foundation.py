@@ -171,10 +171,14 @@ def test_production_configuration_rejects_insecure_defaults() -> None:
         backend_allowed_hosts=["api.example.test"],
         cors_allow_credentials=True,
         auth_secret="x" * 48,
+        auth_allow_legacy_tokens=False,
+        auth_session_trusted_origins=["https://admin.example.test"],
         rate_limit_enabled=True,
         rate_limit_backend="redis",
         rate_limit_shared_required=True,
         docs_enabled=False,
+        supplier_secret_mode="encrypted_file",
+        supplier_secrets_key="MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
     )
     assert valid.backend_cors_origins == ["https://admin.example.test"]
 
@@ -185,11 +189,15 @@ def test_production_configuration_rejects_insecure_defaults() -> None:
             backend_cors_origins=["https://admin.example.test"],
             backend_allowed_hosts=["api.example.test"],
             auth_secret="x" * 48,
+            auth_allow_legacy_tokens=False,
+            auth_session_trusted_origins=["https://admin.example.test"],
             rate_limit_enabled=True,
             rate_limit_backend="redis",
             rate_limit_shared_required=True,
             rate_limit_fail_open_mutations=True,
             docs_enabled=False,
+            supplier_secret_mode="encrypted_file",
+            supplier_secrets_key="MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
         )
 
 
