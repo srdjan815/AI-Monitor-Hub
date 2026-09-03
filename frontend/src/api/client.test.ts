@@ -30,14 +30,10 @@ describe("Supplier API client", () => {
     ).toBe("?limit=25&offset=0&active_only=true");
   });
 
-  it("trajno čuva Bearer token u localStorage", async () => {
-    const { getAccessToken, setAccessToken } = await import("./client");
-    const token = "opaque.portal.token";
-    setAccessToken(`Bearer ${token}`);
-    expect(getAccessToken()).toBe(token);
-    expect(values.get("amh.access_token")).toBe(token);
-    setAccessToken("");
-    expect(getAccessToken()).toBe("");
+  it("ne čuva administratorski token u browser storage-u", async () => {
+    await import("./client");
+    expect(values.has("amh.access_token")).toBe(false);
+    expect(sessionValues.has("amh.access_token")).toBe(false);
   });
 
   it("pretvara 422 listu validacionih grešaka u čitljivu poruku", async () => {

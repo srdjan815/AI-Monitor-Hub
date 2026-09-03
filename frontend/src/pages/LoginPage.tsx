@@ -21,14 +21,24 @@ import { createAppTheme } from "../theme";
 export function LoginPage() {
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const auth = useAuth();
   const preferences = usePreferences();
-  const submit = () => {
+  const submit = async () => {
     if (!token.trim()) {
       setError("Unesite administratorski Bearer token.");
       return;
     }
-    auth.login(token);
+    setSubmitting(true);
+    setError("");
+    try {
+      await auth.login(token);
+      setToken("");
+    } catch {
+      setError("Prijava nije uspela. Proverite token.");
+    } finally {
+      setSubmitting(false);
+    }
   };
   return (
     <ThemeProvider theme={createAppTheme(preferences.resolvedTheme)}>
@@ -64,13 +74,13 @@ export function LoginPage() {
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
                 autoFocus
-                helperText="Token se lokalno čuva u ovom browseru i ostaje posle restarta."
+                helperText="Token se šalje backend-u i ne čuva se u browser storage-u."
                 InputProps={{
                   startAdornment: <KeyRounded color="action" sx={{ mr: 1, alignSelf: "start", mt: 1 }} />
                 }}
               />
             </Tooltip>
-            <Button fullWidth variant="contained" size="large" onClick={submit} sx={{ mt: 2 }}>
+            <Button fullWidth variant="contained" size="large" onClick={submit} disabled={submitting} sx={{ mt: 2 }}>
               Prijavi se
             </Button>
           </CardContent>

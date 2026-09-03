@@ -10,8 +10,8 @@ import {
 import {
   AUTHENTICATION_FAILED_EVENT,
   api,
-  getAccessToken,
-  setAccessToken
+  createSession,
+  deleteSession
 } from "../api/client";
 
 interface AuthIdentity {
@@ -22,47 +22,45 @@ interface AuthIdentity {
 }
 
 interface AuthState {
-  token: string;
   permissions: string[];
   authenticated: boolean;
   loading: boolean;
-  login: (token: string) => void;
-  logout: () => void;
+  login: (token: string) => Promise<void>;
+  logout: () => Promise<void>;
   can: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState(getAccessToken());
   const [identity, setIdentity] = useState<AuthIdentity | null>(null);
-  const [loading, setLoading] = useState(Boolean(token));
+  const [loading, setLoading] = useState(true);
   const permissions = useMemo(() => identity?.permissions ?? [], [identity]);
-  const login = useCallback((value: string) => {
-    setAccessToken(value);
+  const refreshIdentity = useCallback(async () => {
     setLoading(true);
-    setToken(getAccessToken());
+    try {
+      setIdentity(await api<AuthIdentity>("/auth/me"));
+    } finally {
+      setLoading(false);
+    }
   }, []);
-  const logout = useCallback(() => {
-    setAccessToken("");
-    setToken("");
+  const login = useCallback(async (value: string) => {
+    await createSession(value);
+    await refreshIdentity();
+  }, [refreshIdentity]);
+  const logout = useCallback(async () => {
+    try { await deleteSession(); } catch { /* lokalno odjavljivanje mora uspeti */ }
     setIdentity(null);
     setLoading(false);
   }, []);
   useEffect(() => {
-    if (!token) {
-      setIdentity(null);
-      setLoading(false);
-      return;
-    }
     let active = true;
-    setLoading(true);
     api<AuthIdentity>("/auth/me")
       .then((value) => {
         if (active) setIdentity(value);
       })
       .catch(() => {
-        if (active) logout();
+        if (active) setIdentity(null);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -70,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [logout, token]);
+  }, []);
   useEffect(() => {
     window.addEventListener(AUTHENTICATION_FAILED_EVENT, logout);
     return () => window.removeEventListener(AUTHENTICATION_FAILED_EVENT, logout);
@@ -83,9 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        token,
         permissions,
-        authenticated: Boolean(token && identity),
+        authenticated: Boolean(identity),
         loading,
         login,
         logout,

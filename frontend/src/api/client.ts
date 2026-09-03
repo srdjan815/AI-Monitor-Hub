@@ -2,27 +2,7 @@ import type { ApiError, JsonObject } from "../types";
 
 const API_ROOT = "/api/v1";
 
-const TOKEN_KEY = "amh.access_token";
 export const AUTHENTICATION_FAILED_EVENT = "amh:authentication-failed";
-let accessToken =
-  localStorage.getItem(TOKEN_KEY) ??
-  sessionStorage.getItem(TOKEN_KEY) ??
-  "";
-if (accessToken) {
-  localStorage.setItem(TOKEN_KEY, accessToken);
-  sessionStorage.removeItem(TOKEN_KEY);
-}
-
-export function setAccessToken(token: string): void {
-  accessToken = token.trim().replace(/^Bearer\s+/i, "");
-  if (accessToken) localStorage.setItem(TOKEN_KEY, accessToken);
-  else localStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(TOKEN_KEY);
-}
-
-export function getAccessToken(): string {
-  return accessToken;
-}
 
 function correlationId(): string {
   return `ui-${crypto.randomUUID()}`;
@@ -64,7 +44,6 @@ export async function api<T>(
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
   headers.set("X-Correlation-ID", correlationId());
-  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   let body = options.body;
   if (
     body &&
@@ -81,7 +60,7 @@ export async function api<T>(
   try {
     response = await fetch(
       path.startsWith("/api/") ? path : `${API_ROOT}${path}`,
-      { ...options, headers, body: body as BodyInit | null | undefined }
+      { ...options, headers, body: body as BodyInit | null | undefined, credentials: "same-origin" }
     );
   } catch {
     throw {
@@ -105,6 +84,14 @@ export async function api<T>(
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+export async function createSession(token: string): Promise<void> {
+  await api<void>("/auth/session", { method: "POST", body: { token } });
+}
+
+export async function deleteSession(): Promise<void> {
+  await api<void>("/auth/session", { method: "DELETE" });
 }
 
 export function queryString(

@@ -67,6 +67,50 @@ async def test_authenticated_identity_is_backend_authoritative() -> None:
 
 
 @pytest.mark.asyncio
+async def test_http_only_session_replaces_browser_token_storage() -> None:
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    token = create_access_token("browser-admin", ("system_admin",))
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        login = await client.post("/api/v1/auth/session", json={"token": token})
+        assert login.status_code == 204
+        cookie = login.headers["set-cookie"]
+        assert "HttpOnly" in cookie
+        assert "SameSite=strict" in cookie
+
+        identity = await client.get("/api/v1/auth/me")
+        assert identity.status_code == 200
+        assert identity.json()["subject"] == "browser-admin"
+
+        logout = await client.delete("/api/v1/auth/session")
+        assert logout.status_code == 204
+        assert (await client.get("/api/v1/auth/me")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_header_and_cookie_authentication_cannot_be_mixed() -> None:
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    token = create_access_token("browser-admin", ("system_admin",))
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/v1/auth/session", json={"token": token})
+        response = await client.get(
+            "/api/v1/auth/me", headers=bearer("other", "read_only")
+        )
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "AMBIGUOUS_AUTHENTICATION"
+
+
+@pytest.mark.asyncio
+async def test_cookie_authenticated_mutation_requires_trusted_origin() -> None:
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    token = create_access_token("browser-admin", ("system_admin",))
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/v1/auth/session", json={"token": token})
+        response = await client.post("/api/v1/catalog/attribute-seed")
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "CSRF_ORIGIN_REJECTED"
+
+
+@pytest.mark.asyncio
 async def test_raw_preview_requires_permission_and_server_setting() -> None:
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     url = (

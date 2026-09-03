@@ -840,11 +840,13 @@ async def authorize_request(
         for name, value in request.scope.get("headers", ())
         if name.lower() == b"authorization"
     ]
-    if (
-        len(authorization_headers) != 1
-        or credentials is None
-        or credentials.scheme.lower() != "bearer"
-    ):
+    cookie_token = request.cookies.get(settings.auth_session_cookie_name)
+    header_valid = (
+        len(authorization_headers) == 1
+        and credentials is not None
+        and credentials.scheme.lower() == "bearer"
+    )
+    if len(authorization_headers) > 1:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -853,7 +855,39 @@ async def authorize_request(
             },
             headers={"WWW-Authenticate": "Bearer"},
         )
-    principal = authenticate_token(credentials.credentials)
+    if header_valid and cookie_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "AMBIGUOUS_AUTHENTICATION",
+                "message": "Koristite jedan način autentikacije",
+            },
+        )
+    supplied_token = (
+        credentials.credentials if header_valid and credentials else cookie_token
+    )
+    if not supplied_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Bearer token required",
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if cookie_token and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
+        origin = request.headers.get("origin", "").rstrip("/")
+        same_origin = str(request.base_url).rstrip("/")
+        allowed_origins = set(settings.auth_session_trusted_origins)
+        if not origin or (origin != same_origin and origin not in allowed_origins):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "CSRF_ORIGIN_REJECTED",
+                    "message": "Poreklo zahteva nije dozvoljeno",
+                },
+            )
+    principal = authenticate_token(supplied_token)
     permission = required_permission(request)
     if permission is not None and permission not in principal.permissions:
         raise HTTPException(

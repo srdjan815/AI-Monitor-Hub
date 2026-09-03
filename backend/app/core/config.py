@@ -49,12 +49,8 @@ class Settings(BaseSettings):
     supplier_critical_price_decrease_ratio: Decimal = Field(
         default=Decimal("0.5"), gt=Decimal("0"), lt=Decimal("1")
     )
-    supplier_shared_ean_auto_accept_similarity: float = Field(
-        default=0.8, ge=0, le=1
-    )
-    supplier_shared_ean_manual_review_similarity: float = Field(
-        default=0.6, ge=0, le=1
-    )
+    supplier_shared_ean_auto_accept_similarity: float = Field(default=0.8, ge=0, le=1)
+    supplier_shared_ean_manual_review_similarity: float = Field(default=0.6, ge=0, le=1)
     incident_max_synchronized_per_source: int = Field(default=100, ge=1, le=1000)
     incident_due_hours_p1: int = Field(default=4, ge=1, le=720)
     incident_due_hours_p2: int = Field(default=24, ge=1, le=720)
@@ -81,6 +77,13 @@ class Settings(BaseSettings):
     auth_allow_legacy_tokens: bool = True
     auth_mode: Literal["static", "test_jwt"] = "test_jwt"
     ai_monitor_admin_token: SecretStr | None = None
+    auth_session_cookie_name: str = Field(
+        default="amh_admin_session", pattern=r"^[A-Za-z0-9_-]{1,64}$"
+    )
+    auth_session_trusted_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
     docs_enabled: bool = True
     supplier_secrets_file: str = "/app/config/supplier-secrets.json"
     supplier_secret_mode: Literal["file", "test_memory"] = "test_memory"
@@ -185,6 +188,9 @@ class Settings(BaseSettings):
     def validate_security_profile(self) -> "Settings":
         self.backend_cors_origins = sorted(
             {origin.rstrip("/") for origin in self.backend_cors_origins}
+        )
+        self.auth_session_trusted_origins = sorted(
+            {origin.rstrip("/") for origin in self.auth_session_trusted_origins}
         )
         if self.max_request_body_bytes < 65_536:
             raise ValueError("MAX_REQUEST_BODY_BYTES must be at least 65536")
