@@ -14,6 +14,7 @@ export const PAGE_ACCESS = [
   { path: "/snapshots", permission: "snapshots.read" },
   { path: "/deltas", permission: "deltas.read" },
   { path: "/incidents", permission: "incidents.read" },
+  { path: "/article-reviews", permission: "article_reviews.read" },
   { path: "/archive", permission: "snapshots.read" },
   { path: "/administration", permission: "incident_rules.read" }
 ] as const satisfies readonly PageAccess[];

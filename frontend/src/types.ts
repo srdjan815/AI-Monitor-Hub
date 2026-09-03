@@ -8,6 +8,30 @@ export interface Page<T> {
   has_more?: boolean;
 }
 
+export interface ArticleReview {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  source_connection_id: string;
+  source_name: string;
+  delta_run_id: string;
+  delta_code: string;
+  delta_item_id: string;
+  product_code: string;
+  ean?: string | null;
+  status: string;
+  severity: string;
+  issue_codes: string[];
+  previous_data?: Record<string, unknown> | null;
+  current_data?: Record<string, unknown> | null;
+  field_changes: Array<Record<string, unknown>>;
+  decision_comment?: string | null;
+  decided_by?: string | null;
+  opened_at: string;
+  decided_at?: string | null;
+  version: number;
+}
+
 export interface Supplier {
   id: string;
   supplier_code: string;

@@ -1,6 +1,7 @@
 import { api, queryString } from "./client";
 import type {
   BulkResponse,
+  ArticleReview,
   Operation,
   Overview,
   Page,
@@ -200,5 +201,21 @@ export const supplierApi = {
     api<BulkResponse>("/suppliers/platform/bulk/incidents/priority", {
       method: "POST",
       body: { items }
+    }),
+  articleReviews: (params: Record<string, unknown>) =>
+    api<Page<ArticleReview>>(
+      `/suppliers/platform/article-reviews${queryString(params as any)}`
+    ),
+  articleReview: (id: string) =>
+    api<ArticleReview>(`/suppliers/platform/article-reviews/${id}`),
+  decideArticleReview: (
+    id: string,
+    action: "approve" | "reject",
+    expectedVersion: number,
+    comment: string
+  ) =>
+    api<ArticleReview>(`/suppliers/platform/article-reviews/${id}/${action}`, {
+      method: "POST",
+      body: { expected_version: expectedVersion, comment }
     })
 };

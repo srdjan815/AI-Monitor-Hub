@@ -52,9 +52,15 @@ from app.modules.suppliers.pipeline_models import (
     SupplierSourcePipelineRun,
     SupplierSourceSchedule,
 )
+from app.modules.suppliers.article_review_models import (
+    SupplierArticleReview,
+    SupplierArticleReviewEvent,
+)
 
 __all__ = [
     "Supplier",
+    "SupplierArticleReview",
+    "SupplierArticleReviewEvent",
     "SupplierAcquisitionIssue",
     "SupplierAcquisitionRun",
     "SupplierAcquisitionService",

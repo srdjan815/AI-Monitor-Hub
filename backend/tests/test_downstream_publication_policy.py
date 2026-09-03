@@ -89,3 +89,20 @@ def test_item_without_current_snapshot_value_can_never_be_published() -> None:
     assert (
         DownstreamBlockReason.CURRENT_ITEM_MISSING in publication_decision(item).reasons
     )
+
+
+def test_manual_approval_releases_policy_block_but_not_missing_payload() -> None:
+    item = candidate(
+        summary={"downstream_blocked": True, "requires_manual_approval": True},
+        flags=["DOWNSTREAM_ITEM_BLOCKED"],
+    )
+    decision = publication_decision(item, review_status="MANUALLY_APPROVED")
+    assert decision.allowed is True
+
+
+def test_rejected_or_missing_review_stays_fail_closed() -> None:
+    item = candidate(
+        summary={"downstream_blocked": True, "requires_manual_approval": True}
+    )
+    assert not publication_decision(item, review_status="REJECTED").allowed
+    assert not publication_decision(item).allowed

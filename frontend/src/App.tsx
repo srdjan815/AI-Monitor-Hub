@@ -23,6 +23,9 @@ const MappingProfilesPage = lazy(() =>
 const IncidentsPage = lazy(() =>
   import("./pages/IncidentsPage").then((module) => ({ default: module.IncidentsPage }))
 );
+const ArticleReviewsPage = lazy(() =>
+  import("./pages/ArticleReviewsPage").then((module) => ({ default: module.ArticleReviewsPage }))
+);
 const ArchivePage = lazy(() =>
   import("./pages/ArchivePage").then((module) => ({ default: module.ArchivePage }))
 );
@@ -70,6 +73,7 @@ function ProtectedRoutes() {
           element={protectedPage("/deltas", <ScopedResourcePage config={resource("deltas")} />)}
         />
         <Route path="/incidents" element={protectedPage("/incidents", <IncidentsPage />)} />
+        <Route path="/article-reviews" element={protectedPage("/article-reviews", <ArticleReviewsPage />)} />
         <Route path="/archive" element={protectedPage("/archive", <ArchivePage />)} />
         <Route path="/administration" element={protectedPage("/administration", <AdministrationPage />)} />
         <Route path="/automation" element={protectedPage("/automation", <AutomationPage />)} />

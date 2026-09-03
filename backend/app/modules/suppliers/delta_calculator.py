@@ -181,6 +181,7 @@ def add_shared_ean_reviews(
     items: list[SupplierDeltaItem],
 ) -> None:
     for finding in shared_ean_findings(list(current)):
+        requires_review = finding.review_level == "MANUAL_REVIEW"
         key = (
             "SHARED_EAN",
             f"{finding.ean}:{finding.first_code.casefold()}:{finding.second_code.casefold()}",
@@ -204,7 +205,8 @@ def add_shared_ean_reviews(
                     "second_product_code": finding.second_code,
                     "name_similarity": finding.name_similarity,
                     "review_level": finding.review_level,
-                    "downstream_blocked": False,
+                    "downstream_blocked": requires_review,
+                    "requires_manual_approval": requires_review,
                 },
             )
         )

@@ -72,6 +72,8 @@ INCIDENT_RULES_READ = "incident_rules.read"
 INCIDENT_RULES_MANAGE = "incident_rules.manage"
 SUPPLIER_PLATFORM_OVERVIEW = "supplier_platform.overview"
 SUPPLIER_PLATFORM_SEARCH = "supplier_platform.search"
+ARTICLE_REVIEWS_READ = "article_reviews.read"
+ARTICLE_REVIEWS_DECIDE = "article_reviews.decide"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -131,6 +133,8 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         INCIDENT_RULES_MANAGE,
         SUPPLIER_PLATFORM_OVERVIEW,
         SUPPLIER_PLATFORM_SEARCH,
+        ARTICLE_REVIEWS_READ,
+        ARTICLE_REVIEWS_DECIDE,
         ADMIN_ACCESS,
     }
 )
@@ -203,6 +207,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             INCIDENT_RULES_MANAGE,
             SUPPLIER_PLATFORM_OVERVIEW,
             SUPPLIER_PLATFORM_SEARCH,
+            ARTICLE_REVIEWS_READ,
+            ARTICLE_REVIEWS_DECIDE,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -267,6 +273,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             INCIDENT_RULES_READ,
             SUPPLIER_PLATFORM_OVERVIEW,
             SUPPLIER_PLATFORM_SEARCH,
+            ARTICLE_REVIEWS_READ,
+            ARTICLE_REVIEWS_DECIDE,
         }
     ),
     "read_only": frozenset(
@@ -287,6 +295,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             INCIDENT_RULES_READ,
             SUPPLIER_PLATFORM_OVERVIEW,
             SUPPLIER_PLATFORM_SEARCH,
+            ARTICLE_REVIEWS_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,
@@ -729,6 +738,8 @@ def required_permission(request: Request) -> str | None:
         return SUPPLIER_PLATFORM_OVERVIEW
     if "/suppliers/platform/search" in path:
         return SUPPLIER_PLATFORM_SEARCH
+    if "/suppliers/platform/article-reviews" in path:
+        return ARTICLE_REVIEWS_DECIDE if write else ARTICLE_REVIEWS_READ
     if "/suppliers/platform/source-schedules" in path:
         return SUPPLIER_SOURCES_WRITE if write else SUPPLIER_SOURCES_READ
     if "/suppliers/platform/bulk/incidents/assign" in path:

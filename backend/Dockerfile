@@ -23,7 +23,8 @@ RUN adduser --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser /app
 
 COPY docker-entrypoint.sh /usr/local/bin/ai-monitor-entrypoint
-RUN chmod 0755 /usr/local/bin/ai-monitor-entrypoint
+RUN sed -i 's/\r$//' /usr/local/bin/ai-monitor-entrypoint && \
+    chmod 0755 /usr/local/bin/ai-monitor-entrypoint
 
 USER root
 

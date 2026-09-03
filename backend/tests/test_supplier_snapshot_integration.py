@@ -35,6 +35,10 @@ from app.modules.suppliers.delta_models import (
     SupplierDeltaItem,
     SupplierDeltaRun,
 )
+from app.modules.suppliers.article_review_models import (
+    SupplierArticleReview,
+    SupplierArticleReviewEvent,
+)
 
 API_ROOT = "http://localhost:8000/api/v1"
 
@@ -87,6 +91,24 @@ async def _purge(supplier_id: str) -> None:
                     )
                 )
                 if delta_item_ids:
+                    review_ids = list(
+                        await session.scalars(
+                            select(SupplierArticleReview.id).where(
+                                SupplierArticleReview.delta_item_id.in_(delta_item_ids)
+                            )
+                        )
+                    )
+                    if review_ids:
+                        await session.execute(
+                            delete(SupplierArticleReviewEvent).where(
+                                SupplierArticleReviewEvent.review_id.in_(review_ids)
+                            )
+                        )
+                        await session.execute(
+                            delete(SupplierArticleReview).where(
+                                SupplierArticleReview.id.in_(review_ids)
+                            )
+                        )
                     await session.execute(
                         delete(SupplierDeltaFieldChange).where(
                             SupplierDeltaFieldChange.delta_item_id.in_(delta_item_ids)
@@ -309,7 +331,16 @@ def _csv_payload(long_description: str) -> bytes:
             "https://img.test/manual-photo.jpg",
             "https://img.test/a.jpg",
         ],
-        ["A-2", "Drugi", "8600000000028", "200.00", long_description, "", "", "https://img.test/b.jpg"],
+        [
+            "A-2",
+            "Drugi",
+            "8600000000028",
+            "200.00",
+            long_description,
+            "",
+            "",
+            "https://img.test/b.jpg",
+        ],
         ["A-3", "Treći", "8600000000035", "300.00", "Opis 3", "", "", ""],
     ]
     stream = io.StringIO(newline="")

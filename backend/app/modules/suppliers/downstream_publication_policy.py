@@ -12,6 +12,7 @@ class DownstreamBlockReason(StrEnum):
     MANUAL_APPROVAL_REQUIRED = "MANUAL_APPROVAL_REQUIRED"
     BLOCKING_ANOMALY = "BLOCKING_ANOMALY"
     CURRENT_ITEM_MISSING = "CURRENT_ITEM_MISSING"
+    REVIEW_NOT_APPROVED = "REVIEW_NOT_APPROVED"
 
 
 class DownstreamPolicyViolation(RuntimeError):
@@ -35,7 +36,11 @@ class DownstreamDecision:
     reasons: tuple[DownstreamBlockReason, ...]
 
 
-def publication_decision(candidate: DeltaPublicationCandidate) -> DownstreamDecision:
+def publication_decision(
+    candidate: DeltaPublicationCandidate,
+    *,
+    review_status: str | None = None,
+) -> DownstreamDecision:
     """Return the fail-closed decision consumed by every future publisher.
 
     Both booleans are deliberately required. Older rows and new producer code
@@ -50,12 +55,20 @@ def publication_decision(candidate: DeltaPublicationCandidate) -> DownstreamDeci
 
     if not isinstance(blocked, bool) or not isinstance(approval, bool):
         reasons.append(DownstreamBlockReason.POLICY_METADATA_MISSING)
-    if blocked is True:
-        reasons.append(DownstreamBlockReason.EXPLICITLY_BLOCKED)
-    if approval is True:
-        reasons.append(DownstreamBlockReason.MANUAL_APPROVAL_REQUIRED)
-    if "DOWNSTREAM_ITEM_BLOCKED" in candidate.anomaly_flags:
-        reasons.append(DownstreamBlockReason.BLOCKING_ANOMALY)
+    approved = review_status in {"MANUALLY_APPROVED", "AUTO_RELEASED"}
+    requires_review = (
+        blocked is True
+        or approval is True
+        or "DOWNSTREAM_ITEM_BLOCKED" in candidate.anomaly_flags
+    )
+    if requires_review and not approved:
+        reasons.append(DownstreamBlockReason.REVIEW_NOT_APPROVED)
+        if blocked is True:
+            reasons.append(DownstreamBlockReason.EXPLICITLY_BLOCKED)
+        if approval is True:
+            reasons.append(DownstreamBlockReason.MANUAL_APPROVAL_REQUIRED)
+        if "DOWNSTREAM_ITEM_BLOCKED" in candidate.anomaly_flags:
+            reasons.append(DownstreamBlockReason.BLOCKING_ANOMALY)
     if candidate.current_snapshot_item_id is None:
         reasons.append(DownstreamBlockReason.CURRENT_ITEM_MISSING)
 
@@ -68,10 +81,16 @@ def publication_decision(candidate: DeltaPublicationCandidate) -> DownstreamDeci
 
 def require_publishable(
     candidates: Sequence[DeltaPublicationCandidate],
+    *,
+    review_statuses: dict[uuid.UUID, str] | None = None,
 ) -> tuple[DownstreamDecision, ...]:
     """Validate a complete outgoing batch before the first external write."""
 
-    decisions = tuple(publication_decision(candidate) for candidate in candidates)
+    statuses = review_statuses or {}
+    decisions = tuple(
+        publication_decision(candidate, review_status=statuses.get(candidate.id))
+        for candidate in candidates
+    )
     blocked = tuple(decision for decision in decisions if not decision.allowed)
     if blocked:
         raise DownstreamPolicyViolation(blocked)
