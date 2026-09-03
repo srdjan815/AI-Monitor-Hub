@@ -1,0 +1,32 @@
+services:
+  api-replica-a:
+    extends:
+      file: docker-compose.yml
+      service: api
+    ports: !override
+      - "18001:8000"
+    environment:
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_BACKEND: redis
+      RATE_LIMIT_SHARED_REQUIRED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api-replica-b:
+    extends:
+      file: docker-compose.yml
+      service: api
+    ports: !override
+      - "18002:8000"
+    environment:
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_BACKEND: redis
+      RATE_LIMIT_SHARED_REQUIRED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

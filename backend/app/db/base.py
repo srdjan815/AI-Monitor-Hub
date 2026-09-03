@@ -12,6 +12,7 @@ NAMING_CONVENTION = {
 
 metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
+
 # Base class for all database models
 class Base(DeclarativeBase):
     metadata = metadata

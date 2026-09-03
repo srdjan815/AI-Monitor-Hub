@@ -26,8 +26,9 @@ class Job(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "jobs"
     __table_args__ = (
         UniqueConstraint("idempotency_key", name="uq_jobs_idempotency_key"),
-        Index("ix_jobs_claim", "queue", "status", "priority", "created_at"),
+        Index("ix_jobs_created_cursor", "created_at", "id"),
         Index("ix_jobs_locked_at", "locked_at"),
+        Index("ix_jobs_lease_token", "lease_token"),
         Index("ix_jobs_correlation_id", "correlation_id"),
     )
 
@@ -48,6 +49,7 @@ class Job(UUIDMixin, TimestampMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     locked_by: Mapped[str | None] = mapped_column(String(120))
+    lease_token: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     correlation_id: Mapped[uuid.UUID] = mapped_column(
         nullable=False, default=uuid.uuid4
     )
@@ -56,10 +58,32 @@ class Job(UUIDMixin, TimestampMixin, Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[str | None] = mapped_column(String(120))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    __mapper_args__ = {
+        "version_id_col": version,
+        "version_id_generator": False,
+    }
 
     attempts: Mapped[list[JobAttempt]] = relationship(
         back_populates="job", cascade="all, delete-orphan", lazy="selectin"
     )
+
+
+Index(
+    "ix_jobs_claim_v3",
+    Job.queue,
+    Job.priority.asc(),
+    Job.created_at.asc(),
+    Job.id.asc(),
+    postgresql_where=Job.status.in_(
+        [JobStatus.PENDING.value, JobStatus.RETRYING.value]
+    ),
+)
+Index(
+    "ix_jobs_status_created",
+    Job.status,
+    Job.created_at.desc(),
+    Job.id.desc(),
+)
 
 
 class JobAttempt(UUIDMixin, Base):

@@ -1,0 +1,18 @@
+from enum import StrEnum
+
+
+class MovementType(StrEnum):
+    RECEIPT = "RECEIPT"
+    ISSUE = "ISSUE"
+    ADJUSTMENT_IN = "ADJUSTMENT_IN"
+    ADJUSTMENT_OUT = "ADJUSTMENT_OUT"
+    TRANSFER = "TRANSFER"
+
+
+class ReservationStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    PARTIALLY_FULFILLED = "PARTIALLY_FULFILLED"
+    FULFILLED = "FULFILLED"
+    RELEASED = "RELEASED"
+    CANCELLED = "CANCELLED"
+    EXPIRED = "EXPIRED"

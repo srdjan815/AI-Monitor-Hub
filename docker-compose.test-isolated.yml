@@ -1,0 +1,85 @@
+# ============================================================================
+# TEST ONLY - EPHEMERAL - DESTRUCTIVE CLEANUP
+#
+# This Compose file must never be used for development, staging, production,
+# supplier credentials, or real supplier data. Use only through
+# scripts/Invoke-IsolatedTestSuite.ps1. Every run creates disposable services.
+# ============================================================================
+
+services:
+  test-db:
+    image: postgres:15.18@sha256:74e110c41804365e3915fcc09d5e7a1eff50161aaa94d5da0e58e0cd75ae509c
+    environment:
+      POSTGRES_DB: amh_ephemeral_test_only
+      POSTGRES_USER: amh_test_runner
+      POSTGRES_PASSWORD: ephemeral-test-password-not-for-real-systems
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amh_test_runner -d amh_ephemeral_test_only"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    labels:
+      ai.monitor.environment: "TEST_ONLY_EPHEMERAL"
+
+  test-redis:
+    image: redis:7.4.9-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    labels:
+      ai.monitor.environment: "TEST_ONLY_EPHEMERAL"
+
+  test-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment: &test-environment
+      APP_ENV: test
+      AUTH_MODE: test_jwt
+      SUPPLIER_SECRET_MODE: test_memory
+      DATABASE_URL: postgresql+asyncpg://amh_test_runner:ephemeral-test-password-not-for-real-systems@test-db:5432/amh_ephemeral_test_only
+      PRODUCT_CONTENT_INTEGRATION_DATABASE_URL: postgresql+asyncpg://amh_test_runner:ephemeral-test-password-not-for-real-systems@test-db:5432/amh_ephemeral_test_only
+      REDIS_URL: redis://test-redis:6379/0
+      SUPPLIER_ARTIFACT_ROOT: /tmp/amh-test-artifacts
+      HOME: /home/appuser
+      USER: appuser
+      LOGNAME: appuser
+    command:
+      - /bin/sh
+      - -c
+      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers
+    tmpfs:
+      - /tmp/amh-test-artifacts
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 2s
+      timeout: 4s
+      retries: 45
+    labels:
+      ai.monitor.environment: "TEST_ONLY_EPHEMERAL"
+
+  test-runner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment: *test-environment
+    network_mode: "service:test-api"
+    depends_on:
+      test-api:
+        condition: service_healthy
+    entrypoint: ["/usr/bin/setpriv", "--reuid=1000", "--regid=1000", "--init-groups"]
+    command: ["python", "-m", "pytest", "-q"]
+    labels:
+      ai.monitor.environment: "TEST_ONLY_EPHEMERAL"

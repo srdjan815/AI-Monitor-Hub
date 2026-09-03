@@ -4,15 +4,18 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
+from app.core.limits import BoundedJsonObject
 
 
 class JobCreate(BaseModel):
     job_type: str = Field(min_length=1, max_length=120)
     queue: str = Field(default="default", min_length=1, max_length=80)
     priority: int = Field(default=100, ge=0, le=1000)
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: BoundedJsonObject = Field(default_factory=dict)
     max_attempts: int = Field(default=3, ge=1, le=20)
+    available_at: AwareDatetime | None = None
     idempotency_key: str | None = Field(default=None, max_length=255)
     correlation_id: uuid.UUID | None = None
     created_by: str | None = Field(default=None, max_length=120)

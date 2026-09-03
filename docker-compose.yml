@@ -3,14 +3,23 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: ai-monitor-hub-api
     restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - path: .env
+      - path: .env.secrets
+        required: false
     volumes:
       - ./backend:/app
+      # Mount the dedicated directory, not the individual file: the secret
+      # provider persists by atomically replacing supplier-secrets.json.
+      - ./config:/app/config:rw
+      - supplier_artifacts:/app/data/supplier-artifacts
+    environment:
+      AUTH_MODE: static
+      SUPPLIER_SECRET_MODE: file
+      SUPPLIER_SECRETS_FILE: /app/config/supplier-secrets.json
     command:
       - uvicorn
       - app.main:app
@@ -18,7 +27,7 @@ services:
       - "0.0.0.0"
       - --port
       - "8000"
-      - --reload
+      - --no-proxy-headers
     depends_on:
       db:
         condition: service_healthy
@@ -29,11 +38,19 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+      - path: .env.secrets
+        required: false
     volumes:
       - ./backend:/app
+      # API and worker must see the same atomically replaceable secret store.
+      - ./config:/app/config:rw
+      - supplier_artifacts:/app/data/supplier-artifacts
     command: ["python", "-m", "app.modules.execution.worker"]
     environment:
+      AUTH_MODE: static
+      SUPPLIER_SECRET_MODE: file
+      SUPPLIER_SECRETS_FILE: /app/config/supplier-secrets.json
       WORKER_QUEUE: default
       WORKER_POLL_SECONDS: "1"
       WORKER_STALE_AFTER_SECONDS: "300"
@@ -44,15 +61,14 @@ services:
       disable: true
 
   db:
-    image: postgres:15
-    container_name: ai-monitor-hub-postgres
+    image: postgres:15.18@sha256:74e110c41804365e3915fcc09d5e7a1eff50161aaa94d5da0e58e0cd75ae509c
     restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ai_cenovnici}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-password}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ai_cenovnici}"]
       interval: 30s
@@ -60,8 +76,7 @@ services:
       retries: 3
 
   redis:
-    image: redis:7-alpine
-    container_name: ai-monitor-hub-redis
+    image: redis:7.4.9-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     restart: unless-stopped
     volumes:
       - redis_data:/data
@@ -74,3 +89,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  supplier_artifacts:

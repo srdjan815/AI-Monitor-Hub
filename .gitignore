@@ -1,29 +1,76 @@
-# Python
+# Python environments
 .venv/
+.venv-*/
+venv/
+backend/.venv/
+backend/venv/
+
+# Python generated files
 __pycache__/
 *.py[cod]
-*.pyo
-
-# Environment
-.env
-
-# VS Code
-.vscode/settings.json
-
-# Build
+*.egg-info/
 build/
 dist/
 
-# Caches
+# Environment and local overrides
+.env
+.env.*
+!.env.example
+!.env.*.example
+/config/supplier-secrets.json
+/backend/config/supplier-secrets.json
+/Also-pricelist/
+
+# IDE state (canonical shared settings are explicitly retained)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+.idea/
+
+# Test, coverage, and tool output
 .pytest_cache/
+.ruff_cache/
 .mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+coverage.json
+coverage.lcov
+junit.xml
+.benchmarks/
+*.prof
 
 # Logs
 *.log
+*.pid
 
-# Windows
+# Local generated data
+*.dump
+*.pgdump
+*.sql.gz
+*.bak
+*.tmp
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+.local-media/
+.cache/
+/benchmark-results/
+/backend/benchmark-results/
+/checkpoints/
+/tmp/
+/temp/
+/*.zip
+/*.tar
+/*.tar.gz
+/*.7z
+
+# Operating-system metadata
 Thumbs.db
 Desktop.ini
-
-*.egg-info/
-backend_product_core_v1/
+.DS_Store
+._*
