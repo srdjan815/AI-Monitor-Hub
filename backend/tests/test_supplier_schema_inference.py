@@ -324,6 +324,17 @@ def test_item_group_uses_category_business_limit() -> None:
     assert field.max_length == 45
 
 
+def test_category_uses_long_path_business_limit() -> None:
+    inferred = SchemaFieldInferer.fields(
+        uuid.uuid4(),
+        [{"Category": "Računari > Komponente > Memorije"}],
+    )
+
+    field = inferred[0].entity
+    assert field.data_type == "STRING"
+    assert field.max_length == 500
+
+
 def test_multiple_supplier_prices_remain_decimal_with_one_primary_price() -> None:
     inferred = SchemaFieldInferer.fields(
         uuid.uuid4(),

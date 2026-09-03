@@ -191,6 +191,7 @@ class SupplierMappingProfileService(SupplierMappingServiceSupport):
                 "mapping_profile_empty",
                 "Prazan Mapping Profile ne može biti aktiviran",
             )
+        await self._require_core_rules(profile.id)
         current = await self.repository.active_profile(
             schema_profile_id,
             for_update=True,

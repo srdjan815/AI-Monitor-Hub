@@ -80,7 +80,6 @@ def create_supplier(client: httpx.Client, name: str) -> dict:
 
 def test_supplier_source_crud_lifecycle_and_isolation(
     api_client: httpx.Client,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     suffix = uuid.uuid4().hex[:12]
     supplier_ids: list[str] = []
@@ -106,43 +105,22 @@ def test_supplier_source_crud_lifecycle_and_isolation(
         assert "secret_reference" not in source
         assert created_response.headers["location"].endswith(source["id"])
 
-        async def check_validator_permissions() -> tuple[int, int, int]:
-            monkeypatch.setattr(
-                security,
-                "authentication_adapter",
-                LocalHMACAuthenticationAdapter(settings),
+        with httpx.Client(
+            base_url=API_ROOT,
+            timeout=20.0,
+            headers=bearer("source-validator", "supplier_source_validator"),
+        ) as validator_client:
+            permitted = validator_client.post(f"{path}/{source['id']}/validate")
+            assert permitted.status_code == 200, permitted.text
+            denied = validator_client.patch(
+                f"{path}/{source['id']}",
+                json={
+                    "version": permitted.json()["version"],
+                    "description": "Forbidden",
+                },
             )
-            transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
-            async with httpx.AsyncClient(
-                transport=transport,
-                base_url="http://test/api/v1",
-                headers=bearer(
-                    "source-validator",
-                    "supplier_source_validator",
-                ),
-            ) as validator_client:
-                permitted = await validator_client.post(
-                    f"{path}/{source['id']}/validate"
-                )
-                assert permitted.status_code == 200, permitted.text
-                denied = await validator_client.patch(
-                    f"{path}/{source['id']}",
-                    json={
-                        "version": permitted.json()["version"],
-                        "description": "Forbidden",
-                    },
-                )
-                return (
-                    permitted.status_code,
-                    permitted.json()["version"],
-                    denied.status_code,
-                )
-
-        validation_status, source["version"], write_status = asyncio.run(
-            check_validator_permissions()
-        )
-        assert validation_status == 200
-        assert write_status == 403
+        source["version"] = permitted.json()["version"]
+        assert denied.status_code == 403
 
         duplicate = api_client.post(
             path, json={**payload, "name": payload["name"].upper()}
@@ -554,6 +532,7 @@ def test_supplier_source_openapi_and_scope() -> None:
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}/validate",
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}/pipeline-runs",
         "/api/v1/suppliers/{supplier_id}/sources/{source_id}/schedule",
+        "/api/v1/suppliers/{supplier_id}/sources/{source_id}/schedule-readiness-incident",
     }
     assert set(
         schema["paths"][
@@ -561,9 +540,7 @@ def test_supplier_source_openapi_and_scope() -> None:
         ]
     ) == {"post"}
     assert set(
-        schema["paths"][
-            "/api/v1/suppliers/{supplier_id}/sources/{source_id}/schedule"
-        ]
+        schema["paths"]["/api/v1/suppliers/{supplier_id}/sources/{source_id}/schedule"]
     ) == {"get", "put"}
     assert not any(
         token in path

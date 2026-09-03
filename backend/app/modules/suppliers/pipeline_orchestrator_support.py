@@ -8,7 +8,10 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.modules.suppliers.acquisition_adapters import SourceAdapterRegistry, UrllibHttpClient
+from app.modules.suppliers.acquisition_adapters import (
+    SourceAdapterRegistry,
+    UrllibHttpClient,
+)
 from app.modules.suppliers.mapping_profile_repository import SupplierMappingRepository
 from app.modules.suppliers.pipeline_contracts import (
     PipelineContext,
@@ -17,7 +20,14 @@ from app.modules.suppliers.pipeline_contracts import (
     PipelineResult,
 )
 from app.modules.suppliers.pipeline_models import SupplierSchemaCompatibilityReport
+from app.modules.suppliers.pipeline_compatibility_service import (
+    SupplierPipelineCompatibilityService,
+)
 from app.modules.suppliers.pipeline_repository import SupplierPipelineRepository
+from app.modules.suppliers.pipeline_failure_support import failed_phase_results
+from app.modules.suppliers.pipeline_incident_service import (
+    SupplierPipelineIncidentService,
+)
 from app.modules.suppliers.repository import SupplierRepository
 from app.modules.suppliers.schema_compatibility_service import (
     SupplierSchemaCompatibilityService,
@@ -103,28 +113,8 @@ class SupplierPipelineOrchestratorSupport:
             baseline_record_count=context.active_schema.baseline_record_count,
             current_record_count=context.artifact.record_count,
         )
-        report = SupplierSchemaCompatibilityReport(
-            pipeline_run_id=context.run.id,
-            artifact_id=context.artifact.id,
-            active_schema_profile_id=context.active_schema.id,
-            analyzed_schema_profile_id=analyzed.id,
-            result=result.status,
-            severity=result.severity,
-            changes=[
-                {
-                    "code": change.code,
-                    "path": change.path,
-                    "classification": change.classification,
-                    "severity": change.severity,
-                    "expected": change.expected,
-                    "actual": change.actual,
-                    "message": change.message,
-                }
-                for change in result.changes
-            ],
-            summary=result.summary,
-        )
-        await self.repository.add(report)
+        persistence = SupplierPipelineCompatibilityService(self.repository)
+        report = await persistence.upsert(context, analyzed, result)
         await self.repository.mutate(
             context.run,
             {
@@ -226,7 +216,7 @@ class SupplierPipelineOrchestratorSupport:
             run,
             {
                 "status": "FAILED",
-                "phase_results": self._failed_phase_results(
+                "phase_results": failed_phase_results(
                     run.phase_results,
                     run.current_phase,
                     code,
@@ -237,8 +227,19 @@ class SupplierPipelineOrchestratorSupport:
                 "version": run.version + 1,
             },
         )
-        await self._schedule_result(context, "FAILED", 0)
+        if run.schedule_id is not None:
+            schedule = await self.repository.schedule(source_id, for_update=True)
+            if schedule is not None:
+                await self.repository.update_schedule_result(
+                    schedule.id,
+                    status="FAILED",
+                    duration_ms=0,
+                    consecutive_failures=schedule.consecutive_failures + 1,
+                    version=schedule.version,
+                )
         await self.session.commit()
+        fresh_context = await self._context(source_id, run_id)
+        await SupplierPipelineIncidentService(self.session).record_failure(fresh_context, code, message)
 
     async def _success(
         self,
@@ -266,6 +267,8 @@ class SupplierPipelineOrchestratorSupport:
         )
         await self._schedule_result(context, "SUCCEEDED", duration)
         await self.session.commit()
+        if context.run.automation_depth == "FULL_PIPELINE":
+            await SupplierPipelineIncidentService(self.session).resolve_after_success(context)
         return PipelineResult(
             status="SUCCEEDED",
             completed_phase=phase,  # type: ignore[arg-type]
@@ -289,7 +292,7 @@ class SupplierPipelineOrchestratorSupport:
             {
                 "status": "FAILED",
                 "current_phase": phase,
-                "phase_results": self._failed_phase_results(
+                "phase_results": failed_phase_results(
                     context.run.phase_results,
                     phase,
                     code,
@@ -302,6 +305,9 @@ class SupplierPipelineOrchestratorSupport:
         )
         await self._schedule_result(context, "FAILED", duration)
         await self.session.commit()
+        await SupplierPipelineIncidentService(self.session).record_failure(
+            context, code, message
+        )
         return PipelineResult(
             status="FAILED",
             completed_phase=phase,  # type: ignore[arg-type]
@@ -309,16 +315,13 @@ class SupplierPipelineOrchestratorSupport:
             references=references,
             telemetry={"duration_ms": duration, "business_failure": True},
         )
-
     async def _schedule_result(
         self, context: PipelineContext, status: str, duration: int
     ) -> None:
         if context.schedule is None:
             return
         failures = (
-            0
-            if status == "SUCCEEDED"
-            else context.schedule.consecutive_failures + 1
+            0 if status == "SUCCEEDED" else context.schedule.consecutive_failures + 1
         )
         await self.repository.update_schedule_result(
             context.schedule.id,
@@ -327,24 +330,4 @@ class SupplierPipelineOrchestratorSupport:
             consecutive_failures=failures,
             version=context.schedule.version,
         )
-
-    @staticmethod
-    def _failed_phase_results(
-        current: dict[str, object],
-        phase: str,
-        error_code: str,
-    ) -> dict[str, object]:
-        now = datetime.now(UTC)
-        result = PipelinePhaseResult(
-            status="FAILED",
-            started_at=now,
-            completed_at=now,
-            duration_ms=0,
-            error_code=error_code,
-            warning_count=0,
-            error_count=1,
-        )
-        return {**current, phase: result.as_dict()}
-
-
 __all__ = ["SupplierPipelineOrchestratorSupport"]

@@ -85,6 +85,8 @@ const initialForm = {
   certificate_password: "",
   username: "",
   password: "",
+  imap_username: "",
+  imap_password: "",
   token: "",
   api_key: "",
   username_parameter: "username",
@@ -103,6 +105,8 @@ const initialForm = {
   sender: "",
   subject: "",
   received_hours: "24",
+  imap_host: "mail.monitor.rs",
+  imap_port: "993",
   file_id: "",
   folder_id: "",
   shared_drive_id: "",
@@ -178,13 +182,23 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       pin_shop_id:
         form.integration_profile === "PIN_SOAP" ? Number(form.pin_shop_id) : 4,
       catalog_endpoint_path:
-        form.integration_profile === "KIMTEC_MSAN" ? form.catalog_endpoint : null,
+        ["KIMTEC_MSAN", "ASBIS_IT4PROFIT"].includes(form.integration_profile) ? form.catalog_endpoint : null,
       price_endpoint_path:
-        form.integration_profile === "KIMTEC_MSAN" ? form.price_endpoint : null,
+        ["KIMTEC_MSAN", "ASBIS_IT4PROFIT"].includes(form.integration_profile) ? form.price_endpoint : null,
       barcode_service_url:
         form.integration_profile === "KIMTEC_MSAN"
           ? form.barcode_service_url
-          : null
+          : null,
+      imap_host: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_host : null,
+      imap_port: form.integration_profile === "ASBIS_IT4PROFIT" ? Number(form.imap_port) : 993,
+      // mail.monitor.rs currently requires OpenSSL legacy-DH compatibility.
+      // Keep this scoped to the ASBIS integration; never lower TLS globally.
+      imap_allow_legacy_dh: form.integration_profile === "ASBIS_IT4PROFIT",
+      imap_folder: form.integration_profile === "ASBIS_IT4PROFIT" ? "INBOX" : "INBOX",
+      imap_subject_filter: form.integration_profile === "ASBIS_IT4PROFIT" ? "ASBIS" : "ASBIS",
+      imap_sender_filter: form.integration_profile === "ASBIS_IT4PROFIT" ? form.sender || null : null,
+      imap_attachment_prefix: form.integration_profile === "ASBIS_IT4PROFIT" ? "HTML, PO actions, in mail body" : "HTML, PO actions, in mail body",
+      imap_received_within_hours: form.integration_profile === "ASBIS_IT4PROFIT" ? 720 : 720
     };
   } else if (form.method === "FTP") {
     configuration = {
@@ -466,6 +480,7 @@ export function SourcesPage() {
 
   const saveDraft = useMutation({
     mutationFn: async () => {
+      const isNewSource = !draft;
       const source = draft
         ? await supplierApi.updateSource(workspace.supplierId, draft.id, {
             ...sourcePayload(form),
@@ -473,22 +488,35 @@ export function SourcesPage() {
             version: draft.version
           })
         : await supplierApi.createSource(workspace.supplierId, sourcePayload(form));
+      // Creation and credential storage are separate API operations. Remember
+      // the created source before writing secrets so a credential failure can
+      // be retried against the same source instead of attempting a duplicate.
+      if (isNewSource) {
+        setDraft(source);
+        setOpened(source);
+        workspace.setSourceId(source.id);
+        queryClient.invalidateQueries({ queryKey: ["sources"] });
+      }
       const hasCredential =
-        form.password || form.token || form.api_key;
+        form.password || form.token || form.api_key || form.imap_password;
       if (hasCredential) {
         await supplierApi.writeSourceCredentials(workspace.supplierId, source.id, {
           placement:
             form.method === "PORTAL"
               ? "PORTAL_FORM"
-              : form.integration_profile === "CT_SOAP"
+              : form.integration_profile === "ASBIS_IT4PROFIT"
+                ? "QUERY"
+                : form.integration_profile === "CT_SOAP"
                 ? "SOAP_BODY"
                 : form.placement,
           username: form.username || null,
           password: form.password || null,
           token: form.token || null,
           api_key: form.api_key || null,
-          username_parameter: form.username_parameter,
-          password_parameter: form.password_parameter,
+          imap_username: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_username || null : null,
+          imap_password: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_password || null : null,
+          username_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "USERNAME" : form.username_parameter,
+          password_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "PASSWORD" : form.password_parameter,
           api_key_parameter: form.api_key_parameter
         });
         return supplierApi.source(workspace.supplierId, source.id);
@@ -603,15 +631,19 @@ export function SourcesPage() {
       }
       return supplierApi.writeSourceCredentials(opened.supplier_id, opened.id, {
         placement:
-          ["CT_SOAP", "PIN_SOAP"].includes(form.integration_profile)
+          form.integration_profile === "ASBIS_IT4PROFIT"
+            ? "QUERY"
+            : ["CT_SOAP", "PIN_SOAP"].includes(form.integration_profile)
             ? "SOAP_BODY"
             : form.placement,
         username: form.username || null,
         password: form.password || null,
         token: form.token || null,
         api_key: form.api_key || null,
-        username_parameter: form.username_parameter,
-        password_parameter: form.password_parameter,
+        imap_username: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_username || null : null,
+        imap_password: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_password || null : null,
+        username_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "USERNAME" : form.username_parameter,
+        password_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "PASSWORD" : form.password_parameter,
         api_key_parameter: form.api_key_parameter
       });
     },
@@ -735,7 +767,25 @@ export function SourcesPage() {
     );
   const selectIntegrationProfile = (value: string) =>
     setForm((current) =>
-      value === "KIMTEC_MSAN"
+      value === "ASBIS_IT4PROFIT"
+        ? {
+            ...current,
+            integration_profile: value,
+            authentication_type: "BASIC",
+            placement: "QUERY",
+            url: "https://services.it4profit.com/product/sr/710",
+            endpoint: "",
+            catalog_endpoint: "ProductList.xml",
+            price_endpoint: "PriceAvail.xml",
+            username_parameter: "USERNAME",
+            password_parameter: "PASSWORD",
+            imap_host: "mail.monitor.rs",
+            imap_port: "993",
+            imap_username: "",
+            format: "JSON",
+            name: current.name || "ASBIS - objedinjeni cenovnik"
+          }
+        : value === "KIMTEC_MSAN"
         ? {
             ...current,
             integration_profile: value,
@@ -915,6 +965,12 @@ export function SourcesPage() {
                 )}
               <Button
                 variant="contained"
+                disabled={opened.status !== "ACTIVE"}
+                title={
+                  opened.status === "ACTIVE"
+                    ? "Otvori analizu cenovnika"
+                    : "Konekcija mora prvo biti uspešno testirana i aktivirana."
+                }
                 onClick={() => {
                   workspace.setSourceId(opened.id);
                   window.location.assign("/schemas");
@@ -922,6 +978,11 @@ export function SourcesPage() {
               >
                 Otvori analizu cenovnika
               </Button>
+              {opened.status !== "ACTIVE" && (
+                <Typography variant="caption" color="warning.main">
+                  Pre analize uspešno testirajte i aktivirajte konekciju.
+                </Typography>
+              )}
               <Button
                 startIcon={<KeyRounded />}
                 onClick={() => {
@@ -1223,12 +1284,27 @@ export function SourcesPage() {
                     onChange={(event) => update("url", event.target.value)}
                   />
                   {form.method === "API" && (
-                    <TextField
-                      label="Endpoint"
-                      value={form.endpoint}
-                      helperText="Putanja API operacije, na primer /v1/products."
-                      onChange={(event) => update("endpoint", event.target.value)}
-                    />
+                    <>
+                      <TextField select label="Profil integracije" value={form.integration_profile} onChange={(event) => selectIntegrationProfile(event.target.value)}>
+                        <MenuItem value="GENERIC">Opšti API</MenuItem>
+                        <MenuItem value="ASBIS_IT4PROFIT">ASBIS (2 XML + akcije iz emaila)</MenuItem>
+                        <MenuItem value="KIMTEC_MSAN">KimTec / M SAN B2B</MenuItem>
+                      </TextField>
+                      {form.integration_profile === "ASBIS_IT4PROFIT" ? (
+                        <>
+                          <Alert severity="info">Katalog i stanje/cene spajaju se sa poslednjim ASBIS akcijskim ZIP prilogom po šifri artikla.</Alert>
+                          <TextField label="Prvi XML — katalog proizvoda" value={form.catalog_endpoint} helperText={`${form.url.replace(/\/$/, "")}/${form.catalog_endpoint.replace(/^\//, "")} (USERNAME i PASSWORD sistem dodaje bez prikazivanja)`} onChange={(event) => update("catalog_endpoint", event.target.value)} />
+                          <TextField label="Drugi XML — cene i stanje" value={form.price_endpoint} helperText={`${form.url.replace(/\/$/, "")}/${form.price_endpoint.replace(/^\//, "")} (USERNAME i PASSWORD sistem dodaje bez prikazivanja)`} onChange={(event) => update("price_endpoint", event.target.value)} />
+                          <TextField label="IMAP server" value={form.imap_host} onChange={(event) => update("imap_host", event.target.value)} />
+                          <TextField label="IMAP port" value={form.imap_port} onChange={(event) => update("imap_port", event.target.value)} />
+                          <TextField label="Dozvoljeni pošiljalac" value={form.sender} helperText="Opciono, ali preporučeno: email adresa ili stabilan deo From zaglavlja ASBIS poruke." onChange={(event) => update("sender", event.target.value)} />
+                          <TextField label="IMAP korisničko ime" value={form.imap_username} onChange={(event) => update("imap_username", event.target.value)} />
+                          <TextField type="password" label="IMAP lozinka" value={form.imap_password} onChange={(event) => update("imap_password", event.target.value)} />
+                        </>
+                      ) : (
+                        <TextField label="Endpoint" value={form.endpoint} helperText="Putanja API operacije, na primer /v1/products." onChange={(event) => update("endpoint", event.target.value)} />
+                      )}
+                    </>
                   )}
                   {form.method === "PORTAL" && (
                     <>
@@ -1279,11 +1355,14 @@ export function SourcesPage() {
                         <MenuItem value="CLIENT_CERTIFICATE">Klijentski sertifikat (mTLS)</MenuItem>
                         <MenuItem value="SOAP_BODY">SOAP servis (CT / PIN-ALSO)</MenuItem>
                       </TextField>
-                      {!(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && (
+                      {form.integration_profile !== "ASBIS_IT4PROFIT" && !(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && (
                         <TextField select label="Gde dobavljač očekuje podatke za prijavu" value={form.placement} onChange={(event) => update("placement", event.target.value)}>
                           <MenuItem value="HEADER">Bezbednosno zaglavlje</MenuItem>
                           <MenuItem value="QUERY">Parametri adrese (npr. DS Computers)</MenuItem>
                         </TextField>
+                      )}
+                      {form.integration_profile === "ASBIS_IT4PROFIT" && (
+                        <Alert severity="info">ASBIS API prijava je fiksno podešena kroz URL parametre USERNAME i PASSWORD.</Alert>
                       )}
                       {(form.authentication_type === "BASIC" ||
                         form.authentication_type === "API_KEY" ||
@@ -1578,10 +1657,13 @@ export function SourcesPage() {
               <MenuItem value="CLIENT_CERTIFICATE">Klijentski sertifikat (mTLS)</MenuItem>
               <MenuItem value="SOAP_BODY">SOAP servis (CT / PIN-ALSO)</MenuItem>
             </TextField>
-            {!(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && <TextField select label="Gde dobavljač očekuje pristupne podatke" value={form.placement} onChange={(event) => update("placement", event.target.value)}>
+            {form.integration_profile !== "ASBIS_IT4PROFIT" && !(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && <TextField select label="Gde dobavljač očekuje pristupne podatke" value={form.placement} onChange={(event) => update("placement", event.target.value)}>
               <MenuItem value="HEADER">Bezbednosno zaglavlje</MenuItem>
               <MenuItem value="QUERY">Parametri adrese</MenuItem>
             </TextField>}
+            {form.integration_profile === "ASBIS_IT4PROFIT" && (
+              <Alert severity="info">ASBIS API koristi fiksne URL parametre USERNAME i PASSWORD.</Alert>
+            )}
             {(form.authentication_type === "BASIC" ||
               (form.authentication_type === "SOAP_BODY" &&
                 form.integration_profile === "CT_SOAP")) && (
@@ -1595,6 +1677,13 @@ export function SourcesPage() {
             )}
             {form.authentication_type === "API_KEY" && (
               <TextField type="password" label="API ključ" value={form.api_key} onChange={(event) => update("api_key", event.target.value)} />
+            )}
+            {form.integration_profile === "ASBIS_IT4PROFIT" && (
+              <>
+                <Alert severity="info">API i email lozinke čuvaju se zajedno u postojećem zaštićenom fajlu, van baze.</Alert>
+                <TextField label="IMAP korisničko ime" value={form.imap_username} onChange={(event) => update("imap_username", event.target.value)} />
+                <TextField type="password" label="IMAP lozinka" value={form.imap_password} onChange={(event) => update("imap_password", event.target.value)} />
+              </>
             )}
             {form.authentication_type === "SOAP_BODY" && form.integration_profile === "PIN_SOAP" && (
               <>

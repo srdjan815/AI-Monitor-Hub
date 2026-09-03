@@ -14,6 +14,7 @@ PREVIEW_LIMIT = 240
 class IdentityItem(Protocol):
     source_key: str | None
     source_identifier: str | None
+    mapped_data: dict[str, object]
 
 
 TIdentity = TypeVar("TIdentity", bound=IdentityItem)
@@ -28,6 +29,9 @@ class ValueChange:
 
 
 def matching_identity(item: IdentityItem) -> tuple[str, str]:
+    product_code = str(item.mapped_data.get("product_code") or "").strip()
+    if product_code:
+        return "PRODUCT_CODE", product_code.casefold()
     source_key = item.source_key
     if isinstance(source_key, str) and source_key:
         return "SOURCE_KEY", source_key

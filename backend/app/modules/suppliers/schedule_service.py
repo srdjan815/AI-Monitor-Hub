@@ -19,7 +19,14 @@ from app.modules.suppliers.pipeline_repository import SupplierPipelineRepository
 from app.modules.suppliers.pipeline_scheduler import (
     SupplierPipelineScheduleCalculator,
 )
+from app.modules.suppliers.pipeline_recovery_service import (
+    SupplierPipelineRecoveryService,
+)
 from app.modules.suppliers.models import SupplierSource
+from app.modules.suppliers.incident_models import SupplierIncident
+from app.modules.suppliers.incident_support import SupplierIncidentSupport
+from app.modules.suppliers.mapping_profile_repository import SupplierMappingRepository
+from app.modules.suppliers.schema_profile_repository import SupplierSchemaRepository
 from app.modules.suppliers.schedule_schemas import (
     AutomationDepth,
     PipelineRunNowRequest,
@@ -43,7 +50,9 @@ class SupplierScheduleService:
     ) -> SupplierSource:
         source = await self.sources.get_source(supplier_id, source_id)
         if source is None:
-            supplier_error(404, "supplier_source_not_found", "Konekcija nije pronaÄ‘ena")
+            supplier_error(
+                404, "supplier_source_not_found", "Konekcija nije pronaÄ‘ena"
+            )
         return source
 
     async def get(
@@ -74,7 +83,7 @@ class SupplierScheduleService:
             supplier_error(
                 409,
                 "supplier_schedule_source_not_ready",
-                "Raspored se moÅ¾e ukljuÄiti tek kada je konekcija ACTIVE",
+                "Raspored se moÅ¾e uključiti tek kada je konekcija ACTIVE",
             )
         schedule = await self.repository.schedule(source_id, for_update=True)
         if schedule is not None and data.version != schedule.version:
@@ -146,6 +155,50 @@ class SupplierScheduleService:
         await self.session.refresh(schedule)
         return SupplierScheduleRead.model_validate(schedule)
 
+    async def report_not_ready(
+        self, supplier_id: uuid.UUID, source_id: uuid.UUID
+    ) -> SupplierIncident:
+        source = await self._source(supplier_id, source_id)
+        schema = await SupplierSchemaRepository(self.session).active_profile(source.id)
+        mapping = (
+            await SupplierMappingRepository(self.session).active_profile(schema.id)
+            if schema is not None
+            else None
+        )
+        missing: list[str] = []
+        if source.status != "ACTIVE":
+            missing.append("aktivna konekcija cenovnika")
+        if schema is None:
+            missing.append("aktivna schema")
+        if mapping is None:
+            missing.append("aktivno mapiranje")
+        if not missing:
+            supplier_error(
+                409,
+                "supplier_schedule_source_ready",
+                "Konekcija je spremna i ne zahteva incident konfiguracije",
+            )
+        return await SupplierIncidentSupport(self.session).create_or_occurrence(
+            incident_id=uuid.uuid4(),
+            supplier_id=supplier_id,
+            source_id=source.id,
+            source_domain="SOURCE_CONNECTION",
+            incident_type="CONFIGURATION_REVIEW_REQUIRED",
+            severity="MEDIUM",
+            priority="P3",
+            title="Dobavljaču nije potpuno integrisan cenovnik",
+            description=(
+                f"Konekcija {source.name} nije uključena u automatski raspored. "
+                f"Nedostaje: {', '.join(missing)}."
+            ),
+            source_entity_id=source.id,
+            context={
+                "source_status": source.status,
+                "missing": missing,
+                "automation_action": "SKIPPED_NOT_READY",
+            },
+        )
+
     async def list(self, *, limit: int, offset: int) -> SupplierScheduleList:
         rows, total = await self.repository.list_schedules(
             limit=limit,
@@ -176,9 +229,7 @@ class SupplierScheduleService:
                 "pipeline_source_not_active",
                 "Samo aktivna i proverena konekcija moÅ¾e pokrenuti pipeline",
             )
-        existing = await self.repository.pipeline_by_idempotency(
-            data.idempotency_key
-        )
+        existing = await self.repository.pipeline_by_idempotency(data.idempotency_key)
         if existing is not None and existing.job_id is not None:
             return PipelineRunQueued(
                 pipeline_run_id=existing.id,
@@ -187,11 +238,15 @@ class SupplierScheduleService:
                 status=existing.status,
                 automation_depth=cast(AutomationDepth, existing.automation_depth),
             )
-        if await self.repository.active_pipeline(source_id) is not None:
+        await self.repository.lock_global_pipeline_dispatch()
+        recovery = SupplierPipelineRecoveryService(self.session)
+        recovery.repository = self.repository
+        await recovery.recover_global()
+        if await self.repository.blocking_pipeline_global() is not None:
             supplier_error(
                 409,
                 "supplier_pipeline_already_running",
-                "Pipeline za ovu konekciju je veÄ‡ pokrenut",
+                "Drugi dobavljački pipeline je već pokrenut; pokušajte ponovo kada se završi",
             )
         schedule = await self.repository.schedule(source_id)
         timeout_seconds = schedule.timeout_seconds if schedule is not None else 300

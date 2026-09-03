@@ -82,7 +82,7 @@ export function EntityTable<T extends { id: string }>({
   onSort?: (key: string) => void;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
-  onOpen: (row: T) => void;
+  onOpen?: (row: T) => void;
   onRefresh: () => void;
   bulkActions?: ReactNode;
 }) {
@@ -267,12 +267,12 @@ export function EntityTable<T extends { id: string }>({
                   hover
                   key={row.id}
                   selected={selected.includes(row.id)}
-                  onDoubleClick={() => onOpen(row)}
-                  tabIndex={0}
+                  onDoubleClick={onOpen ? () => onOpen(row) : undefined}
+                  tabIndex={onOpen ? 0 : undefined}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter") onOpen(row);
+                    if (event.key === "Enter") onOpen?.(row);
                   }}
-                  sx={{ cursor: "pointer" }}
+                  sx={{ cursor: onOpen ? "pointer" : "default" }}
                 >
                   <TableCell padding="checkbox">
                     <Checkbox

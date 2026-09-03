@@ -1,5 +1,11 @@
 # Testing Strategy
 
+> **TEST SYSTEM SEPARATION:** destructive integration and stress testing runs
+> only through `scripts/Invoke-IsolatedTestSuite.ps1`. The environment is
+> ephemeral, contains no real credentials or persistent application volumes,
+> and is not a development environment. See
+> [isolated-test-environment.md](isolated-test-environment.md).
+
 The normal gate runs collected pytest tests against PostgreSQL, followed by
 Ruff, C901, compilation, mapper configuration, Alembic check, clean MyPy,
 `pip check`, OpenAPI snapshots, architecture boundaries, and `git diff --check`.

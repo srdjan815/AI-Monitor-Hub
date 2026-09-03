@@ -10,6 +10,9 @@ from app.modules.execution.protocols import (
     PermanentJobError,
 )
 from app.modules.suppliers.pipeline_service import SupplierPipelineOrchestrator
+from app.modules.suppliers.pipeline_recovery_service import (
+    SupplierPipelineRecoveryService,
+)
 
 
 async def supplier_pipeline_handler(
@@ -22,11 +25,24 @@ async def supplier_pipeline_handler(
         run_id = uuid.UUID(str(payload["pipeline_run_id"]))
     except (KeyError, TypeError, ValueError) as exc:
         raise PermanentJobError("Supplier Pipeline job payload is invalid") from exc
-    async with AsyncSessionLocal() as session:
-        result = await SupplierPipelineOrchestrator(session).execute(
-            source_id,
-            run_id,
-        )
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await SupplierPipelineOrchestrator(session).execute(
+                source_id,
+                run_id,
+            )
+    except Exception as exc:
+        async with AsyncSessionLocal() as recovery_session:
+            await SupplierPipelineRecoveryService(recovery_session).fail_if_active(
+                source_id,
+                run_id,
+                code="pipeline_worker_execution_failed",
+                message=(
+                    "Worker nije završio obradu cenovnika. Pipeline je bezbedno "
+                    "zatvoren; proverite Incident centar pre ponovnog pokretanja."
+                ),
+            )
+        raise exc
     await context.checkpoint()
     return JobResult(
         data={

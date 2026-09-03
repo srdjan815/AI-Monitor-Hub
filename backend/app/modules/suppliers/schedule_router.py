@@ -14,6 +14,7 @@ from app.modules.suppliers.schedule_schemas import (
     SupplierScheduleRead,
     SupplierScheduleWrite,
 )
+from app.modules.suppliers.incident_schemas import IncidentRead
 from app.modules.suppliers.schedule_service import SupplierScheduleService
 
 router = APIRouter(tags=["supplier-automation"])
@@ -50,6 +51,23 @@ async def save_schedule(
     return await SupplierScheduleService(session).save(
         supplier_id, source_id, payload
     )
+
+
+@router.post(
+    "/suppliers/{supplier_id}/sources/{source_id}/schedule-readiness-incident",
+    response_model=IncidentRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Evidentiraj da konekcija nije spremna za automatski raspored",
+)
+async def report_schedule_readiness_incident(
+    supplier_id: uuid.UUID,
+    source_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+) -> IncidentRead:
+    incident = await SupplierScheduleService(session).report_not_ready(
+        supplier_id, source_id
+    )
+    return IncidentRead.model_validate(incident)
 
 
 @router.post(

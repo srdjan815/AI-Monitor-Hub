@@ -4,6 +4,8 @@ import { Box } from "@mui/material";
 import { AppShell } from "./components/AppShell";
 import { LoadingBlock } from "./components/AsyncState";
 import { LoginPage } from "./pages/LoginPage";
+import { PAGE_ACCESS, firstAccessiblePath } from "./accessControl";
+import { PermissionRoute } from "./components/PermissionRoute";
 import { useAuth } from "./state/AuthContext";
 
 const DashboardPage = lazy(() =>
@@ -38,35 +40,40 @@ function ProtectedRoutes() {
   const auth = useAuth();
   if (auth.loading) return <Box p={4}><LoadingBlock rows={8} /></Box>;
   if (!auth.authenticated) return <LoginPage />;
+  const home = firstAccessiblePath(auth.permissions);
+  const protectedPage = (path: (typeof PAGE_ACCESS)[number]["path"], page: React.ReactNode) => {
+    const permission = PAGE_ACCESS.find((item) => item.path === path)!.permission;
+    return <PermissionRoute permission={permission}>{page}</PermissionRoute>;
+  };
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/suppliers" element={<SuppliersPage />} />
-        <Route path="/sources" element={<SourcesPage />} />
+        <Route index element={home ? <Navigate to={home} replace /> : <PermissionRoute permission="any.application.permission"><></></PermissionRoute>} />
+        <Route path="/dashboard" element={protectedPage("/dashboard", <DashboardPage />)} />
+        <Route path="/suppliers" element={protectedPage("/suppliers", <SuppliersPage />)} />
+        <Route path="/sources" element={protectedPage("/sources", <SourcesPage />)} />
         <Route
           path="/schemas"
-          element={<ScopedResourcePage config={resource("schemas")} />}
+          element={protectedPage("/schemas", <ScopedResourcePage config={resource("schemas")} />)}
         />
-        <Route path="/mappings" element={<MappingProfilesPage />} />
+        <Route path="/mappings" element={protectedPage("/mappings", <MappingProfilesPage />)} />
         <Route
           path="/acquisitions"
-          element={<ScopedResourcePage config={resource("acquisitions")} />}
+          element={protectedPage("/acquisitions", <ScopedResourcePage config={resource("acquisitions")} />)}
         />
         <Route
           path="/snapshots"
-          element={<ScopedResourcePage config={resource("snapshots")} />}
+          element={protectedPage("/snapshots", <ScopedResourcePage config={resource("snapshots")} />)}
         />
         <Route
           path="/deltas"
-          element={<ScopedResourcePage config={resource("deltas")} />}
+          element={protectedPage("/deltas", <ScopedResourcePage config={resource("deltas")} />)}
         />
-        <Route path="/incidents" element={<IncidentsPage />} />
-        <Route path="/archive" element={<ArchivePage />} />
-        <Route path="/administration" element={<AdministrationPage />} />
-        <Route path="/automation" element={<AutomationPage />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/incidents" element={protectedPage("/incidents", <IncidentsPage />)} />
+        <Route path="/archive" element={protectedPage("/archive", <ArchivePage />)} />
+        <Route path="/administration" element={protectedPage("/administration", <AdministrationPage />)} />
+        <Route path="/automation" element={protectedPage("/automation", <AutomationPage />)} />
+        <Route path="*" element={home ? <Navigate to={home} replace /> : <PermissionRoute permission="any.application.permission"><></></PermissionRoute>} />
       </Route>
     </Routes>
   );

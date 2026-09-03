@@ -17,6 +17,7 @@ from app.modules.suppliers.acquisition_contracts import (
     SourceAdapter,
 )
 from app.modules.suppliers.ct_soap_acquisition import acquire_ct_payload
+from app.modules.suppliers.asbis_acquisition import acquire_asbis_payload
 from app.modules.suppliers.kimtec_acquisition import acquire_kimtec_payload
 from app.modules.suppliers.models import SupplierSource
 from app.modules.suppliers.mtls_http_client import certificate_request
@@ -286,6 +287,10 @@ class HttpSourceAdapter:
             )
         if str(config.get("integration_profile")) == "PIN_SOAP":
             return await self._pin_payload(source, config, secret_values, headers)
+        if str(config.get("integration_profile")) == "ASBIS_IT4PROFIT":
+            return await acquire_asbis_payload(
+                source, config, secret_values, self.maximum_bytes, self.client.request
+            )
         if source.secret_reference:
             for key, value in secret_values.items():
                 if key.startswith("query:"):

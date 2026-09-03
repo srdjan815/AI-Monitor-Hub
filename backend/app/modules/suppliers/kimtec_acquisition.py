@@ -93,8 +93,9 @@ async def acquire_kimtec_payload(
         merged.update(price_by_code.get(product_code, {}))
         barcode = barcode_by_code.get(product_code, {})
         merged.update(barcode)
-        if str(barcode.get("BarcodeType", "")).strip().upper() == "EAN":
-            merged["EAN"] = str(barcode.get("BarcodeValue", "")).strip()
+        # Preserve the stable source alias used by existing mappings. The
+        # shared post-mapping policy performs all GTIN validation/conversion.
+        merged["EAN"] = str(barcode.get("BarcodeValue") or "").strip()
         products.append(merged)
     envelope = {
         "products": products,

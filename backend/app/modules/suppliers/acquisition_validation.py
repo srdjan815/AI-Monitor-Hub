@@ -22,13 +22,16 @@ MINIMUM_TEXT_LENGTHS = {
     "name": 255,
     "naziv": 255,
     "productname": 255,
+    "model": 255,
     "acdept": 25,
     "brand": 25,
     "manufacturer": 25,
+    "vendor": 255,
+    "producttype": 500,
     "proizvodjac": 25,
-    "accategory": 45,
-    "acmaincategory": 45,
-    "category": 45,
+    "accategory": 500,
+    "acmaincategory": 500,
+    "category": 500,
     "grupa": 45,
     "itemgroup": 45,
     "nadgrupa": 45,
@@ -41,8 +44,12 @@ MINIMUM_TEXT_LENGTHS = {
     "opis": 150_000,
     "attributes": 150_000,
     "imageurl": 150_000,
+    "image": 150_000,
+    "primaryimageurl": 150_000,
+    "productimageurl": 150_000,
     "imageurls": 150_000,
     "urlimages": 150_000,
+    "notes": 5_000,
 }
 
 IDENTIFIER_TEXT_CODES = {
@@ -58,6 +65,7 @@ IDENTIFIER_TEXT_CODES = {
     "barcode",
     "barkod",
     "acean",
+    "asbisvalidean",
 }
 
 PRICE_CODES = {
@@ -73,6 +81,7 @@ PRICE_CODES = {
     "anretailprice",
     "anrecommendedretailprice",
     "anpromoprice",
+    "myprice",
 }
 
 

@@ -115,14 +115,9 @@ def _secure_url(value: str) -> str:
         normalized_path,
     ) in _APPROVED_INSECURE_HTTP_ENDPOINTS
     if approved_http_endpoint and (
-        parsed.username
-        or parsed.password
-        or parsed.query
-        or parsed.fragment
+        parsed.username or parsed.password or parsed.query or parsed.fragment
     ):
-        raise ValueError(
-            "EWE URL ne sme sadržati pristupne ili javne parametre"
-        )
+        raise ValueError("EWE URL ne sme sadržati pristupne ili javne parametre")
     if parsed.scheme != "https" and not local and not approved_http_endpoint:
         raise ValueError("HTTPS je obavezan za javne adrese")
     if len(value) > 2048:
@@ -145,11 +140,21 @@ class ApiSourceConfiguration(StrictConfiguration):
     password_field: str | None = Field(default=None, min_length=1, max_length=128)
     login_form_fields: BoundedParameters = Field(default_factory=dict)
     integration_profile: Literal[
-        "GENERIC", "KIMTEC_MSAN", "CT_SOAP", "PIN_SOAP"
+        "GENERIC", "KIMTEC_MSAN", "CT_SOAP", "PIN_SOAP", "ASBIS_IT4PROFIT"
     ] = "GENERIC"
     pin_shop_id: int = Field(default=4, ge=1, le=2_147_483_647)
     catalog_endpoint_path: str | None = Field(default=None, max_length=1024)
     price_endpoint_path: str | None = Field(default=None, max_length=1024)
+    imap_host: str | None = Field(default=None, min_length=1, max_length=253)
+    imap_port: int = Field(default=993, ge=1, le=65535)
+    imap_allow_legacy_dh: bool = False
+    imap_folder: str = Field(default="INBOX", min_length=1, max_length=255)
+    imap_subject_filter: str = Field(default="ASBIS", min_length=1, max_length=255)
+    imap_sender_filter: str | None = Field(default=None, min_length=3, max_length=320)
+    imap_attachment_prefix: str = Field(
+        default="HTML, PO actions, in mail body", min_length=1, max_length=255
+    )
+    imap_received_within_hours: int = Field(default=720, ge=1, le=8760)
     barcode_service_url: str | None = None
     barcode_soap_action: str = Field(
         default="http://www.msan.hr/B2B/GetProductsBarcodes",
@@ -183,11 +188,19 @@ class ApiSourceConfiguration(StrictConfiguration):
 
     @model_validator(mode="after")
     def integration_profile_is_complete(self) -> ApiSourceConfiguration:
+        if self.integration_profile == "ASBIS_IT4PROFIT":
+            if self.authentication_type != AuthenticationType.BASIC:
+                raise ValueError("ASBIS profil zahteva API korisničko ime i lozinku")
+            if (
+                not self.catalog_endpoint_path
+                or not self.price_endpoint_path
+                or not self.imap_host
+            ):
+                raise ValueError("ASBIS profil zahteva oba XML endpointa i IMAP server")
+            return self
         if self.integration_profile in {"CT_SOAP", "PIN_SOAP"}:
             if self.authentication_type != AuthenticationType.SOAP_BODY:
-                raise ValueError(
-                    "SOAP profil zahteva pristupni podatak u SOAP telu"
-                )
+                raise ValueError("SOAP profil zahteva pristupni podatak u SOAP telu")
             if self.http_method != HttpMethod.POST:
                 raise ValueError("SOAP profil zahteva POST metod")
             if (
@@ -199,9 +212,7 @@ class ApiSourceConfiguration(StrictConfiguration):
         if self.integration_profile != "KIMTEC_MSAN":
             return self
         if self.authentication_type != AuthenticationType.CLIENT_CERTIFICATE:
-            raise ValueError(
-                "KimTec / M SAN profil zahteva klijentski sertifikat"
-            )
+            raise ValueError("KimTec / M SAN profil zahteva klijentski sertifikat")
         if (
             not self.catalog_endpoint_path
             or not self.price_endpoint_path

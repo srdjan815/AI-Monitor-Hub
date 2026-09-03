@@ -13,7 +13,7 @@ charset-normalizer==3.4.9
 click==8.4.2
 colorama==0.4.6; sys_platform == "win32"
 coverage==7.15.2
-cryptography==46.0.7
+cryptography==50.0.0
 cyclonedx-python-lib==11.11.0
 defusedxml==0.7.1
 execnet==2.1.2

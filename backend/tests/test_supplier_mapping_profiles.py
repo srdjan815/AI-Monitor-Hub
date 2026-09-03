@@ -37,7 +37,7 @@ async def test_mapping_preview_can_select_record_after_first_100(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     schema_id = uuid.uuid4()
-    field_id = uuid.uuid4()
+    field_ids = [uuid.uuid4() for _ in range(4)]
     mapping_id = uuid.uuid4()
     artifact_id = uuid.uuid4()
     service = SupplierMappingTestService.__new__(SupplierMappingTestService)
@@ -47,7 +47,12 @@ async def test_mapping_preview_can_select_record_after_first_100(
         ),
         list_fields=lambda *_: asyncio.sleep(
             0,
-            result=[SimpleNamespace(id=field_id, name="SKU")],
+            result=[
+                SimpleNamespace(id=field_id, name=name)
+                for field_id, name in zip(
+                    field_ids, ("SKU", "Name", "EAN", "Price"), strict=True
+                )
+            ],
         ),
     )
     service.mappings = SimpleNamespace(
@@ -58,8 +63,18 @@ async def test_mapping_preview_can_select_record_after_first_100(
                 SimpleNamespace(
                     id=uuid.uuid4(),
                     schema_field_id=field_id,
-                    target_attribute="product_code",
-                    priority=1,
+                    target_attribute=target,
+                    priority=priority,
+                    required=True,
+                    is_active=True,
+                )
+                for priority, (field_id, target) in enumerate(
+                    zip(
+                        field_ids,
+                        ("product_code", "name", "ean", "price"),
+                        strict=True,
+                    ),
+                    1,
                 )
             ],
         ),
@@ -88,9 +103,7 @@ async def test_mapping_preview_can_select_record_after_first_100(
         detect,
     )
 
-    result = await service.test(
-        uuid.uuid4(), schema_id, mapping_id, record_number=150
-    )
+    result = await service.test(uuid.uuid4(), schema_id, mapping_id, record_number=150)
 
     assert result.tested_records == 1
     assert result.rows[0].row_number == 150
@@ -195,7 +208,13 @@ def setup_active_schema(
     schema = schema_response.json()
     field_root = f"{schema_root}/{schema['id']}/fields"
     fields: list[dict] = []
-    for code, position in (("sku", 1), ("description", 2), ("price", 3)):
+    for code, position in (
+        ("sku", 1),
+        ("description", 2),
+        ("price", 3),
+        ("name", 4),
+        ("ean", 5),
+    ):
         response = client.post(
             field_root,
             json={
@@ -300,6 +319,17 @@ def test_mapping_profile_rule_version_lifecycle(api_client: httpx.Client) -> Non
         assert description.status_code == 201, description.text
         assert description.json()["default_value"] == long_text
 
+        for field, target, priority in (
+            (fields[2], "price", 3),
+            (fields[3], "name", 4),
+            (fields[4], "ean", 5),
+        ):
+            response = api_client.post(
+                rules,
+                json=rule(field["id"], target, priority, required=True),
+            )
+            assert response.status_code == 201, response.text
+
         partial = api_client.patch(
             f"{rules}/{sku_rule['id']}",
             json={
@@ -343,7 +373,7 @@ def test_mapping_profile_rule_version_lifecycle(api_client: httpx.Client) -> Non
         assert clone_response.status_code == 201, clone_response.text
         clone = clone_response.json()
         assert clone["version_number"] == 2
-        assert api_client.get(f"{root}/{clone['id']}/rules").json()["total"] == 2
+        assert api_client.get(f"{root}/{clone['id']}/rules").json()["total"] == 5
         activated_clone = api_client.post(
             f"{root}/{clone['id']}/activate",
             json={"optimistic_version": clone["optimistic_version"]},
@@ -411,9 +441,26 @@ def test_mapping_validation_permissions_and_schema_integration(
 
         valid_rule = api_client.post(
             rules,
-            json=rule(fields[0]["id"], "product_code", 1),
+            json=rule(fields[0]["id"], "product_code", 1, required=True),
         )
         assert valid_rule.status_code == 201
+        invalid = api_client.get(f"{root}/{invalid['id']}").json()
+        activated = api_client.post(
+            f"{root}/{invalid['id']}/activate",
+            json={"optimistic_version": invalid["optimistic_version"]},
+        )
+        assert activated.status_code == 409
+        assert activated.json()["code"] == "mapping_required_targets_missing"
+        for field, target, priority in (
+            (fields[2], "price", 2),
+            (fields[3], "name", 3),
+            (fields[4], "ean", 4),
+        ):
+            response = api_client.post(
+                rules,
+                json=rule(field["id"], target, priority, required=True),
+            )
+            assert response.status_code == 201, response.text
         invalid = api_client.get(f"{root}/{invalid['id']}").json()
         activated = api_client.post(
             f"{root}/{invalid['id']}/activate",

@@ -48,6 +48,7 @@ import { useAuth } from "../state/AuthContext";
 import { usePreferences } from "../state/PreferencesContext";
 import { createAppTheme } from "../theme";
 import { GlobalSearch } from "./GlobalSearch";
+import { canAccess, PAGE_ACCESS } from "../accessControl";
 
 const items = [
   { path: "/dashboard", label: "Dashboard", icon: DashboardRounded },
@@ -65,7 +66,8 @@ const items = [
 ];
 
 export function AppShell() {
-  const { logout } = useAuth();
+  const auth = useAuth();
+  const { logout } = auth;
   const preferences = usePreferences();
   const desktop = useMediaQuery("(min-width:900px)");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -76,7 +78,11 @@ export function AppShell() {
     [preferences.resolvedTheme]
   );
   const location = useLocation();
-  const current = items.find((item) => location.pathname.startsWith(item.path));
+  const visibleItems = items.filter((item) => {
+    const access = PAGE_ACCESS.find((page) => page.path === item.path);
+    return Boolean(access && canAccess(auth.permissions, access.permission));
+  });
+  const current = visibleItems.find((item) => location.pathname.startsWith(item.path));
   const navigation = (
     <Stack height="100%">
       <Stack direction="row" alignItems="center" gap={1.3} p={2}>
@@ -92,7 +98,7 @@ export function AppShell() {
       </Stack>
       <Divider />
       <List sx={{ p: 1, flex: 1 }}>
-        {items.map(({ path, label, icon: Icon }) => (
+        {visibleItems.map(({ path, label, icon: Icon }) => (
           <Tooltip
             title={preferences.navigationCollapsed ? label : ""}
             key={path}
@@ -156,13 +162,15 @@ export function AppShell() {
                 <MenuRounded />
               </IconButton>
             )}
-            <GlobalSearch />
+            {auth.can("supplier_platform.search") && <GlobalSearch />}
             <Box flex={1} />
-            <Tooltip title="Obaveštenja su vezana za Incident centar">
-              <IconButton component={Link} to="/incidents" aria-label="Obaveštenja">
-                <NotificationsNoneRounded />
-              </IconButton>
-            </Tooltip>
+            {auth.can("incidents.read") && (
+              <Tooltip title="Obaveštenja su vezana za Incident centar">
+                <IconButton component={Link} to="/incidents" aria-label="Obaveštenja">
+                  <NotificationsNoneRounded />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="Korisnički meni">
               <IconButton
                 onClick={(event) => setUserAnchor(event.currentTarget)}
@@ -216,7 +224,11 @@ export function AppShell() {
         >
           <Box px={{ xs: 2, md: 3.5 }} py={2}>
             <Breadcrumbs aria-label="Navigaciona putanja" sx={{ mb: 2 }}>
-              <Link to="/dashboard" style={{ color: "inherit" }}>Supplier Platform</Link>
+              {visibleItems[0] ? (
+                <Link to={visibleItems[0].path} style={{ color: "inherit" }}>Supplier Platform</Link>
+              ) : (
+                <Typography color="text.secondary">Supplier Platform</Typography>
+              )}
               <Typography color="text.primary">{current?.label ?? "Radni prostor"}</Typography>
             </Breadcrumbs>
             <Outlet />

@@ -1,4 +1,5 @@
 import ipaddress
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
@@ -42,6 +43,18 @@ class Settings(BaseSettings):
     delta_high_removal_ratio: float = Field(default=0.5, ge=0, le=1)
     delta_high_addition_ratio: float = Field(default=0.5, ge=0, le=1)
     delta_unusual_modified_ratio: float = Field(default=0.8, ge=0, le=1)
+    supplier_critical_price_increase_ratio: Decimal = Field(
+        default=Decimal("3"), gt=Decimal("1"), le=Decimal("100")
+    )
+    supplier_critical_price_decrease_ratio: Decimal = Field(
+        default=Decimal("0.5"), gt=Decimal("0"), lt=Decimal("1")
+    )
+    supplier_shared_ean_auto_accept_similarity: float = Field(
+        default=0.8, ge=0, le=1
+    )
+    supplier_shared_ean_manual_review_similarity: float = Field(
+        default=0.6, ge=0, le=1
+    )
     incident_max_synchronized_per_source: int = Field(default=100, ge=1, le=1000)
     incident_due_hours_p1: int = Field(default=4, ge=1, le=720)
     incident_due_hours_p2: int = Field(default=24, ge=1, le=720)
@@ -177,6 +190,14 @@ class Settings(BaseSettings):
             raise ValueError("MAX_REQUEST_BODY_BYTES must be at least 65536")
         if self.auth_key_id in self.auth_previous_keys:
             raise ValueError("AUTH_KEY_ID must not also appear in AUTH_PREVIOUS_KEYS")
+        if (
+            self.supplier_shared_ean_manual_review_similarity
+            > self.supplier_shared_ean_auto_accept_similarity
+        ):
+            raise ValueError(
+                "SUPPLIER_SHARED_EAN_MANUAL_REVIEW_SIMILARITY must not exceed "
+                "SUPPLIER_SHARED_EAN_AUTO_ACCEPT_SIMILARITY"
+            )
         self._validate_rate_limit_configuration()
         if self.app_env != "production":
             return self

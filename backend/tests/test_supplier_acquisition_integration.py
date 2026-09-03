@@ -202,7 +202,7 @@ def _pipeline(client: httpx.Client, suffix: str) -> tuple[str, str, str]:
                 "target_attribute": target,
                 "transformation_type": "COPY",
                 "priority": priority,
-                "required": target == "product_code",
+                "required": target in {"product_code", "name", "ean", "price"},
             },
         )
         assert rule_response.status_code == 201, rule_response.text
@@ -226,10 +226,10 @@ def test_frozen_supplier_pipeline_partial_success_and_idempotency() -> None:
                 + ("dobavljački proizvod " * 3500)
             )
             rows = [
-                ["A-1", "860000000001", "Prvi", "Opis 1", "10.00", "RSD", "4"],
-                ["A-2", "860000000002", "Drugi", long_description, "20", "EUR", "2"],
-                ["A-3", "860000000003", "Treći", "Opis 3", "30", "RSD", "0"],
-                ["", "860000000004", "Nevažeći", "Opis 4", "40", "RSD", "1"],
+                    ["A-1", "8606019540128", "Prvi", "Opis 1", "10.00", "RSD", "4"],
+                    ["A-2", "4711158481004", "Drugi", long_description, "20", "EUR", "2"],
+                    ["A-3", "8808979804832", "Treći", "Opis 3", "30", "RSD", "0"],
+                    ["", "4711377342544", "Nevažeći", "Opis 4", "40", "RSD", "1"],
             ]
             header = "supplier_sku,ean,name,description,price,currency,stock\n"
             stream = io.StringIO(newline="")

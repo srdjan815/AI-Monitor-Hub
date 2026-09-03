@@ -24,22 +24,28 @@ import { StatusChip } from "../components/StatusChip";
 import { WorkspaceSelector } from "../components/WorkspaceSelector";
 import { useWorkspace } from "../state/WorkspaceContext";
 import type { ApiError, Operation } from "../types";
+import { mappingFieldPreview, mappingFieldValue } from "./mappingPreview";
+
+const REQUIRED_TARGETS = new Set(["product_code", "name", "ean", "price"]);
 
 const TARGETS = [
-  { value: "product_code", label: "Šifra proizvoda", help: "Jedinstvena šifra proizvoda kod dobavljača." },
-  { value: "ean", label: "Barkod (EAN)", help: "EAN ili drugi standardni barkod proizvoda." },
-  { value: "name", label: "Naziv proizvoda", help: "Puni naziv proizvoda." },
+  { value: "product_code", label: "Šifra artikla dobavljača *", help: "Jedinstvena šifra artikla u cenovniku dobavljača." },
+  { value: "ean", label: "Barkod (EAN) *", help: "EAN ili drugi standardni barkod proizvoda." },
+  { value: "name", label: "Naziv proizvoda *", help: "Puni naziv proizvoda; može se sastaviti od više izvornih polja." },
   { value: "description", label: "Opis proizvoda", help: "Tekstualni opis proizvoda." },
   { value: "manufacturer", label: "Proizvođač", help: "Naziv proizvođača ili brenda." },
   { value: "manufacturer_part_number", label: "Šifra proizvođača", help: "Kataloška šifra koju daje proizvođač." },
   { value: "category", label: "Kategorija", help: "Kategorija ili grupa proizvoda dobavljača." },
-  { value: "price", label: "Cena", help: "Nabavna ili prodajna cena iz cenovnika." },
+  { value: "price", label: "Cena *", help: "Nabavna ili prodajna cena iz cenovnika." },
   { value: "currency", label: "Valuta", help: "Oznaka valute, na primer RSD ili EUR." },
   { value: "vat_rate", label: "Stopa PDV-a", help: "Procenat poreza na dodatu vrednost." },
   { value: "stock", label: "Količina na stanju", help: "Broj trenutno dostupnih komada." },
   { value: "stock_status", label: "Status dostupnosti", help: "Tekstualna oznaka dostupnosti proizvoda." },
   { value: "image_url", label: "Slika proizvoda", help: "Internet adresa slike proizvoda." },
-  { value: "product_url", label: "Stranica proizvoda", help: "Internet adresa proizvoda kod dobavljača." }
+  { value: "primary_image_url", label: "Glavna slika proizvoda", help: "Glavna internet adresa slike proizvoda." },
+  { value: "image_urls", label: "Galerija slika", help: "Lista internet adresa svih slika proizvoda." },
+  { value: "product_url", label: "Stranica proizvoda", help: "Internet adresa proizvoda kod dobavljača." },
+  { value: "warranty", label: "Garancija", help: "Garantni rok u obliku u kom ga dobavljač dostavlja." }
 ];
 
 function suggestedTarget(name: string): string {
@@ -65,7 +71,11 @@ function suggestedTarget(name: string): string {
     [/^anstock$/, "stock"],
     [/^(dostupnost|availability|stock_status)$/, "stock_status"],
     [/^(slika|image|image_url)$/, "image_url"],
+    [/^primary_image_url$/, "primary_image_url"],
+    [/^image_urls$/, "image_urls"],
     [/^(link|url|product_url)$/, "product_url"],
+    [/^(warranty|warrantyterm|warranty_period|garancija|garantni_rok)$/, "warranty"],
+    [/^attr_(garancija.*|warranty_term.*)$/, "warranty"],
     [/^acsubcategory$/, "category"]
   ];
   return suggestions.find(([pattern]) => pattern.test(normalized))?.[1] ?? "";
@@ -185,6 +195,19 @@ export function MappingProfilesPage() {
       ),
     [rules.data]
   );
+  const missingRequiredTargets = TARGETS.filter(
+    (target) => REQUIRED_TARGETS.has(target.value) && !rulesByTarget.has(target.value)
+  );
+  const requireCoreMappings = () => {
+    if (!missingRequiredTargets.length) return;
+    throw {
+      status: 409,
+      code: "mapping_required_targets_missing",
+      message: `Mapirajte obavezna polja: ${missingRequiredTargets
+        .map((target) => target.label.replace(" *", ""))
+        .join(", ")}.`
+    } satisfies ApiError;
+  };
   const noteRule = rulesByTarget.get("promotion_note");
   const nameRule = rulesByTarget.get("name");
 
@@ -242,7 +265,8 @@ export function MappingProfilesPage() {
           "PATCH",
           {
             optimistic_version: existing.optimistic_version,
-            target_attribute: target
+            target_attribute: target,
+            required: REQUIRED_TARGETS.has(target)
           }
         );
         return;
@@ -253,7 +277,7 @@ export function MappingProfilesPage() {
         target_attribute: target,
         transformation_type: "COPY",
         priority: field.field.position,
-        required: target === "product_code"
+        required: REQUIRED_TARGETS.has(target)
       });
     },
     onSuccess: () => {
@@ -406,11 +430,13 @@ export function MappingProfilesPage() {
   });
 
   const testMapping = useMutation({
-    mutationFn: () =>
-      supplierApi.mutate<MappingTestResult>(
+    mutationFn: () => {
+      requireCoreMappings();
+      return supplierApi.mutate<MappingTestResult>(
         `${root}/${mappingId}/test${selectedRecord ? `?record_number=${selectedRecord.record_number}` : ""}`,
         "POST"
-      ),
+      );
+    },
     onSuccess: (data) => {
       setTestResult(data);
       toast.success(String(data.message));
@@ -420,6 +446,7 @@ export function MappingProfilesPage() {
 
   const activate = useMutation({
     mutationFn: async () => {
+      requireCoreMappings();
       const result = await supplierApi.mutate<MappingTestResult>(
         `${root}/${mappingId}/test${selectedRecord ? `?record_number=${selectedRecord.record_number}` : ""}`,
         "POST"
@@ -477,8 +504,10 @@ export function MappingProfilesPage() {
     .map((id) => analysis.fields.find((item) => item.field.id === id))
     .filter((item): item is AnalysisField => Boolean(item));
   const namePreview = orderedNameFields.reduce<string[]>((parts, item) => {
-    const value = String(
-      selectedRecord?.values[item.field.name] ?? item.sample_values[0] ?? ""
+    const value = mappingFieldValue(
+      selectedRecord,
+      item.field.name,
+      item.sample_values
     ).trim();
     if (!value) return parts;
     const normalized = value.toLocaleLowerCase("sr-RS");
@@ -736,8 +765,11 @@ export function MappingProfilesPage() {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    {selectedRecord?.values[item.field.name] ??
-                      (item.sample_values.slice(0, 3).join(" · ") || "—")}
+                    {mappingFieldPreview(
+                      selectedRecord,
+                      item.field.name,
+                      item.sample_values
+                    )}
                   </TableCell>
                   <TableCell sx={{ minWidth: 260 }}>
                     <TextField
@@ -791,10 +823,23 @@ export function MappingProfilesPage() {
         </Table>
       </TableContainer>
 
+      {missingRequiredTargets.length > 0 && (
+        <Alert severity="warning" sx={{ mt: 2 }}>
+          Pre testiranja i aktivacije mapirajte obavezna polja: {missingRequiredTargets
+            .map((target) => target.label.replace(" *", ""))
+            .join(", ")}.
+        </Alert>
+      )}
+
       <Stack direction={{ xs: "column", sm: "row" }} gap={1} mt={2}>
         <Button
           variant="outlined"
-          disabled={!editable || testMapping.isPending || !rules.data?.total}
+          disabled={
+            !editable ||
+            testMapping.isPending ||
+            !rules.data?.total ||
+            missingRequiredTargets.length > 0
+          }
           onClick={() => testMapping.mutate()}
         >
           Testiraj mapiranje
@@ -804,6 +849,7 @@ export function MappingProfilesPage() {
           disabled={
             !editable ||
             !rules.data?.total ||
+            missingRequiredTargets.length > 0 ||
             testMapping.isPending ||
             activate.isPending
           }

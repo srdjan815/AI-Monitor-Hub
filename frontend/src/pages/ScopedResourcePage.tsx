@@ -254,7 +254,8 @@ export function ScopedResourcePage({ config }: { config: ResourceConfiguration }
       ),
     enabled:
       config.resource === "snapshots" &&
-      Boolean(workspace.supplierId && workspace.sourceId)
+      Boolean(workspace.supplierId && workspace.sourceId),
+    refetchOnMount: "always"
   });
   const snapshottedAcquisitions = useMemo(
     () =>
@@ -353,6 +354,7 @@ export function ScopedResourcePage({ config }: { config: ResourceConfiguration }
         toast.success("Import cenovnika je uspešno završen.");
       }
       client.invalidateQueries({ queryKey: [config.resource] });
+      client.invalidateQueries({ queryKey: ["snapshot-eligible-acquisitions"] });
     },
     onError: (error: ApiError) => toast.error(`${error.code}: ${error.message}`)
   });

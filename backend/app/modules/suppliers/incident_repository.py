@@ -68,6 +68,23 @@ class SupplierIncidentRepository:
             query = query.with_for_update()
         return (await self.session.execute(query)).scalar_one_or_none()
 
+    async def active_pipeline_incidents(
+        self, source_id: uuid.UUID
+    ) -> list[SupplierIncident]:
+        rows = await self.session.execute(
+            select(SupplierIncident)
+            .where(
+                SupplierIncident.source_connection_id == source_id,
+                SupplierIncident.source_domain == "PIPELINE",
+                SupplierIncident.status.in_(
+                    ("OPEN", "ACKNOWLEDGED", "IN_PROGRESS", "SUPPRESSED")
+                ),
+            )
+            .order_by(SupplierIncident.created_at, SupplierIncident.id)
+            .with_for_update()
+        )
+        return list(rows.scalars())
+
     async def add_incident(
         self, incident: SupplierIncident, event: SupplierIncidentEvent
     ) -> None:

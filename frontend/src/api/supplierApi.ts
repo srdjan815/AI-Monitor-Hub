@@ -129,6 +129,11 @@ export const supplierApi = {
       `/suppliers/${supplierId}/sources/${sourceId}/schedule`,
       { method: "PUT", body }
     ),
+  reportScheduleReadinessIncident: (supplierId: string, sourceId: string) =>
+    api<Operation>(
+      `/suppliers/${supplierId}/sources/${sourceId}/schedule-readiness-incident`,
+      { method: "POST", body: null }
+    ),
   runPipelineNow: (
     supplierId: string,
     sourceId: string,

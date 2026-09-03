@@ -30,12 +30,14 @@ class SchemaFieldInferer:
         "acname": 255,
         "proizvodjac": 25,
         "manufacturer": 25,
+        "vendor": 255,
+        "producttype": 500,
         "brand": 25,
         "grupa": 45,
         "itemgroup": 45,
-        "category": 45,
-        "accategory": 45,
-        "acmaincategory": 45,
+        "category": 500,
+        "accategory": 500,
+        "acmaincategory": 500,
         "nadgrupa": 45,
         "naziv": 255,
         "artikal": 255,
@@ -43,8 +45,11 @@ class SchemaFieldInferer:
         "opis": 150_000,
         "attributes": 150_000,
         "imageurl": 150_000,
+        "image": 150_000,
+        "primaryimageurl": 150_000,
         "imageurls": 150_000,
         "urlimages": 150_000,
+        "notes": 5_000,
     }
     DECIMAL_FIELDS = {"cena", "mpcena"}
     PRICE_FIELDS = {
@@ -59,6 +64,7 @@ class SchemaFieldInferer:
         "anretailprice",
         "anrecommendedretailprice",
         "anpromoprice",
+        "myprice",
     }
     PRICE_PRIORITY = (
         "pricewithdiscounts",
@@ -73,6 +79,7 @@ class SchemaFieldInferer:
         "oldprice",
         "anoldprice",
         "anrecommendedretailprice",
+        "myprice",
     )
     IDENTIFIER_TEXT_FIELDS = {
         "ean",
@@ -86,6 +93,7 @@ class SchemaFieldInferer:
         "gtin14",
         "barcode",
         "barkod",
+        "asbisvalidean",
     }
 
     @classmethod
@@ -115,7 +123,18 @@ class SchemaFieldInferer:
                 or compact_header in cls.PRICE_FIELDS
             ):
                 data_type, confidence = "DECIMAL", 1.0
-            nullable = any(
+            always_optional = (
+                normalized_header.startswith("attr_")
+                or compact_header
+                in {
+                    "attributes",
+                    "image",
+                    "imageurls",
+                    "primaryimageurl",
+                }
+                or re.fullmatch(r"imageurl\d+", compact_header) is not None
+            )
+            nullable = always_optional or any(
                 value is None or not str(value).strip() for value in values
             )
             semantic_limit = cls.STRING_LIMITS.get(
@@ -125,8 +144,7 @@ class SchemaFieldInferer:
             if compact_header in cls.IDENTIFIER_TEXT_FIELDS:
                 semantic_limit = 64
             max_length = (
-                semantic_limit
-                or max((len(value) for value in samples), default=1)
+                semantic_limit or max((len(value) for value in samples), default=1)
                 if data_type == "STRING"
                 else None
             )
@@ -138,12 +156,16 @@ class SchemaFieldInferer:
             precision = (
                 38
                 if is_price_field
-                else cls._precision(samples) if data_type == "DECIMAL" else None
+                else cls._precision(samples)
+                if data_type == "DECIMAL"
+                else None
             )
             scale = (
                 2
                 if is_price_field
-                else cls._scale(samples) if data_type == "DECIMAL" else None
+                else cls._scale(samples)
+                if data_type == "DECIMAL"
+                else None
             )
             result.append(
                 InferredField(
@@ -160,9 +182,7 @@ class SchemaFieldInferer:
                         scale=scale,
                         example_value=samples[0][:4000] if samples else None,
                         path=header[:500],
-                        is_identifier=(
-                            compact_header in cls.IDENTIFIER_TEXT_FIELDS
-                        ),
+                        is_identifier=(compact_header in cls.IDENTIFIER_TEXT_FIELDS),
                         is_price=is_price,
                         is_active=True,
                         version=1,
@@ -180,9 +200,7 @@ class SchemaFieldInferer:
             for header in headers
             if (
                 cls._normalized_header(header) in cls.DECIMAL_FIELDS
-                or re.sub(
-                    r"[^a-z0-9]", "", cls._normalized_header(header)
-                )
+                or re.sub(r"[^a-z0-9]", "", cls._normalized_header(header))
                 in cls.PRICE_FIELDS
             )
         }
@@ -203,11 +221,7 @@ class SchemaFieldInferer:
 
     @staticmethod
     def _code(header: str, used: set[str]) -> str:
-        value = (
-            unicodedata.normalize("NFKD", header)
-            .encode("ascii", "ignore")
-            .decode()
-        )
+        value = unicodedata.normalize("NFKD", header).encode("ascii", "ignore").decode()
         value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_.-")
         if not value or not value[0].isalpha():
             value = f"field_{value or 'value'}"

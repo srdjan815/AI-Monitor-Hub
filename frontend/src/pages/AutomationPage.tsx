@@ -27,6 +27,8 @@ import { EntityTable, type Column } from "../components/EntityTable";
 import { PageHeader } from "../components/PageHeader";
 import { StatusChip } from "../components/StatusChip";
 import type { ApiError, Source, SupplierSchedule } from "../types";
+import { normalizeScheduleTimes } from "./scheduleTime";
+import { useAuth } from "../state/AuthContext";
 
 const initialForm = {
   status: "ENABLED",
@@ -39,9 +41,12 @@ const initialForm = {
   max_attempts: 3
 };
 
+const ALL_SUPPLIERS = "__all_suppliers__";
+
 const dayNames = ["Ponedeljak", "Utorak", "Sreda", "Četvrtak", "Petak", "Subota", "Nedelja"];
 
 export function AutomationPage() {
+  const auth = useAuth();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
@@ -70,6 +75,33 @@ export function AutomationPage() {
     queryKey: ["automation-suppliers"],
     queryFn: () => supplierApi.suppliers({ limit: 500, offset: 0, active_only: true })
   });
+  const allSources = useQuery({
+    queryKey: ["automation-all-sources", suppliers.data?.items.map((item) => item.id)],
+    queryFn: async () => {
+      const supplierRows = suppliers.data?.items ?? [];
+      const pages = await Promise.all(
+        supplierRows.map(async (supplier) => ({
+          supplier,
+          page: await supplierApi.sources(supplier.id, {
+            limit: 500,
+            offset: 0,
+            active_only: true
+          })
+        }))
+      );
+      return pages
+        .flatMap(({ supplier, page }) =>
+          page.items.map((source) => ({ supplier, source }))
+        )
+        .sort((left, right) =>
+          `${left.supplier.company_name}\u0000${left.source.name}`.localeCompare(
+            `${right.supplier.company_name}\u0000${right.source.name}`,
+            "sr"
+          )
+        );
+    },
+    enabled: supplierId === ALL_SUPPLIERS && Boolean(suppliers.data)
+  });
   const sources = useQuery({
     queryKey: ["automation-sources", supplierId],
     queryFn: () =>
@@ -78,16 +110,13 @@ export function AutomationPage() {
         offset: 0,
         active_only: true
       }),
-    enabled: Boolean(supplierId)
+    enabled: Boolean(supplierId && supplierId !== ALL_SUPPLIERS)
   });
   const save = useMutation({
-    mutationFn: () => {
-      const times = form.times
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean);
-      return supplierApi.saveSchedule(supplierId, sourceId, {
-        version: editing?.version,
+    mutationFn: async () => {
+      const times = normalizeScheduleTimes(form.times);
+      const payload = (version?: number) => ({
+        version,
         status: form.status,
         schedule_type: form.status === "MANUAL" ? null : form.schedule_type,
         timezone: "Europe/Belgrade",
@@ -98,10 +127,77 @@ export function AutomationPage() {
         timeout_seconds: form.timeout_seconds,
         max_attempts: form.max_attempts
       });
+      if (supplierId !== ALL_SUPPLIERS) {
+        await supplierApi.saveSchedule(
+          supplierId,
+          sourceId,
+          payload(editing?.version)
+        );
+        return { saved: 1, skipped: 0, failed: [] as string[] };
+      }
+      const entries = allSources.data ?? [];
+      let saved = 0;
+      let skipped = 0;
+      const failed: string[] = [];
+      for (const { supplier, source } of entries) {
+        if (source.status !== "ACTIVE") {
+          try {
+            await supplierApi.reportScheduleReadinessIncident(
+              supplier.id,
+              source.id
+            );
+            skipped += 1;
+          } catch (error) {
+            const apiError = error as ApiError;
+            failed.push(
+              `${supplier.company_name} / ${source.name}: ${apiError.message}`
+            );
+          }
+          continue;
+        }
+        const existing = schedules.data?.items.find(
+          (schedule) => schedule.source_connection_id === source.id
+        );
+        try {
+          await supplierApi.saveSchedule(
+            supplier.id,
+            source.id,
+            payload(existing?.version)
+          );
+          saved += 1;
+        } catch (error) {
+          const apiError = error as ApiError;
+          failed.push(
+            `${supplier.company_name} / ${source.name}: ${apiError.message}`
+          );
+        }
+      }
+      return { saved, skipped, failed };
     },
-    onSuccess: () => {
-      toast.success("Automatski raspored je sačuvan.");
-      setDialogOpen(false);
+    onSuccess: ({ saved, skipped, failed }) => {
+      if (saved > 0) {
+        toast.success(
+          saved === 1
+          ? "Automatski raspored je sačuvan."
+          : `Sačuvani su rasporedi za ${saved} konekcija.`
+        );
+      }
+      if (skipped > 0) {
+        toast(
+          `${skipped} nespremnih konekcija je preskočeno; upozorenje je upisano u Incident centar.`,
+          { duration: 8000, icon: "⚠️" }
+        );
+      }
+      if (failed.length > 0) {
+        const visibleFailures = failed.slice(0, 3).join(" | ");
+        const remaining = failed.length > 3 ? ` | i još ${failed.length - 3}` : "";
+        toast.error(
+          `Nije sačuvano ${failed.length}: ${visibleFailures}${remaining}`,
+          { duration: 12000 }
+        );
+      } else {
+        setDialogOpen(false);
+      }
       queryClient.invalidateQueries({ queryKey: ["source-schedules"] });
     },
     onError: (error: ApiError) => toast.error(error.message)
@@ -215,9 +311,11 @@ export function AutomationPage() {
         title="Automatski pokretač"
         description="Trajni nedeljni raspored preuzimanja, validacije, importa i Snapshot obrade."
         actions={
-          <Button variant="contained" startIcon={<ScheduleRounded />} onClick={openNew}>
-            Dodaj raspored
-          </Button>
+          auth.can("supplier_sources.write") ? (
+            <Button variant="contained" startIcon={<ScheduleRounded />} onClick={openNew}>
+              Dodaj raspored
+            </Button>
+          ) : undefined
         }
       />
       <Alert severity="info" sx={{ mb: 2 }}>
@@ -234,10 +332,10 @@ export function AutomationPage() {
         selected={selected}
         onSelected={setSelected}
         onPage={setPage}
-        onOpen={openEdit}
+        onOpen={auth.can("supplier_sources.write") ? openEdit : undefined}
         onRefresh={() => schedules.refetch()}
         bulkActions={
-          selected.length === 1 ? (
+          selected.length === 1 && auth.can("acquisitions.execute") ? (
             <Tooltip title="Odmah pokreni izabrani raspored bez menjanja sledećeg termina.">
               <Button
                 size="small"
@@ -270,6 +368,9 @@ export function AutomationPage() {
                   setSourceId("");
                 }}
               >
+                {!editing && (
+                  <MenuItem value={ALL_SUPPLIERS}>Svi dobavljači</MenuItem>
+                )}
                 {suppliers.data?.items.map((supplier) => (
                   <MenuItem key={supplier.id} value={supplier.id}>
                     {supplier.supplier_code} · {supplier.company_name}
@@ -277,7 +378,14 @@ export function AutomationPage() {
                 ))}
               </Select>
             </FormControl>
-            <FormControl fullWidth disabled={!supplierId || Boolean(editing)}>
+            <FormControl
+              fullWidth
+              disabled={
+                !supplierId ||
+                supplierId === ALL_SUPPLIERS ||
+                Boolean(editing)
+              }
+            >
               <InputLabel id="automation-source-label">Konekcija</InputLabel>
               <Select
                 labelId="automation-source-label"
@@ -285,6 +393,9 @@ export function AutomationPage() {
                 value={sourceId}
                 onChange={(event) => setSourceId(event.target.value)}
               >
+                {supplierId === ALL_SUPPLIERS && (
+                  <MenuItem value="">Sve konekcije redom</MenuItem>
+                )}
                 {sources.data?.items.map((source: Source) => (
                   <MenuItem key={source.id} value={source.id}>
                     {source.source_code} · {source.name}
@@ -292,6 +403,13 @@ export function AutomationPage() {
                 ))}
               </Select>
             </FormControl>
+            {supplierId === ALL_SUPPLIERS && (
+              <Alert severity="info">
+                {allSources.isLoading
+                  ? "Učitavanje konekcija..."
+                  : `Raspored će dobiti ${(allSources.data ?? []).filter(({ source }) => source.status === "ACTIVE").length} spremnih konekcija. ${(allSources.data ?? []).filter(({ source }) => source.status !== "ACTIVE").length} nespremnih biće preskočeno i evidentirano u Incident centru. Worker obrađuje red jednu po jednu; neuspeh jedne ne zaustavlja ostale.`}
+              </Alert>
+            )}
             <FormControl fullWidth>
               <InputLabel id="automation-status-label">Status rasporeda</InputLabel>
               <Select
@@ -341,7 +459,7 @@ export function AutomationPage() {
                   <TextField
                     label="Vreme pokretanja"
                     value={form.times}
-                    helperText="Jedno ili više vremena odvojite zarezom, na primer: 06:00, 18:00."
+                    helperText="Obavezan format je HH:MM. Za više termina koristite zarez, na primer: 08:30, 10:00, 12:00, 14:00 (bez tačke na kraju)."
                     onChange={(event) =>
                       setForm((value) => ({ ...value, times: event.target.value }))
                     }
@@ -422,7 +540,13 @@ export function AutomationPage() {
           <Button onClick={() => setDialogOpen(false)}>Otkaži</Button>
           <Button
             variant="contained"
-            disabled={save.isPending || !supplierId || !sourceId}
+            disabled={
+              save.isPending ||
+              !supplierId ||
+              (supplierId === ALL_SUPPLIERS
+                ? allSources.isLoading || !allSources.data?.length
+                : !sourceId)
+            }
             onClick={() => save.mutate()}
           >
             Sačuvaj raspored

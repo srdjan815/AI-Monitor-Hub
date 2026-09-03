@@ -25,8 +25,10 @@ import { ErrorBlock, LoadingBlock } from "../components/AsyncState";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { StatusChip } from "../components/StatusChip";
+import { useAuth } from "../state/AuthContext";
 
 export function DashboardPage() {
+  const auth = useAuth();
   const metrics = useQuery({
     queryKey: ["overview", "metrics"],
     queryFn: supplierApi.overview,
@@ -62,8 +64,12 @@ export function DashboardPage() {
         description="Zdravlje dobavljačke platforme, pažnja i poslednje aktivnosti."
         actions={
           <>
-            <Button component={Link} to="/sources" variant="outlined">Novi izvor</Button>
-            <Button component={Link} to="/acquisitions" variant="contained">Pokreni Acquisition</Button>
+            {auth.can("supplier_sources.write") && (
+              <Button component={Link} to="/sources" variant="outlined">Novi izvor</Button>
+            )}
+            {auth.can("acquisitions.execute") && (
+              <Button component={Link} to="/acquisitions" variant="contained">Pokreni Acquisition</Button>
+            )}
           </>
         }
       />
@@ -316,14 +322,22 @@ export function DashboardPage() {
                         {item.error_count ? ` · ${item.error_count} grešaka` : ""}
                         {` · ${new Date(item.occurred_at).toLocaleString("sr-RS")}`}
                       </Typography>
-                      <Button
-                        component={Link}
-                        to={failurePages[item.resource_type] ?? "/dashboard"}
-                        size="small"
-                        sx={{ minWidth: 0, p: 0 }}
-                      >
-                        Otvori detalje
-                      </Button>
+                      {auth.can(
+                        item.resource_type === "snapshot"
+                          ? "snapshots.read"
+                          : item.resource_type === "delta"
+                            ? "deltas.read"
+                            : "acquisitions.read"
+                      ) && (
+                        <Button
+                          component={Link}
+                          to={failurePages[item.resource_type] ?? "/dashboard"}
+                          size="small"
+                          sx={{ minWidth: 0, p: 0 }}
+                        >
+                          Otvori detalje
+                        </Button>
+                      )}
                     </Stack>
                   </Box>
                 ))

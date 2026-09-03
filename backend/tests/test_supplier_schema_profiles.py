@@ -254,6 +254,24 @@ def test_profile_field_version_lifecycle(api_client: httpx.Client) -> None:
         asyncio.run(purge(supplier_id))
 
 
+def test_analysis_rejects_draft_source_with_clear_error(
+    api_client: httpx.Client,
+) -> None:
+    suffix = uuid.uuid4().hex[:12]
+    supplier_id, source_id = setup_source(api_client, suffix)
+    root = f"/suppliers/{supplier_id}/sources/{source_id}/schema-profiles"
+    try:
+        response = api_client.post(
+            f"{root}/analyze",
+            json={"name": f"Analysis {suffix}"},
+        )
+        assert response.status_code == 409, response.text
+        assert response.json()["code"] == "schema_analysis_source_not_active"
+        assert "aktivirana" in response.text
+    finally:
+        asyncio.run(purge(supplier_id))
+
+
 def test_profile_validation_permissions_and_parent_isolation(
     api_client: httpx.Client,
 ) -> None:

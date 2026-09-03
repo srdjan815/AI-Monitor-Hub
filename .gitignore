@@ -18,6 +18,8 @@ dist/
 !.env.example
 !.env.*.example
 /config/supplier-secrets.json
+/backend/config/supplier-secrets.json
+/Also-pricelist/
 
 # IDE state (canonical shared settings are explicitly retained)
 .vscode/*

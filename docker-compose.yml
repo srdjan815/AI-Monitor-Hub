@@ -12,7 +12,9 @@ services:
         required: false
     volumes:
       - ./backend:/app
-      - ./config/supplier-secrets.json:/app/config/supplier-secrets.json:rw
+      # Mount the dedicated directory, not the individual file: the secret
+      # provider persists by atomically replacing supplier-secrets.json.
+      - ./config:/app/config:rw
       - supplier_artifacts:/app/data/supplier-artifacts
     environment:
       AUTH_MODE: static
@@ -41,7 +43,8 @@ services:
         required: false
     volumes:
       - ./backend:/app
-      - ./config/supplier-secrets.json:/app/config/supplier-secrets.json:rw
+      # API and worker must see the same atomically replaceable secret store.
+      - ./config:/app/config:rw
       - supplier_artifacts:/app/data/supplier-artifacts
     command: ["python", "-m", "app.modules.execution.worker"]
     environment:

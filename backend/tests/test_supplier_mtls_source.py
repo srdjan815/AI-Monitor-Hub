@@ -13,11 +13,15 @@ from app.modules.suppliers.acquisition_contracts import HttpResponse
 from app.modules.suppliers.models import SupplierSource
 from app.modules.suppliers.source_configuration import ApiSourceConfiguration
 from app.modules.suppliers.source_secrets import FileSourceSecretProvider
+from app.modules.suppliers.gtin_normalization import (
+    GtinNormalizationStatus,
+    normalize_to_ean13,
+)
 
 
 CATALOG = b"""<NewDataSet><Table><ProductCode>100</ProductCode><ProductName>Test</ProductName></Table></NewDataSet>"""
 PRICES = b"""<NewDataSet><Table><ProductCode>100</ProductCode><ProductPartnerPrice>12.34</ProductPartnerPrice></Table></NewDataSet>"""
-BARCODES = b"""<NewDataSet><Table><ProductCode>100</ProductCode><BarcodeType>EAN</BarcodeType><BarcodeValue>8601234567890</BarcodeValue></Table></NewDataSet>"""
+BARCODES = b"""<NewDataSet><Table><ProductCode>100</ProductCode><BarcodeType>EAN</BarcodeType><BarcodeValue>8606019540128</BarcodeValue></Table></NewDataSet>"""
 
 
 class CertificateClient:
@@ -90,13 +94,36 @@ async def test_kimtec_feeds_are_joined_by_product_code() -> None:
             "ProductName": "Test",
             "ProductPartnerPrice": "12.34",
             "BarcodeType": "EAN",
-            "BarcodeValue": "8601234567890",
-            "EAN": "8601234567890",
+            "BarcodeValue": "8606019540128",
+            "EAN": "8606019540128",
         }
     ]
     assert value["source_summary"]["join_key"] == "ProductCode"
     assert value["source_summary"]["products_with_ean"] == 1
     assert set(value["raw_sources"]) == {"barcode", "catalog", "price"}
+
+
+@pytest.mark.parametrize(
+    ("source", "expected", "status"),
+    [
+        ("198156628701", "0198156628701", GtinNormalizationStatus.UPC_A_CONVERTED_TO_EAN13),
+        ("8606019540128", "8606019540128", GtinNormalizationStatus.EAN13_VALID),
+        ("198156628702", "", GtinNormalizationStatus.INVALID_CHECKSUM),
+        ("1111111111111", "", GtinNormalizationStatus.PLACEHOLDER),
+        ("000000000000", "", GtinNormalizationStatus.PLACEHOLDER),
+        ("123", "", GtinNormalizationStatus.UNSUPPORTED_LENGTH),
+        ("12345678901A", "", GtinNormalizationStatus.NON_NUMERIC),
+        ("", "", GtinNormalizationStatus.MISSING),
+    ],
+)
+def test_gtin_normalization_is_strict_and_preserves_source(
+    source: str,
+    expected: str,
+    status: GtinNormalizationStatus,
+) -> None:
+    result = normalize_to_ean13(source)
+    assert result.value == expected
+    assert result.status == status
 
 
 def test_file_provider_persists_certificate_outside_database(tmp_path: Path) -> None:

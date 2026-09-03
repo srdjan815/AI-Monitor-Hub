@@ -67,3 +67,10 @@ short setup entry point remains at
 [docs/development/local-setup.md](docs/development/local-setup.md). Architecture
 rules are in
 [docs/architecture/module-boundaries.md](docs/architecture/module-boundaries.md).
+
+## Destructive integration tests
+
+The repository includes a separately fenced, disposable test system. It is
+**test-only and must not be used for development or real data**. Run it only via
+`scripts/Invoke-IsolatedTestSuite.ps1`; see
+[the isolated test environment runbook](docs/operations/isolated-test-environment.md).

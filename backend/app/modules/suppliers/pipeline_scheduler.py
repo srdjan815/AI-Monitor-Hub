@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.execution.models import Job
 from app.modules.suppliers.pipeline_models import SupplierSourcePipelineRun
 from app.modules.suppliers.pipeline_repository import SupplierPipelineRepository
+from app.modules.suppliers.pipeline_recovery_service import (
+    SupplierPipelineRecoveryService,
+)
 
 
 class SupplierPipelineScheduleCalculator:
@@ -62,9 +65,7 @@ class SupplierPipelineScheduleCalculator:
         return sorted(set(result))
 
     @staticmethod
-    def _weekdays(
-        kind: str | None, config: dict[str, object]
-    ) -> set[int] | None:
+    def _weekdays(kind: str | None, config: dict[str, object]) -> set[int] | None:
         if kind in {"DAILY", "MULTI_DAILY"}:
             return None
         if kind == "WEEKDAYS":
@@ -98,6 +99,13 @@ class SupplierPipelineScheduler:
         limit: int = 25,
     ) -> int:
         current = now or datetime.now(UTC)
+        await self.repository.lock_global_pipeline_dispatch()
+        recovery = SupplierPipelineRecoveryService(self.session)
+        recovery.repository = self.repository
+        await recovery.recover_global()
+        if await self.repository.blocking_pipeline_global() is not None:
+            await self.session.commit()
+            return 0
         schedules = await self.repository.due_schedules(current, limit=limit)
         count = 0
         try:
@@ -123,7 +131,9 @@ class SupplierPipelineScheduler:
                         },
                     )
                     continue
-                idempotency = f"supplier-schedule:{schedule.id}:{occurrence.isoformat()}"
+                idempotency = (
+                    f"supplier-schedule:{schedule.id}:{occurrence.isoformat()}"
+                )
                 existing = await self.repository.pipeline_by_idempotency(idempotency)
                 if existing is None:
                     run = SupplierSourcePipelineRun(
@@ -168,6 +178,8 @@ class SupplierPipelineScheduler:
                         "version": schedule.version + 1,
                     },
                 )
+                if count:
+                    break
             await self.session.commit()
         except Exception:
             await self.session.rollback()

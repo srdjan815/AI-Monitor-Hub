@@ -235,6 +235,8 @@ def _pipeline(client: httpx.Client, suffix: str) -> tuple[str, str, str]:
     codes = (
         "supplier_sku",
         "name",
+        "ean",
+        "price",
         "description",
         "image_url",
         "primary_image_url",
@@ -267,6 +269,8 @@ def _pipeline(client: httpx.Client, suffix: str) -> tuple[str, str, str]:
     targets = (
         "product_code",
         "name",
+        "ean",
+        "price",
         "description",
         "image_url",
         "primary_image_url",
@@ -280,7 +284,7 @@ def _pipeline(client: httpx.Client, suffix: str) -> tuple[str, str, str]:
                 "target_attribute": target,
                 "transformation_type": "COPY",
                 "priority": priority,
-                "required": target == "product_code",
+                "required": target in {"product_code", "name", "ean", "price"},
             },
         )
         assert response.status_code == 201, response.text
@@ -298,13 +302,15 @@ def _csv_payload(long_description: str) -> bytes:
         [
             "A-1",
             "Prvi",
+            "8600000000011",
+            "100.00",
             "Opis 1",
             "https://img.test/a.jpg",
             "https://img.test/manual-photo.jpg",
             "https://img.test/a.jpg",
         ],
-        ["A-2", "Drugi", long_description, "", "", "https://img.test/b.jpg"],
-        ["A-3", "Treći", "Opis 3", "", "", ""],
+        ["A-2", "Drugi", "8600000000028", "200.00", long_description, "", "", "https://img.test/b.jpg"],
+        ["A-3", "Treći", "8600000000035", "300.00", "Opis 3", "", "", ""],
     ]
     stream = io.StringIO(newline="")
     writer = csv.writer(stream)
@@ -312,6 +318,8 @@ def _csv_payload(long_description: str) -> bytes:
         [
             "supplier_sku",
             "name",
+            "ean",
+            "price",
             "description",
             "image_url",
             "primary_image_url",

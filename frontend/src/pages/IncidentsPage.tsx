@@ -155,12 +155,27 @@ export function IncidentsPage() {
     []
   );
   const workflow = details.data ?? opened;
+  const incidentContext =
+    workflow?.sanitized_context && typeof workflow.sanitized_context === "object"
+      ? (workflow.sanitized_context as Record<string, unknown>)
+      : undefined;
   return (
     <>
       <PageHeader
         title="Incident Center"
         description="Jedinstven operativni ekran za trijažu, dodelu, istragu i resolution."
       />
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Typography variant="h2" mb={1}>Redosled rada sa cenovnikom</Typography>
+        <Typography color="text.secondary">
+          1. Dobavljači: proverite osnovne podatke. 2. Izvori: preuzmite i testirajte
+          konekciju. 3. Analiza cenovnika: proverite pronađena polja. 4. Mapiranje polja:
+          mapirajte obavezna polja i testirajte mapiranje. 5. Import cenovnika: pregledajte
+          prihvaćene i odbijene artikle. 6. Snapshots: kreirajte validno stanje iz poslednjeg
+          uspešnog importa. 7. Delta Runs: proverite promene prema prethodnom stanju. Ako
+          faza ne prođe, prvo otvorite njen incident i pratite preporučeni sledeći korak.
+        </Typography>
+      </Paper>
       <Stack direction={{ xs: "column", md: "row" }} gap={1.5} mb={2}>
         <TextField
           size="small"
@@ -263,6 +278,33 @@ export function IncidentsPage() {
         {details.isLoading ? <LoadingBlock /> : workflow && (
           <Stack gap={3}>
             <RecordDetails record={workflow} exclude={["sanitized_context", "description"]} />
+            {incidentContext && (
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="h2" mb={1}>Dijagnostika i sledeći korak</Typography>
+                <Stack gap={0.75}>
+                  {Boolean(incidentContext.pipeline_code) && (
+                    <Typography>Pipeline: {String(incidentContext.pipeline_code)}</Typography>
+                  )}
+                  {Boolean(incidentContext.phase) && (
+                    <Typography>Faza: {String(incidentContext.phase)}</Typography>
+                  )}
+                  {Boolean(incidentContext.failure_code) && (
+                    <Typography>Razlog: {String(incidentContext.failure_code)}</Typography>
+                  )}
+                  {Boolean(incidentContext.recommended_action) && (
+                    <Typography fontWeight={650}>
+                      Sledeći korak: {String(incidentContext.recommended_action)}
+                    </Typography>
+                  )}
+                  {Array.isArray(incidentContext.workflow) &&
+                    incidentContext.workflow.map((step, index) => (
+                      <Typography key={`${index}-${String(step)}`} color="text.secondary">
+                        {index + 1}. {String(step)}
+                      </Typography>
+                    ))}
+                </Stack>
+              </Paper>
+            )}
             <Divider />
             <Typography variant="h2">Komentari</Typography>
             <Stack direction="row" gap={1}>

@@ -338,6 +338,8 @@ def test_three_level_inheritance_and_deepest_override(
 def test_product_values_history_delta_export_and_system_read_only(
     client: httpx.Client,
 ) -> None:
+    seeded = client.post("/catalog/attribute-seed")
+    assert seeded.status_code == 200, seeded.text
     suffix = _suffix()
     category = client.post(
         "/categories",

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.suppliers.pipeline_models import (
@@ -13,6 +13,7 @@ from app.modules.suppliers.pipeline_models import (
     SupplierSourceSchedule,
 )
 from app.modules.suppliers.models import Supplier, SupplierSource
+from app.modules.execution.models import Job
 
 
 class SupplierPipelineRepository:
@@ -20,6 +21,9 @@ class SupplierPipelineRepository:
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def lock_global_pipeline_dispatch(self) -> None:
+        await self.session.execute(select(func.pg_advisory_xact_lock(7_241_901_001)))
 
     async def add(
         self,
@@ -59,6 +63,11 @@ class SupplierPipelineRepository:
     ) -> list[SupplierSourceSchedule]:
         rows = await self.session.execute(
             select(SupplierSourceSchedule)
+            .join(
+                SupplierSource,
+                SupplierSource.id == SupplierSourceSchedule.source_connection_id,
+            )
+            .join(Supplier, Supplier.id == SupplierSource.supplier_id)
             .where(
                 SupplierSourceSchedule.status == "ENABLED",
                 SupplierSourceSchedule.next_run_at.is_not(None),
@@ -66,6 +75,8 @@ class SupplierPipelineRepository:
             )
             .order_by(
                 SupplierSourceSchedule.next_run_at,
+                Supplier.company_name,
+                SupplierSource.name,
                 SupplierSourceSchedule.id,
             )
             .with_for_update(skip_locked=True)
@@ -82,9 +93,7 @@ class SupplierPipelineRepository:
         list[tuple[SupplierSourceSchedule, SupplierSource, Supplier]],
         int,
     ]:
-        total = await self.session.scalar(
-            select(func.count(SupplierSourceSchedule.id))
-        )
+        total = await self.session.scalar(select(func.count(SupplierSourceSchedule.id)))
         rows = await self.session.execute(
             select(SupplierSourceSchedule, SupplierSource, Supplier)
             .join(
@@ -158,6 +167,47 @@ class SupplierPipelineRepository:
                     SupplierSourcePipelineRun.source_connection_id == source_id,
                     SupplierSourcePipelineRun.status.in_(("PENDING", "RUNNING")),
                 )
+            )
+        ).scalar_one_or_none()
+
+    async def active_pipeline_global(self) -> SupplierSourcePipelineRun | None:
+        return (
+            await self.session.execute(
+                select(SupplierSourcePipelineRun)
+                .where(SupplierSourcePipelineRun.status.in_(("PENDING", "RUNNING")))
+                .order_by(
+                    SupplierSourcePipelineRun.created_at,
+                    SupplierSourcePipelineRun.id,
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+    async def blocking_pipeline_global(self) -> SupplierSourcePipelineRun | None:
+        """Return work that must finish before another supplier is dispatched.
+
+        A retrying job remains blocking even when its pipeline run was temporarily
+        marked failed by the failed attempt. This keeps supplier processing strictly
+        serial and prevents two suppliers from overlapping between retries.
+        """
+        return (
+            await self.session.execute(
+                select(SupplierSourcePipelineRun)
+                .outerjoin(Job, Job.id == SupplierSourcePipelineRun.job_id)
+                .where(
+                    or_(
+                        SupplierSourcePipelineRun.status.in_(("PENDING", "RUNNING")),
+                        and_(
+                            Job.job_type == "supplier.pipeline",
+                            Job.status.in_(("PENDING", "RUNNING", "RETRYING")),
+                        ),
+                    )
+                )
+                .order_by(
+                    SupplierSourcePipelineRun.created_at,
+                    SupplierSourcePipelineRun.id,
+                )
+                .limit(1)
             )
         ).scalar_one_or_none()
 

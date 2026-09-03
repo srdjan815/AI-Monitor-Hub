@@ -6,7 +6,7 @@ The reviewed dependency source is `backend/requirements.lock`, containing 81
 nonblank, exactly pinned entries. Its SHA-256 digest is:
 
 ```text
-6DC94A09053D4143D7EA73AB696EC25E890733019DEFA0D6039FCF7ABDA83F24
+0161C9551DE7DE95DA01DFC5B2A606FF44A6AA6020A274A3644BFF7EE1D99141
 ```
 
 `backend/pyproject.toml` declares the supported dependency ranges and direct
@@ -46,6 +46,7 @@ application package itself.
 
 | Package | Advisory | Exposure and reachability | Resolution |
 |---|---|---|---|
+| cryptography 46.0.7 | PYSEC-2026-3552, PYSEC-2026-3553, PYSEC-2026-3554 and GHSA-537c-gmf6-5ccf | Direct runtime dependency used for supplier PKCS#12 parsing, certificate validation and mTLS. Because this path is reachable while acquiring supplier data, release remained blocked until the complete fixed version was verified. | Upgraded to `cryptography==50.0.0` and constrained the supported range to `>=50.0.0,<51.0.0`. A clean Linux image reports zero known vulnerabilities; all 76 targeted certificate/acquisition unit tests and 278 isolated supplier tests pass. |
 | Black 24.10.0 | CVE-2026-31900 / PYSEC-2026-2120 | Direct development/formatting dependency. The affected GitHub Action path is not part of the application request runtime and no Black Action execution path was identified in the reviewed repository, but retaining a vulnerable developer tool was not acceptable. | Upgraded to `black==26.3.1`; fixed from 26.3.0. |
 | Black 24.10.0 | CVE-2026-32274 / PYSEC-2026-2121 | Direct development/formatting dependency. Black is invoked by developer and release checks, so the affected arbitrary cache-path behavior was potentially reachable in tooling even though it was outside the production API path. | Upgraded to `black==26.3.1`; fixed in 26.3.1. |
 | pytest 8.4.2 | CVE-2025-71176 / PYSEC-2026-1845 | Direct test dependency. The predictable Unix temporary-path issue could affect Linux test execution through local denial of service and, under adverse local privilege conditions, broader impact. It was not reachable from a production HTTP request. | Upgraded to `pytest==9.0.3`, the first reviewed fixed target used by this lock. |
@@ -56,6 +57,12 @@ release used with pytest 9. The resulting host environment passes dependency
 resolution and the two advisory scans above.
 
 ## Container and release status
+
+An additional controlled review on 2026-09-03 rebuilt the Linux images with
+`cryptography==50.0.0`. `pip-audit` and `pip check` passed, and the supplier
+regression ran against disposable PostgreSQL and Redis services which were
+verified removed afterward. The image build did not restart the active
+development services.
 
 | Evidence | Status |
 |---|---|

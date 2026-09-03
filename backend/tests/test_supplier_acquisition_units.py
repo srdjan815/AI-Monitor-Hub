@@ -19,6 +19,10 @@ from app.modules.suppliers.acquisition_contracts import (
 )
 from app.modules.suppliers.acquisition_parsers import ParserRegistry, XlsxParser
 from app.modules.suppliers.acquisition_processing import AcquisitionProcessor
+from app.modules.suppliers.acquisition_models import (
+    SupplierAcquisitionIssue,
+    SupplierStagedRecord,
+)
 from app.modules.suppliers.acquisition_storage import LocalArtifactStorage
 from app.modules.suppliers.acquisition_transformations import MappingExecutor
 from app.modules.suppliers.acquisition_validation import SchemaRecordValidator
@@ -165,6 +169,60 @@ def test_business_text_limit_overrides_short_inference_sample() -> None:
     assert result.problems == []
 
 
+def test_category_policy_accepts_realistic_long_supplier_paths() -> None:
+    field = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code="Category",
+        name="Category",
+        position=1,
+        data_type="STRING",
+        required=False,
+        nullable=True,
+        max_length=45,
+        path="Category",
+        is_active=True,
+        version=1,
+    )
+
+    result = SchemaRecordValidator().validate(
+        {"Category": "Računari > Komponente > Memorije > Desktop memorije"},
+        [field],
+    )
+
+    assert result.problems == []
+
+
+@pytest.mark.parametrize(
+    ("field_code", "value"),
+    [
+        ("Model", "RTX 5060 8G GAMING OC"),
+        ("ProductImageUrl", "https://b2b.kimtec.rs/slike/0001405728_big.jpg"),
+    ],
+)
+def test_product_identity_text_limits_override_short_inference_samples(
+    field_code: str, value: str
+) -> None:
+    field = SupplierSchemaField(
+        id=uuid.uuid4(),
+        schema_profile_id=uuid.uuid4(),
+        field_code=field_code,
+        name=field_code,
+        position=1,
+        data_type="STRING",
+        required=False,
+        nullable=True,
+        max_length=max(1, len(value) - 1),
+        path=field_code,
+        is_active=True,
+        version=1,
+    )
+
+    result = SchemaRecordValidator().validate({field_code: value}, [field])
+
+    assert result.problems == []
+
+
 def test_acquisition_can_limit_strict_schema_validation_to_ean() -> None:
     ean = SupplierSchemaField(
         id=uuid.uuid4(),
@@ -297,6 +355,77 @@ def test_product_price_must_be_positive(
     problem = AcquisitionProcessor._price_problem({"price": price})
 
     assert (problem is not None) is has_problem
+
+
+@pytest.mark.parametrize(
+    ("name", "has_problem"),
+    [("Monitor Lenovo", False), ("  Monitor Lenovo  ", False), ("", True), ("   ", True), (None, True)],
+)
+def test_product_name_must_not_be_blank(name: object, has_problem: bool) -> None:
+    problem = AcquisitionProcessor._name_problem({"name": name})
+
+    assert (problem is not None) is has_problem
+
+
+@pytest.mark.parametrize(
+    ("source", "expected", "error_code"),
+    [
+        ("8606019540128", "8606019540128", None),
+        ("198156628701", "0198156628701", None),
+        ("111", "", "acquisition_ean_placeholder"),
+        ("1111", "", "acquisition_ean_placeholder"),
+        ("11111", "", "acquisition_ean_placeholder"),
+        ("2222222222", "", "acquisition_ean_placeholder"),
+        ("8606019540129", "", "acquisition_ean_invalid_checksum"),
+        ("EAN-8606019540128", "", "acquisition_ean_non_numeric"),
+        ("", "", "acquisition_ean_missing"),
+    ],
+)
+def test_universal_ean_policy_normalizes_or_rejects(
+    source: str, expected: str, error_code: str | None
+) -> None:
+    mapped: dict[str, object] = {"ean": source}
+
+    problem = AcquisitionProcessor._ean_problem(mapped)
+
+    assert mapped["ean"] == expected
+    assert (problem.code if problem else None) == error_code
+
+
+def test_duplicate_supplier_product_codes_are_all_rejected() -> None:
+    run_id = uuid.uuid4()
+    records = [
+        SupplierStagedRecord(
+            id=uuid.uuid4(),
+            acquisition_run_id=run_id,
+            record_number=number,
+            source_key=code,
+            source_identifier=code,
+            raw_data={"code": code},
+            mapped_data={"product_code": code, "ean": ean},
+            validation_status="ACCEPTED",
+            warning_count=0,
+            error_count=0,
+        )
+        for number, code, ean in (
+            (1, "DUP-1", "8606019540128"),
+            (2, " dup-1 ", "4006381333931"),
+            (3, "UNIQUE", "5901234123457"),
+        )
+    ]
+    issues: list[SupplierAcquisitionIssue] = []
+
+    AcquisitionProcessor._reject_duplicate_product_codes(run_id, records, issues)
+
+    assert [record.validation_status for record in records] == [
+        "REJECTED",
+        "REJECTED",
+        "ACCEPTED",
+    ]
+    assert [issue.record_number for issue in issues] == [1, 2]
+    assert {issue.error_code for issue in issues} == {
+        "acquisition_product_code_duplicate"
+    }
 
 
 def test_concat_mapping_combines_multiple_supplier_note_fields() -> None:

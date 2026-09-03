@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.suppliers.delta_models import (
     SupplierDeltaFieldChange, SupplierDeltaItem, SupplierDeltaRun,
 )
+from app.modules.suppliers.acquisition_models import SupplierStagedRecord
 from app.modules.suppliers.snapshot_models import SupplierSnapshot, SupplierSnapshotItem
 
 
@@ -23,6 +24,17 @@ class SupplierDeltaRepository:
             select(SupplierSnapshotItem)
             .where(SupplierSnapshotItem.snapshot_id == snapshot_id)
             .order_by(SupplierSnapshotItem.record_number, SupplierSnapshotItem.id)
+        )
+        return list(rows.scalars())
+
+    async def rejected_records(self, run_id: uuid.UUID) -> list[SupplierStagedRecord]:
+        rows = await self.session.execute(
+            select(SupplierStagedRecord)
+            .where(
+                SupplierStagedRecord.acquisition_run_id == run_id,
+                SupplierStagedRecord.validation_status == "REJECTED",
+            )
+            .order_by(SupplierStagedRecord.record_number, SupplierStagedRecord.id)
         )
         return list(rows.scalars())
 

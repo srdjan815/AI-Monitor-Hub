@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import base64
+import os
+import tempfile
 import threading
 import uuid
 from pathlib import Path
@@ -31,11 +33,27 @@ class FileSourceSecretProvider:
             records = self._records()
             records[reference] = dict(values)
             try:
-                self.path.write_text(
-                    json.dumps(records, ensure_ascii=False, indent=2),
-                    encoding="utf-8",
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                existing_mode = (
+                    self.path.stat().st_mode if self.path.exists() else 0o600
                 )
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=self.path.parent,
+                    prefix=f".{self.path.name}.",
+                    suffix=".tmp",
+                    delete=False,
+                ) as temporary:
+                    json.dump(records, temporary, ensure_ascii=False, indent=2)
+                    temporary.flush()
+                    os.fsync(temporary.fileno())
+                    temporary_path = Path(temporary.name)
+                os.chmod(temporary_path, existing_mode)
+                os.replace(temporary_path, self.path)
             except OSError as exc:
+                if "temporary_path" in locals():
+                    temporary_path.unlink(missing_ok=True)
                 raise AcquisitionFailure(
                     "acquisition_secret_store_unavailable",
                     "Pristupni podaci nisu mogli trajno da se sačuvaju",

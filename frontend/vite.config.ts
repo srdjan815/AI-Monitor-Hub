@@ -19,9 +19,12 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
-          manualChunks: {
-            mui: ["@mui/material", "@mui/icons-material"],
-            query: ["@tanstack/react-query"]
+          manualChunks(id) {
+            if (id.indexOf("node_modules/@mui/") >= 0 || id.indexOf("node_modules/@emotion/") >= 0) {
+              return "mui";
+            }
+            if (id.indexOf("node_modules/@tanstack/react-query") >= 0) return "query";
+            return undefined;
           }
         }
       }

@@ -5,9 +5,11 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.suppliers.acquisition_transformations import MappingExecutor
+from app.modules.suppliers.acquisition_processing import AcquisitionProcessor
 from app.modules.suppliers.acquisition_validation import SchemaRecordValidator
 from app.modules.suppliers.errors import supplier_error
 from app.modules.suppliers.mapping_profile_repository import SupplierMappingRepository
+from app.modules.suppliers.mapping_service_support import CORE_REQUIRED_TARGETS
 from app.modules.suppliers.mapping_test_schemas import (
     MappingTestCell,
     MappingTestRead,
@@ -48,9 +50,7 @@ class SupplierMappingTestService:
                 "mapping_test_artifact_missing",
                 "Schema nema sačuvan cenovnik za test mapiranja.",
             )
-        artifact = await self.pipeline.artifact(
-            source_id, schema.baseline_artifact_id
-        )
+        artifact = await self.pipeline.artifact(source_id, schema.baseline_artifact_id)
         if artifact is None:
             supplier_error(
                 409,
@@ -64,6 +64,18 @@ class SupplierMappingTestService:
                 409,
                 "mapping_profile_empty",
                 "Dodajte bar jedno mapiranje pre testa.",
+            )
+        required_targets = {
+            rule.target_attribute.strip().lower()
+            for rule in rules
+            if rule.is_active and rule.required
+        }
+        missing = sorted(CORE_REQUIRED_TARGETS - required_targets)
+        if missing:
+            supplier_error(
+                409,
+                "mapping_required_targets_missing",
+                "Mapiranje nema sva obavezna polja: " + ", ".join(missing),
             )
         mapped_field_ids = {rule.schema_field_id for rule in rules}
         for rule in rules:
@@ -102,6 +114,29 @@ class SupplierMappingTestService:
             )
             mapped = self.executor.execute(validated.values, rules)
             problems = [*validated.problems, *mapped.problems]
+            ean_rule = next(
+                (
+                    rule
+                    for rule in rules
+                    if rule.is_active and rule.target_attribute == "ean"
+                ),
+                None,
+            )
+            if ean_rule is not None:
+                ean_problem = AcquisitionProcessor._ean_problem(
+                    mapped.mapped,
+                    schema_field_id=ean_rule.schema_field_id,
+                    mapping_rule_id=ean_rule.id,
+                )
+                if ean_problem is not None:
+                    problems.append(ean_problem)
+            for problem in (
+                AcquisitionProcessor._identifier_problem(mapped.mapped),
+                AcquisitionProcessor._price_problem(mapped.mapped),
+                AcquisitionProcessor._name_problem(mapped.mapped),
+            ):
+                if problem is not None:
+                    problems.append(problem)
             row_errors = sum(item.severity == "ERROR" for item in problems)
             row_warnings = len(problems) - row_errors
             warnings += row_warnings
@@ -110,12 +145,23 @@ class SupplierMappingTestService:
             for rule in sorted(rules, key=lambda item: item.priority):
                 field = fields_by_id.get(rule.schema_field_id)
                 original = validated.values.get(rule.schema_field_id)
+                configured_field_ids: set[uuid.UUID] = set()
+                configured = (
+                    getattr(rule, "transformation_config", None) or {}
+                ).get("field_ids", [])
+                if isinstance(configured, list):
+                    for field_id in configured:
+                        try:
+                            configured_field_ids.add(uuid.UUID(str(field_id)))
+                        except (TypeError, ValueError):
+                            continue
                 problem = next(
                     (
                         item
                         for item in problems
                         if item.mapping_rule_id == rule.id
                         or item.schema_field_id == rule.schema_field_id
+                        or item.schema_field_id in configured_field_ids
                     ),
                     None,
                 )
@@ -138,7 +184,9 @@ class SupplierMappingTestService:
                     status=(
                         "GREŠKA"
                         if row_errors
-                        else "UPOZORENJE" if row_warnings else "ISPRAVNO"
+                        else "UPOZORENJE"
+                        if row_warnings
+                        else "ISPRAVNO"
                     ),
                     cells=cells,
                 )

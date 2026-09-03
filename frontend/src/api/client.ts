@@ -29,14 +29,26 @@ function correlationId(): string {
 }
 
 function apiError(status: number, payload: any): ApiError {
+  const rawMessage =
+    payload?.error?.message ??
+    payload?.detail?.message ??
+    payload?.detail ??
+    "Zahtev nije uspeo";
+  const message = Array.isArray(rawMessage)
+    ? rawMessage
+        .map((item) =>
+          typeof item?.msg === "string"
+            ? `${Array.isArray(item.loc) ? item.loc.slice(1).join(".") : "polje"}: ${item.msg}`
+            : JSON.stringify(item)
+        )
+        .join("; ")
+    : typeof rawMessage === "string"
+      ? rawMessage
+      : JSON.stringify(rawMessage);
   return {
     status,
     code: payload?.error?.code ?? payload?.code ?? "INTERNAL_ERROR",
-    message:
-      payload?.error?.message ??
-      payload?.detail?.message ??
-      payload?.detail ??
-      "Zahtev nije uspeo",
+    message,
     requestId: payload?.request_id,
     correlationId: payload?.correlation_id,
     fieldErrors: payload?.error?.field_errors

@@ -39,4 +39,26 @@ describe("Supplier API client", () => {
     setAccessToken("");
     expect(getAccessToken()).toBe("");
   });
+
+  it("pretvara 422 listu validacionih grešaka u čitljivu poruku", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          detail: [
+            { loc: ["body", "times", 0], msg: "Field required" }
+          ]
+        }),
+        { status: 422, headers: { "Content-Type": "application/json" } }
+      );
+    try {
+      const { api } = await import("./client");
+      await expect(api("/test")).rejects.toMatchObject({
+        status: 422,
+        message: "times.0: Field required"
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

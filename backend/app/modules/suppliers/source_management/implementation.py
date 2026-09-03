@@ -222,6 +222,9 @@ class SupplierSourceService(SupplierSourceServiceSupport):
             values[f"{prefix}{data.token_parameter}"] = token
         if data.api_key:
             values[f"{prefix}{data.api_key_parameter}"] = data.api_key
+        if data.imap_username and data.imap_password:
+            values["imap:username"] = data.imap_username
+            values["imap:password"] = data.imap_password
         try:
             reference = source_secret_provider.write(values)
         except AcquisitionFailure as exc:

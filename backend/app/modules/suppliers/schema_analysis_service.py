@@ -68,8 +68,15 @@ class SupplierSchemaAnalysisService:
         reanalyze_profile_id: uuid.UUID | None = None,
         reanalyze_action: SchemaProfileAction | None = None,
     ) -> SchemaInferenceRead:
-        if await self.sources.get_source(supplier_id, source_id) is None:
+        source = await self.sources.get_source(supplier_id, source_id)
+        if source is None:
             supplier_error(404, "supplier_source_not_found", "Izvor nije pronađen")
+        if not source.is_active or source.status != "ACTIVE":
+            supplier_error(
+                409,
+                "schema_analysis_source_not_active",
+                "Konekcija mora prvo biti uspešno testirana i aktivirana.",
+            )
         key = f"schema-analysis:{source_id}:{uuid.uuid4()}"
         run = await self.runs.create(
             source_id,

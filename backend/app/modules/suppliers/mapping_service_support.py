@@ -12,6 +12,8 @@ from app.modules.suppliers.mapping_profile_repository import SupplierMappingRepo
 from app.modules.suppliers.schema_profile_repository import SupplierSchemaRepository
 from app.modules.suppliers.source_repository import SupplierSourceRepository
 
+CORE_REQUIRED_TARGETS = frozenset({"product_code", "name", "ean", "price"})
+
 
 class SupplierMappingServiceSupport:
     def __init__(self, session: AsyncSession) -> None:
@@ -90,6 +92,28 @@ class SupplierMappingServiceSupport:
             )
         return profile
 
+    async def _require_core_rules(self, mapping_profile_id: uuid.UUID) -> None:
+        rules = await self.repository.list_rules(mapping_profile_id)
+        required_targets = {
+            rule.target_attribute.strip().lower()
+            for rule in rules
+            if rule.is_active and rule.required
+        }
+        missing = sorted(CORE_REQUIRED_TARGETS - required_targets)
+        if missing:
+            labels = {
+                "product_code": "šifra artikla dobavljača",
+                "name": "naziv proizvoda",
+                "ean": "EAN",
+                "price": "cena",
+            }
+            supplier_error(
+                409,
+                "mapping_required_targets_missing",
+                "Mapiranje nema sva obavezna polja: "
+                + ", ".join(labels[target] for target in missing),
+            )
+
     @staticmethod
     def _draft(profile: SupplierMappingProfile) -> None:
         if not profile.is_active or profile.status != "DRAFT":
@@ -158,4 +182,4 @@ class SupplierMappingServiceSupport:
         supplier_error(409, "mapping_profile_conflict", "Konflikt mapiranja")
 
 
-__all__ = ["SupplierMappingServiceSupport"]
+__all__ = ["CORE_REQUIRED_TARGETS", "SupplierMappingServiceSupport"]

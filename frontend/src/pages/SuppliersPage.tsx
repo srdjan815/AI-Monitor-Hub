@@ -29,6 +29,7 @@ import { StatusChip } from "../components/StatusChip";
 import { useAuth } from "../state/AuthContext";
 import { useWorkspace } from "../state/WorkspaceContext";
 import type { ApiError, Supplier } from "../types";
+import { supplierErrorMessage, supplierPayload } from "./supplierForm";
 
 const emptyForm = {
   company_name: "",
@@ -73,11 +74,11 @@ export function SuppliersPage() {
     mutationFn: async () => {
       if (opened) {
         return supplierApi.updateSupplier(opened.id, {
-          ...form,
+          ...supplierPayload(form),
           version: opened.version
         });
       }
-      const supplier = await supplierApi.createSupplier(form);
+      const supplier = await supplierApi.createSupplier(supplierPayload(form));
       const hasContact = [
         contactForm.name,
         contactForm.email,
@@ -107,7 +108,7 @@ export function SuppliersPage() {
       setFormOpen(false);
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
     },
-    onError: (error: ApiError) => toast.error(`${error.code}: ${error.message}`)
+    onError: (error: ApiError) => toast.error(supplierErrorMessage(error))
   });
   const deactivate = useMutation({
     mutationFn: (id: string) => supplierApi.deactivateSupplier(id),
@@ -286,7 +287,13 @@ export function SuppliersPage() {
                 label={label}
                 value={form[key as keyof typeof form]}
                 required={key === "company_name"}
-                helperText={helper}
+                helperText={
+                  key === "tax_identifier" && !form.tax_identifier.trim()
+                    ? "PIB nije unet (opciono)."
+                    : key === "registration_number" && !form.registration_number.trim()
+                      ? "Matični broj nije unet (opciono)."
+                      : helper
+                }
                 onChange={(event) =>
                   setForm((value) => ({ ...value, [key]: event.target.value }))
                 }
