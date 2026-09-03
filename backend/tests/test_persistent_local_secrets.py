@@ -4,12 +4,16 @@ import json
 import logging
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi import HTTPException
 
 from app.core.config import Settings
 from app.core.security import StaticAdminAuthenticationAdapter
 from app.modules.suppliers.acquisition_contracts import AcquisitionFailure
-from app.modules.suppliers.source_secrets import FileSourceSecretProvider
+from app.modules.suppliers.source_secrets import (
+    EncryptedFileSourceSecretProvider,
+    FileSourceSecretProvider,
+)
 from app.modules.suppliers.source_schemas import SupplierSourceCreate
 
 
@@ -112,6 +116,44 @@ def test_file_provider_persists_new_credentials_across_recreation(tmp_path) -> N
         "portal:username": "partner",
         "portal:password": "hidden",
     }
+
+
+def test_encrypted_file_provider_persists_without_plaintext(tmp_path) -> None:
+    path = tmp_path / "supplier-secrets.enc"
+    key = Fernet.generate_key().decode("ascii")
+    provider = EncryptedFileSourceSecretProvider(path, key)
+
+    reference = provider.write(
+        {"portal:username": "partner", "portal:password": "hidden-password"}
+    )
+
+    raw = path.read_bytes()
+    assert b"partner" not in raw
+    assert b"hidden-password" not in raw
+    assert EncryptedFileSourceSecretProvider(path, key).resolve(reference) == {
+        "portal:username": "partner",
+        "portal:password": "hidden-password",
+    }
+
+
+def test_encrypted_file_provider_fails_closed_with_wrong_key(tmp_path) -> None:
+    path = tmp_path / "supplier-secrets.enc"
+    first_key = Fernet.generate_key().decode("ascii")
+    EncryptedFileSourceSecretProvider(path, first_key).write(
+        {"header:X-API-Key": "hidden"}
+    )
+
+    wrong_key = Fernet.generate_key().decode("ascii")
+    with pytest.raises(AcquisitionFailure) as failure:
+        EncryptedFileSourceSecretProvider(path, wrong_key).resolve(
+            "secret:supplier/unknown"
+        )
+    assert failure.value.code == "acquisition_secret_file_invalid"
+
+
+def test_encrypted_file_provider_rejects_invalid_master_key(tmp_path) -> None:
+    with pytest.raises(RuntimeError, match="Fernet"):
+        EncryptedFileSourceSecretProvider(tmp_path / "secrets.enc", "not-a-key")
 
 
 def test_file_provider_reports_missing_unknown_and_invalid_files(tmp_path) -> None:

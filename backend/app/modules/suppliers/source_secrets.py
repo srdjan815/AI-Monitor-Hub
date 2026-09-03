@@ -9,6 +9,8 @@ import uuid
 from pathlib import Path
 from typing import Protocol
 
+from cryptography.fernet import Fernet, InvalidToken
+
 from app.core.config import settings
 from app.modules.suppliers.acquisition_contracts import AcquisitionFailure
 
@@ -155,6 +157,74 @@ class FileSourceSecretProvider:
         return direct
 
 
+class EncryptedFileSourceSecretProvider(FileSourceSecretProvider):
+    """Encrypted-at-rest file store with atomic replacement semantics."""
+
+    def __init__(self, path: str | Path, key: str) -> None:
+        super().__init__(path)
+        try:
+            self._fernet = Fernet(key.encode("ascii"))
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise RuntimeError(
+                "SUPPLIER_SECRETS_KEY mora biti validan Fernet ključ"
+            ) from exc
+
+    def _records(self) -> dict[str, object]:
+        try:
+            encrypted = self.path.read_bytes()
+            plaintext = self._fernet.decrypt(encrypted)
+            value = json.loads(plaintext.decode("utf-8"))
+        except FileNotFoundError as exc:
+            raise AcquisitionFailure(
+                "acquisition_secret_file_missing",
+                "Šifrovani supplier secret store nije pronađen",
+            ) from exc
+        except (OSError, InvalidToken, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise AcquisitionFailure(
+                "acquisition_secret_file_invalid",
+                "Šifrovani supplier secret store nije validan ili ključ nije ispravan",
+            ) from exc
+        if not isinstance(value, dict):
+            raise AcquisitionFailure(
+                "acquisition_secret_file_invalid",
+                "Dešifrovani supplier secret store mora sadržati JSON objekat",
+            )
+        return value
+
+    def write(self, values: dict[str, str]) -> str:
+        reference = f"secret:supplier/{uuid.uuid4()}"
+        with self._lock:
+            records = self._records() if self.path.exists() else {}
+            records[reference] = dict(values)
+            temporary_path: Path | None = None
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                payload = json.dumps(
+                    records, ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8")
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    dir=self.path.parent,
+                    prefix=f".{self.path.name}.",
+                    suffix=".tmp",
+                    delete=False,
+                ) as temporary:
+                    temporary.write(self._fernet.encrypt(payload))
+                    temporary.flush()
+                    os.fsync(temporary.fileno())
+                    temporary_path = Path(temporary.name)
+                os.chmod(temporary_path, 0o600)
+                os.replace(temporary_path, self.path)
+            except OSError as exc:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
+                raise AcquisitionFailure(
+                    "acquisition_secret_store_unavailable",
+                    "Šifrovani pristupni podaci nisu mogli trajno da se sačuvaju",
+                ) from exc
+        return reference
+
+
 class TestMemorySecretProvider:
     """Explicit test-only provider; never selected by a deployment mode."""
 
@@ -193,17 +263,24 @@ class TestMemorySecretProvider:
             return reference in self._values
 
 
-source_secret_provider: SourceSecretProvider = (
-    TestMemorySecretProvider()
-    if settings.supplier_secret_mode == "test_memory"
-    else FileSourceSecretProvider(settings.supplier_secrets_file)
-)
+if settings.supplier_secret_mode == "test_memory":
+    source_secret_provider: SourceSecretProvider = TestMemorySecretProvider()
+elif settings.supplier_secret_mode == "encrypted_file":
+    if settings.supplier_secrets_key is None:
+        raise RuntimeError("SUPPLIER_SECRETS_KEY nedostaje")
+    source_secret_provider = EncryptedFileSourceSecretProvider(
+        settings.supplier_secrets_file,
+        settings.supplier_secrets_key.get_secret_value(),
+    )
+else:
+    source_secret_provider = FileSourceSecretProvider(settings.supplier_secrets_file)
 
 # Backward-compatible test fixture name; never selected by normal deployment.
 DevelopmentSecretProvider = TestMemorySecretProvider
 
 __all__ = [
     "DevelopmentSecretProvider",
+    "EncryptedFileSourceSecretProvider",
     "FileSourceSecretProvider",
     "SourceSecretProvider",
     "TestMemorySecretProvider",
