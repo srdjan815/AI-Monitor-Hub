@@ -9,6 +9,17 @@ origins, wildcard hosts, weak/default secrets, known default database
 passwords, a non-shared limiter, fail-open mutations, trusted raw preview, and
 enabled interactive docs.
 
+Production additionally requires `AUTH_ALLOW_LEGACY_TOKENS=false`, HTTPS-only
+`AUTH_SESSION_TRUSTED_ORIGINS`, `SUPPLIER_SECRET_MODE=encrypted_file`, and a
+valid `SUPPLIER_SECRETS_KEY` supplied outside Git. Before starting API or
+workers, run:
+
+```bash
+python -m scripts.validate_production_config
+```
+
+The command is fail-closed and prints only named checks, never secret values.
+
 Set a stable `AUTH_KEY_ID`, issuer, audience and token version. During rotation,
 put old verification-only secrets in the JSON `AUTH_PREVIOUS_KEYS` map. The
 active key ID cannot also be a previous key ID.
