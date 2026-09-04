@@ -7,7 +7,10 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from app.modules.suppliers.currency_conversion import convert_supplier_price
+from app.modules.suppliers.currency_conversion import (
+    convert_supplier_price,
+    rate_for_pricing,
+)
 from app.modules.suppliers.currency_contracts import SnapshotCurrencyPlan
 from app.modules.suppliers.currency_schemas import CurrencySettingWrite
 
@@ -41,11 +44,25 @@ def test_snapshot_conversion_preserves_source_and_uses_decimal_half_up() -> None
         **original,
         "source_price": "10.125",
         "source_currency": "EUR",
-        "exchange_rate": "117.36000000",
+        "exchange_rate": "117.36",
         "exchange_rate_id": str(rate_id),
         "price_rsd": "1188.27",
     }
     assert original == {"product_code": "A-1", "price": "10.125", "currency": "EUR"}
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("118.70499999", "118.70"),
+        ("118.70500000", "118.71"),
+        ("118.79500000", "118.80"),
+    ],
+)
+def test_rate_for_pricing_uses_financial_half_up_rounding(
+    source: str, expected: str
+) -> None:
+    assert rate_for_pricing(Decimal(source)) == Decimal(expected)
 
 
 def test_rate_payload_rejects_non_iso_currency() -> None:

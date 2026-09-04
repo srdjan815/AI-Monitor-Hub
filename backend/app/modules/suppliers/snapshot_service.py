@@ -9,7 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import current_actor_id
 from app.modules.suppliers.errors import supplier_error
-from app.modules.suppliers.currency_conversion import convert_supplier_price
+from app.modules.suppliers.currency_conversion import (
+    convert_supplier_price,
+    rate_for_pricing,
+)
 from app.modules.suppliers.currency_service import SupplierCurrencyService
 from app.modules.suppliers.currency_snapshot_policy import build_snapshot_currency_plan
 from app.modules.suppliers.snapshot_fingerprints import (
@@ -93,7 +96,9 @@ class SupplierSnapshotService:
             exchange_rate_id=currency_plan.rate.id if currency_plan else None,
             source_currency=currency_plan.currency_code if currency_plan else None,
             exchange_rate_to_rsd=(
-                currency_plan.rate.rate_to_rsd if currency_plan else None
+                rate_for_pricing(currency_plan.rate.rate_to_rsd)
+                if currency_plan
+                else None
             ),
             status="BUILDING",
             storage_state="ONLINE",

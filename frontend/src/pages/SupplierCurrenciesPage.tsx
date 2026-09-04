@@ -53,6 +53,19 @@ type ExtractionMethod =
   | "REGEX"
   | "TEXT_LABEL";
 
+function formatRate(value: string | null | undefined): string {
+  if (value == null || !/^\d+(?:\.\d+)?$/.test(value.trim())) return "—";
+  const [whole, decimals = ""] = value.trim().split(".");
+  const padded = decimals.padEnd(3, "0");
+  let hundredths = BigInt(whole) * 100n + BigInt(padded.slice(0, 2));
+  if (padded[2] >= "5") hundredths += 1n;
+  const integerPart = hundredths / 100n;
+  const decimalPart = String(hundredths % 100n)
+    .padStart(2, "0")
+    .replace(/0+$/, "");
+  return decimalPart ? `${integerPart},${decimalPart}` : String(integerPart);
+}
+
 export function SupplierCurrenciesPage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<SupplierCurrencySetting | null>(
@@ -301,7 +314,7 @@ export function SupplierCurrenciesPage() {
           <Typography color="text.secondary">Monitor valuta</Typography>
           <Typography variant="h2">
             {monitor.data?.currency_code ?? "RSD"} ={" "}
-            {monitor.data?.rate_to_rsd ?? "1"}
+            {formatRate(monitor.data?.rate_to_rsd ?? "1")}
           </Typography>
         </Paper>
         <Paper sx={{ p: 2, minWidth: 220 }}>
@@ -338,7 +351,9 @@ export function SupplierCurrenciesPage() {
               >
                 <TableCell>{row.supplier_name}</TableCell>
                 <TableCell>{row.currency_code}</TableCell>
-                <TableCell align="right">{row.current_rate ?? "—"}</TableCell>
+                <TableCell align="right">
+                  {formatRate(row.current_rate)}
+                </TableCell>
                 <TableCell>
                   {row.current_rate_effective_at
                     ? new Date(row.current_rate_effective_at).toLocaleString(
@@ -418,7 +433,9 @@ export function SupplierCurrenciesPage() {
                   <TableCell>
                     {new Date(item.effective_at).toLocaleString("sr-RS")}
                   </TableCell>
-                  <TableCell align="right">{item.rate_to_rsd}</TableCell>
+                  <TableCell align="right">
+                    {formatRate(item.rate_to_rsd)}
+                  </TableCell>
                   <TableCell>
                     {modeLabels[item.source_type as keyof typeof modeLabels] ??
                       item.source_type}
@@ -722,7 +739,8 @@ export function SupplierCurrenciesPage() {
                 </Button>
                 {testResult && (
                   <Alert severity="success">
-                    Pročitan kurs: {testResult.rate_to_rsd} RSD. Metoda:{" "}
+                    Pročitan kurs: {formatRate(testResult.rate_to_rsd)} RSD.
+                    Metoda:{" "}
                     {testResult.extraction_method_used}. Izvor: „
                     {testResult.source_excerpt}“
                     {testResult.difference_percent != null
