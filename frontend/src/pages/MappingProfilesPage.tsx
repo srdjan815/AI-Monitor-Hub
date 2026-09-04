@@ -3,18 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Button,
-  Checkbox,
-  FormControlLabel,
-  MenuItem,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
   Typography
 } from "@mui/material";
 import toast from "react-hot-toast";
@@ -24,9 +14,9 @@ import { StatusChip } from "../components/StatusChip";
 import { WorkspaceSelector } from "../components/WorkspaceSelector";
 import { useWorkspace } from "../state/WorkspaceContext";
 import type { ApiError, Operation } from "../types";
-import { mappingFieldPreview, mappingFieldValue } from "./mappingPreview";
 
 import { initialSuggestions, loadAnalysis, REQUIRED_TARGETS, TARGETS, type AnalysisField, type MappingTestResult, type PriceListRecord } from "./mapping/mappingConfiguration";
+import { CombinedNotePanel, CompositeNamePanel, MappingRecordSelector, MappingRulesTable } from "./mapping/MappingPanels";
 
 export function MappingProfilesPage() {
   const workspace = useWorkspace();
@@ -395,27 +385,6 @@ export function MappingProfilesPage() {
     !mapping.data ||
     String(mapping.data.status) === "DRAFT";
   const successful = testResult?.successful === true;
-  const orderedNameFields = nameFieldIds
-    .map((id) => analysis.fields.find((item) => item.field.id === id))
-    .filter((item): item is AnalysisField => Boolean(item));
-  const namePreview = orderedNameFields.reduce<string[]>((parts, item) => {
-    const value = mappingFieldValue(
-      selectedRecord,
-      item.field.name,
-      item.sample_values
-    ).trim();
-    if (!value) return parts;
-    const normalized = value.toLocaleLowerCase("sr-RS");
-    if (
-      parts.some(
-        (part) => part.toLocaleLowerCase("sr-RS") === normalized ||
-          part.toLocaleLowerCase("sr-RS").includes(normalized)
-      )
-    ) {
-      return parts;
-    }
-    return [...parts, value];
-  }, []).join(" — ");
 
   return (
     <>
@@ -437,286 +406,13 @@ export function MappingProfilesPage() {
         </Stack>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6">Sastavljen naziv proizvoda</Typography>
-        <Typography color="text.secondary" mb={1}>
-          Opciono spojite više izvornih polja u jedan naziv. Originalne vrednosti
-          ostaju sačuvane, prazna i već sadržana polja se ne dodaju ponovo.
-        </Typography>
-        <TextField
-          select
-          fullWidth
-          label="Polja koja čine naziv"
-          value={nameFieldIds}
-          disabled={!editable}
-          SelectProps={{
-            multiple: true,
-            renderValue: (selected) =>
-              (selected as string[])
-                .map(
-                  (id) =>
-                    analysis.fields.find((item) => item.field.id === id)?.field
-                      .name ?? id
-                )
-                .join(" + ")
-          }}
-          onChange={(event) => {
-            const value = event.target.value;
-            setNameFieldIds(
-              typeof value === "string"
-                ? value.split(",")
-                : (value as unknown as string[])
-            );
-            setTestResult(null);
-          }}
-        >
-          {analysis.fields.map((item) => (
-            <MenuItem key={item.field.id} value={item.field.id}>
-              <Checkbox checked={nameFieldIds.includes(item.field.id)} />
-              {item.field.name}
-            </MenuItem>
-          ))}
-        </TextField>
-        {orderedNameFields.length > 0 && (
-          <Stack gap={0.75} mt={1.5}>
-            {orderedNameFields.map((item, index) => (
-              <Stack
-                key={item.field.id}
-                direction={{ xs: "column", sm: "row" }}
-                gap={1}
-                alignItems={{ sm: "center" }}
-                sx={{ p: 1, border: 1, borderColor: "divider", borderRadius: 1 }}
-              >
-                <Typography sx={{ flex: 1 }}>
-                  {index + 1}. {item.field.name}
-                </Typography>
-                <Button
-                  size="small"
-                  disabled={!editable || index === 0}
-                  onClick={() =>
-                    setNameFieldIds((current) => {
-                      const next = [...current];
-                      [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                      return next;
-                    })
-                  }
-                >
-                  Pomeri gore
-                </Button>
-                <Button
-                  size="small"
-                  disabled={!editable || index === orderedNameFields.length - 1}
-                  onClick={() =>
-                    setNameFieldIds((current) => {
-                      const next = [...current];
-                      [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                      return next;
-                    })
-                  }
-                >
-                  Pomeri dole
-                </Button>
-                <Button
-                  size="small"
-                  color="error"
-                  disabled={!editable}
-                  onClick={() =>
-                    setNameFieldIds((current) =>
-                      current.filter((id) => id !== item.field.id)
-                    )
-                  }
-                >
-                  Ukloni
-                </Button>
-              </Stack>
-            ))}
-          </Stack>
-        )}
-        {namePreview && (
-          <Alert severity="info" sx={{ mt: 1.5 }}>
-            Pregled naziva: {namePreview}
-          </Alert>
-        )}
-        <Button
-          variant="outlined"
-          sx={{ mt: 1 }}
-          disabled={!editable || saveCompositeName.isPending}
-          onClick={() => saveCompositeName.mutate()}
-        >
-          Sačuvaj sastavljen naziv
-        </Button>
-      </Paper>
+      <CompositeNamePanel fields={analysis.fields} editable={editable} selectedRecord={selectedRecord} fieldIds={nameFieldIds} setFieldIds={setNameFieldIds} saving={saveCompositeName.isPending} onSave={() => saveCompositeName.mutate()} onChanged={() => setTestResult(null)} />
 
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6">Izaberi artikal za proveru mapiranja</Typography>
-        <Typography color="text.secondary" mb={2}>
-          Pretražite šifru, EAN, naziv, cenu ili bilo koju vrednost iz izvornog cenovnika.
-        </Typography>
-        <Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={2}>
-          <TextField
-            fullWidth
-            size="small"
-            label="Pretraži artikal"
-            value={recordSearch}
-            onChange={(event) => setRecordSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") setAppliedRecordSearch(recordSearch.trim());
-            }}
-          />
-          <Button
-            variant="outlined"
-            disabled={!recordSearch.trim()}
-            onClick={() => setAppliedRecordSearch(recordSearch.trim())}
-          >
-            Pretraži
-          </Button>
-        </Stack>
-        {(records.data?.items ?? []).map((record) => (
-          <Button
-            key={record.record_number}
-            fullWidth
-            variant={selectedRecord?.record_number === record.record_number ? "contained" : "text"}
-            sx={{ justifyContent: "flex-start", mb: 0.5 }}
-            onClick={() => {
-              setSelectedRecord(record);
-              setTestResult(null);
-            }}
-          >
-            Red {record.record_number} · {record.manufacturer_code || "bez šifre proizvođača"} · {record.ean || "bez EAN-a"} · {record.name || "bez naziva"} · {record.price || "bez cene"}
-          </Button>
-        ))}
-        {selectedRecord && (
-          <Alert severity="success" sx={{ mt: 1 }}>
-            Test mapiranja koristiće izvorni red {selectedRecord.record_number}: {selectedRecord.name || selectedRecord.manufacturer_code || selectedRecord.ean}.
-          </Alert>
-        )}
-      </Paper>
+      <MappingRecordSelector records={records.data?.items ?? []} selectedRecord={selectedRecord} search={recordSearch} onSearch={setRecordSearch} onApplySearch={() => setAppliedRecordSearch(recordSearch.trim())} onSelect={(record) => { setSelectedRecord(record); setTestResult(null); }} />
 
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6">Objedinjena napomena dobavljača</Typography>
-        <Typography color="text.secondary" mb={1}>
-          Izaberite sva opisna polja za akcije, promocije, preporuke i napomene.
-          Prazne i negativne vrednosti se preskaču, a ostale se čuvaju u jednoj napomeni.
-        </Typography>
-        <Stack direction={{ xs: "column", md: "row" }} useFlexGap flexWrap="wrap">
-          {analysis.fields.map((item) => (
-            <FormControlLabel
-              key={item.field.id}
-              control={
-                <Checkbox
-                  checked={noteFieldIds.includes(item.field.id)}
-                  disabled={!editable}
-                  onChange={(event) => {
-                    setNoteFieldIds((current) =>
-                      event.target.checked
-                        ? [...current, item.field.id]
-                        : current.filter((id) => id !== item.field.id)
-                    );
-                    setTestResult(null);
-                  }}
-                />
-              }
-              label={item.field.name}
-            />
-          ))}
-        </Stack>
-        <Button
-          variant="outlined"
-          sx={{ mt: 1 }}
-          disabled={!editable || saveCombinedNote.isPending}
-          onClick={() => saveCombinedNote.mutate()}
-        >
-          Sačuvaj objedinjenu napomenu
-        </Button>
-      </Paper>
+      <CombinedNotePanel fields={analysis.fields} editable={editable} fieldIds={noteFieldIds} setFieldIds={setNoteFieldIds} saving={saveCombinedNote.isPending} onSave={() => saveCombinedNote.mutate()} onChanged={() => setTestResult(null)} />
 
-      <TableContainer component={Paper} variant="outlined">
-        <Typography sx={{ p: 2 }} color="text.secondary">
-          Sistem je ponudio početne predloge prema nazivima kolona. Svaki
-          predlog možete slobodno promeniti. Proverite primer vrednosti,
-          izaberite odgovarajuće značenje i kliknite „Sačuvaj“. Polja koja ne
-          želite da koristite ostavite kao „Ne koristi“.
-        </Typography>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Pronađeno polje</TableCell>
-              <TableCell>Primer vrednosti</TableCell>
-              <TableCell>Šta ovo polje predstavlja?</TableCell>
-              <TableCell align="right">Akcija</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {analysis.fields.map((item) => {
-              const existing = rulesByField.get(item.field.id);
-              const selected =
-                targets[item.field.id] ?? String(existing?.target_attribute ?? "");
-              return (
-                <TableRow key={item.field.id}>
-                  <TableCell>
-                    <Typography fontWeight={650}>{item.field.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {item.field.data_type}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {mappingFieldPreview(
-                      selectedRecord,
-                      item.field.name,
-                      item.sample_values
-                    )}
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 260 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      value={selected}
-                      disabled={!editable}
-                      onChange={(event) => {
-                        const nextTarget = event.target.value;
-                        setTargets((current) => {
-                          const updated = { ...current };
-                          if (nextTarget) {
-                            for (const [fieldId, target] of Object.entries(updated)) {
-                              if (fieldId !== item.field.id && target === nextTarget) {
-                                updated[fieldId] = "";
-                              }
-                            }
-                          }
-                          updated[item.field.id] = nextTarget;
-                          return updated;
-                        });
-                        setTestResult(null);
-                      }}
-                    >
-                      <MenuItem value="">Ne koristi ovo polje</MenuItem>
-                      {TARGETS.map((target) => (
-                        <MenuItem key={target.value} value={target.value}>
-                          {target.label} — {target.help}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      disabled={
-                        !editable ||
-                        saveRule.isPending ||
-                        !(item.field.id in targets) ||
-                        targets[item.field.id] === existing?.target_attribute
-                      }
-                      onClick={() => saveRule.mutate(item)}
-                    >
-                      Sačuvaj
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <MappingRulesTable fields={analysis.fields} selectedRecord={selectedRecord} rulesByField={rulesByField} targets={targets} setTargets={setTargets} editable={editable} saving={saveRule.isPending} onSave={(field) => saveRule.mutate(field)} onChanged={() => setTestResult(null)} />
 
       {missingRequiredTargets.length > 0 && (
         <Alert severity="warning" sx={{ mt: 2 }}>

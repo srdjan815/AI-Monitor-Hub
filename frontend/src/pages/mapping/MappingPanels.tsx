@@ -1,0 +1,44 @@
+import type { Dispatch, KeyboardEvent, SetStateAction } from "react";
+import { Alert, Button, Checkbox, FormControlLabel, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+
+import type { Operation } from "../../types";
+import { mappingFieldPreview, mappingFieldValue } from "../mappingPreview";
+import { TARGETS, type AnalysisField, type PriceListRecord } from "./mappingConfiguration";
+
+type FieldsProps = { fields: AnalysisField[]; editable: boolean };
+
+function composeNamePreview(fields: AnalysisField[], selectedRecord: PriceListRecord | null): string {
+  return fields.reduce<string[]>((parts, item) => {
+    const value = mappingFieldValue(selectedRecord, item.field.name, item.sample_values).trim();
+    if (!value) return parts;
+    const normalized = value.toLocaleLowerCase("sr-RS");
+    return parts.some((part) => part.toLocaleLowerCase("sr-RS") === normalized || part.toLocaleLowerCase("sr-RS").includes(normalized)) ? parts : [...parts, value];
+  }, []).join(" — ");
+}
+
+export function CompositeNamePanel({ fields, editable, selectedRecord, fieldIds, setFieldIds, saving, onSave, onChanged }: FieldsProps & { selectedRecord: PriceListRecord | null; fieldIds: string[]; setFieldIds: Dispatch<SetStateAction<string[]>>; saving: boolean; onSave: () => void; onChanged: () => void }) {
+  const ordered = fieldIds.map((id) => fields.find((item) => item.field.id === id)).filter((item): item is AnalysisField => Boolean(item));
+  const preview = composeNamePreview(ordered, selectedRecord);
+  const update = (next: string[]) => { setFieldIds(next); onChanged(); };
+  return <Paper variant="outlined" sx={{ p: 2, mb: 2 }}><Typography variant="h6">Sastavljen naziv proizvoda</Typography><Typography color="text.secondary" mb={1}>Opciono spojite više izvornih polja u jedan naziv. Originalne vrednosti ostaju sačuvane, prazna i već sadržana polja se ne dodaju ponovo.</Typography>
+    <TextField select fullWidth label="Polja koja čine naziv" value={fieldIds} disabled={!editable} SelectProps={{ multiple: true, renderValue: (selected) => (selected as string[]).map((id) => fields.find((item) => item.field.id === id)?.field.name ?? id).join(" + ") }} onChange={(event) => { const value = event.target.value; update(typeof value === "string" ? value.split(",") : value as unknown as string[]); }}>{fields.map((item) => <MenuItem key={item.field.id} value={item.field.id}><Checkbox checked={fieldIds.includes(item.field.id)} />{item.field.name}</MenuItem>)}</TextField>
+    {ordered.length > 0 && <Stack gap={0.75} mt={1.5}>{ordered.map((item, index) => <Stack key={item.field.id} direction={{ xs: "column", sm: "row" }} gap={1} alignItems={{ sm: "center" }} sx={{ p: 1, border: 1, borderColor: "divider", borderRadius: 1 }}><Typography sx={{ flex: 1 }}>{index + 1}. {item.field.name}</Typography><Button size="small" disabled={!editable || index === 0} onClick={() => { const next = [...fieldIds]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; update(next); }}>Pomeri gore</Button><Button size="small" disabled={!editable || index === ordered.length - 1} onClick={() => { const next = [...fieldIds]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; update(next); }}>Pomeri dole</Button><Button size="small" color="error" disabled={!editable} onClick={() => update(fieldIds.filter((id) => id !== item.field.id))}>Ukloni</Button></Stack>)}</Stack>}
+    {preview && <Alert severity="info" sx={{ mt: 1.5 }}>Pregled naziva: {preview}</Alert>}<Button variant="outlined" sx={{ mt: 1 }} disabled={!editable || saving} onClick={onSave}>Sačuvaj sastavljen naziv</Button>
+  </Paper>;
+}
+
+export function MappingRecordSelector({ records, selectedRecord, search, onSearch, onApplySearch, onSelect }: { records: PriceListRecord[]; selectedRecord: PriceListRecord | null; search: string; onSearch: (value: string) => void; onApplySearch: () => void; onSelect: (record: PriceListRecord) => void }) {
+  const keyDown = (event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") onApplySearch(); };
+  return <Paper variant="outlined" sx={{ p: 2, mb: 2 }}><Typography variant="h6">Izaberi artikal za proveru mapiranja</Typography><Typography color="text.secondary" mb={2}>Pretražite šifru, EAN, naziv, cenu ili bilo koju vrednost iz izvornog cenovnika.</Typography><Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={2}><TextField fullWidth size="small" label="Pretraži artikal" value={search} onChange={(event) => onSearch(event.target.value)} onKeyDown={keyDown} /><Button variant="outlined" disabled={!search.trim()} onClick={onApplySearch}>Pretraži</Button></Stack>
+    {records.map((record) => <Button key={record.record_number} fullWidth variant={selectedRecord?.record_number === record.record_number ? "contained" : "text"} sx={{ justifyContent: "flex-start", mb: 0.5 }} onClick={() => onSelect(record)}>Red {record.record_number} · {record.manufacturer_code || "bez šifre proizvođača"} · {record.ean || "bez EAN-a"} · {record.name || "bez naziva"} · {record.price || "bez cene"}</Button>)}
+    {selectedRecord && <Alert severity="success" sx={{ mt: 1 }}>Test mapiranja koristiće izvorni red {selectedRecord.record_number}: {selectedRecord.name || selectedRecord.manufacturer_code || selectedRecord.ean}.</Alert>}
+  </Paper>;
+}
+
+export function CombinedNotePanel({ fields, editable, fieldIds, setFieldIds, saving, onSave, onChanged }: FieldsProps & { fieldIds: string[]; setFieldIds: Dispatch<SetStateAction<string[]>>; saving: boolean; onSave: () => void; onChanged: () => void }) {
+  return <Paper variant="outlined" sx={{ p: 2, mb: 2 }}><Typography variant="h6">Objedinjena napomena dobavljača</Typography><Typography color="text.secondary" mb={1}>Izaberite sva opisna polja za akcije, promocije, preporuke i napomene. Prazne i negativne vrednosti se preskaču, a ostale se čuvaju u jednoj napomeni.</Typography><Stack direction={{ xs: "column", md: "row" }} useFlexGap flexWrap="wrap">{fields.map((item) => <FormControlLabel key={item.field.id} control={<Checkbox checked={fieldIds.includes(item.field.id)} disabled={!editable} onChange={(event) => { setFieldIds((current) => event.target.checked ? [...current, item.field.id] : current.filter((id) => id !== item.field.id)); onChanged(); }} />} label={item.field.name} />)}</Stack><Button variant="outlined" sx={{ mt: 1 }} disabled={!editable || saving} onClick={onSave}>Sačuvaj objedinjenu napomenu</Button></Paper>;
+}
+
+export function MappingRulesTable({ fields, selectedRecord, rulesByField, targets, setTargets, editable, saving, onSave, onChanged }: FieldsProps & { selectedRecord: PriceListRecord | null; rulesByField: ReadonlyMap<string, Operation>; targets: Record<string, string>; setTargets: Dispatch<SetStateAction<Record<string, string>>>; saving: boolean; onSave: (field: AnalysisField) => void; onChanged: () => void }) {
+  return <TableContainer component={Paper} variant="outlined"><Typography sx={{ p: 2 }} color="text.secondary">Sistem je ponudio početne predloge prema nazivima kolona. Svaki predlog možete slobodno promeniti. Proverite primer vrednosti, izaberite odgovarajuće značenje i kliknite „Sačuvaj“. Polja koja ne želite da koristite ostavite kao „Ne koristi“.</Typography><Table><TableHead><TableRow><TableCell>Pronađeno polje</TableCell><TableCell>Primer vrednosti</TableCell><TableCell>Šta ovo polje predstavlja?</TableCell><TableCell align="right">Akcija</TableCell></TableRow></TableHead><TableBody>{fields.map((item) => { const existing = rulesByField.get(item.field.id); const selected = targets[item.field.id] ?? String(existing?.target_attribute ?? ""); return <TableRow key={item.field.id}><TableCell><Typography fontWeight={650}>{item.field.name}</Typography><Typography variant="caption" color="text.secondary">{item.field.data_type}</Typography></TableCell><TableCell>{mappingFieldPreview(selectedRecord, item.field.name, item.sample_values)}</TableCell><TableCell sx={{ minWidth: 260 }}><TextField select fullWidth size="small" value={selected} disabled={!editable} onChange={(event) => { const nextTarget = event.target.value; setTargets((current) => { const updated = { ...current }; if (nextTarget) for (const [fieldId, target] of Object.entries(updated)) if (fieldId !== item.field.id && target === nextTarget) updated[fieldId] = ""; updated[item.field.id] = nextTarget; return updated; }); onChanged(); }}><MenuItem value="">Ne koristi ovo polje</MenuItem>{TARGETS.map((target) => <MenuItem key={target.value} value={target.value}>{target.label} — {target.help}</MenuItem>)}</TextField></TableCell><TableCell align="right"><Button disabled={!editable || saving || !(item.field.id in targets) || targets[item.field.id] === existing?.target_attribute} onClick={() => onSave(item)}>Sačuvaj</Button></TableCell></TableRow>; })}</TableBody></Table></TableContainer>;
+}
