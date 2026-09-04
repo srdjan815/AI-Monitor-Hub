@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
     text,
 )
@@ -62,6 +63,11 @@ class SupplierCurrencySetting(UUIDMixin, TimestampMixin, Base):
             "currency_code",
             "is_active",
         ),
+        Index(
+            "ix_supplier_currency_settings_automatic_due",
+            "next_check_at",
+            postgresql_where=text("is_active AND rate_mode = 'AUTOMATIC'"),
+        ),
         CheckConstraint("currency_code ~ '^[A-Z]{3}$'", name="currency_iso_format"),
         CheckConstraint(
             "currency_source IN ('CONFIGURED','PRICE_LIST')",
@@ -74,6 +80,17 @@ class SupplierCurrencySetting(UUIDMixin, TimestampMixin, Base):
         CheckConstraint(
             "currency_code <> 'RSD' OR rate_mode = 'FIXED'", name="rsd_rate_fixed"
         ),
+        CheckConstraint(
+            "currency_code = 'RSD' OR rate_mode IN ('MANUAL','AUTOMATIC')",
+            name="foreign_rate_not_fixed",
+        ),
+        CheckConstraint(
+            "extraction_method IN ('JSON_PATH','CSS_SELECTOR','XPATH','REGEX')",
+            name="extraction_method_valid",
+        ),
+        CheckConstraint(
+            "decimal_separator IN ('.', ',')", name="decimal_separator_valid"
+        ),
     )
     supplier_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=False
@@ -84,6 +101,20 @@ class SupplierCurrencySetting(UUIDMixin, TimestampMixin, Base):
     )
     rate_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     automatic_source_url: Mapped[str | None] = mapped_column(String(2000))
+    extraction_method: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="JSON_PATH", server_default="JSON_PATH"
+    )
+    extraction_expression: Mapped[str | None] = mapped_column(String(1000))
+    decimal_separator: Mapped[str] = mapped_column(
+        String(1), nullable=False, default=".", server_default="."
+    )
+    daily_check_time: Mapped[time] = mapped_column(
+        Time(timezone=False), nullable=False, server_default="06:00:00"
+    )
+    next_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_check_status: Mapped[str | None] = mapped_column(String(24))
+    last_check_message: Mapped[str | None] = mapped_column(String(500))
     max_rate_age_hours: Mapped[int] = mapped_column(
         Integer, nullable=False, default=48, server_default="48"
     )
@@ -126,6 +157,8 @@ class SupplierExchangeRate(UUIDMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="VERIFIED")
     source_type: Mapped[str] = mapped_column(String(16), nullable=False)
     evidence_checksum: Mapped[str | None] = mapped_column(String(64))
+    source_excerpt: Mapped[str | None] = mapped_column(String(1000))
+    source_content_type: Mapped[str | None] = mapped_column(String(120))
     note: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
 

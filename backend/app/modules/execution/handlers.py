@@ -11,6 +11,7 @@ from app.modules.execution.protocols import (
     RetryableJobError,
 )
 from app.modules.suppliers.pipeline_worker import supplier_pipeline_handler
+from app.modules.suppliers.currency_worker import supplier_currency_rate_handler
 
 MAX_SYNTHETIC_DURATION_MS = 60_000
 
@@ -88,6 +89,7 @@ async def synthetic(
 
 
 HANDLERS: HandlerRegistry = {
+    "supplier.currency_rate": supplier_currency_rate_handler,
     "supplier.pipeline": supplier_pipeline_handler,
     "system.health_echo": health_echo,
     "system.synthetic": synthetic,

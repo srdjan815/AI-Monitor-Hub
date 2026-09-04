@@ -21,6 +21,7 @@ from app.modules.execution.protocols import (
 )
 from app.modules.execution.repository import JobLeaseLostError, JobRepository
 from app.modules.suppliers.pipeline_scheduler import SupplierPipelineScheduler
+from app.modules.suppliers.currency_scheduler import SupplierCurrencyScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +263,10 @@ async def process_once() -> bool:
 
 async def dispatch_supplier_schedules() -> int:
     async with AsyncSessionLocal() as session:
-        return await SupplierPipelineScheduler(session).dispatch_due()
+        pipeline_count = await SupplierPipelineScheduler(session).dispatch_due()
+    async with AsyncSessionLocal() as session:
+        currency_count = await SupplierCurrencyScheduler(session).dispatch_due()
+    return pipeline_count + currency_count
 
 
 async def run() -> None:

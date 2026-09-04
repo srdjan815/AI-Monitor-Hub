@@ -12,7 +12,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import current_actor_id
+from app.modules.suppliers.currency_automation_service import next_daily_check
 from app.modules.suppliers.currency_contracts import SnapshotCurrencyPlan
+from app.modules.suppliers.currency_snapshot_policy import build_snapshot_currency_plan
 from app.modules.suppliers.currency_models import (
     MonitorCurrencySetting,
     SupplierCurrencyEvent,
@@ -31,6 +33,7 @@ from app.modules.suppliers.currency_schemas import (
 )
 from app.modules.suppliers.errors import supplier_error
 from app.modules.suppliers.models import Supplier
+
 
 class SupplierCurrencyService:
     def __init__(self, session: AsyncSession) -> None:
@@ -133,9 +136,15 @@ class SupplierCurrencyService:
                 currency_code=payload.currency_code,
                 currency_source=payload.currency_source,
                 rate_mode=payload.rate_mode,
-                automatic_source_url=str(payload.automatic_source_url)
-                if payload.automatic_source_url
-                else None,
+                automatic_source_url=(
+                    str(payload.automatic_source_url)
+                    if payload.automatic_source_url
+                    else None
+                ),
+                extraction_method=payload.extraction_method,
+                extraction_expression=payload.extraction_expression,
+                decimal_separator=payload.decimal_separator,
+                daily_check_time=payload.daily_check_time,
                 max_rate_age_hours=payload.max_rate_age_hours,
             )
             self.session.add(setting)
@@ -151,8 +160,17 @@ class SupplierCurrencyService:
                 else None
             )
             setting.max_rate_age_hours = payload.max_rate_age_hours
+            setting.extraction_method = payload.extraction_method
+            setting.extraction_expression = payload.extraction_expression
+            setting.decimal_separator = payload.decimal_separator
+            setting.daily_check_time = payload.daily_check_time
             setting.version += 1
             action = "SETTING_UPDATED"
+        setting.next_check_at = (
+            next_daily_check(payload.daily_check_time)
+            if payload.rate_mode == "AUTOMATIC"
+            else None
+        )
         rate = await self.latest_rate(setting.id)
         if payload.currency_code == "RSD" and (
             rate is None or rate.rate_to_rsd != Decimal("1")
@@ -301,43 +319,4 @@ class SupplierCurrencyService:
     async def snapshot_plan(
         self, supplier_id: uuid.UUID, records: Sequence[object], at: datetime
     ) -> SnapshotCurrencyPlan | None:
-        setting = await self.active_setting(supplier_id)
-        if setting is None:
-            return None
-        observed = {
-            str(getattr(record, "mapped_data").get("currency") or "").strip().upper()
-            for record in records
-        }
-        observed.discard("")
-        if setting.currency_source == "PRICE_LIST" and (
-            not observed
-            or any(
-                not str(getattr(record, "mapped_data").get("currency") or "").strip()
-                for record in records
-            )
-        ):
-            supplier_error(
-                409,
-                "CURRENCY_MISSING",
-                "Valuta nedostaje u cenovniku; ceo cenovnik je blokiran",
-            )
-        if observed and observed != {setting.currency_code}:
-            supplier_error(
-                409,
-                "CURRENCY_CHANGED",
-                f"Očekivana valuta je {setting.currency_code}, a cenovnik sadrži: {', '.join(sorted(observed))}",
-            )
-        rate = await self.latest_rate(setting.id, at)
-        if rate is None:
-            supplier_error(
-                409,
-                "EXCHANGE_RATE_MISSING",
-                "Nema proverenog kursa koji važi za ovaj cenovnik",
-            )
-        if setting.currency_code != "RSD" and at - rate.effective_at > timedelta(
-            hours=setting.max_rate_age_hours
-        ):
-            supplier_error(
-                409, "EXCHANGE_RATE_STALE", "Kurs je zastareo; ceo cenovnik je blokiran"
-            )
-        return SnapshotCurrencyPlan(setting, rate, setting.currency_code)
+        return await build_snapshot_currency_plan(self, supplier_id, records, at)

@@ -246,6 +246,14 @@ export interface SupplierCurrencySetting {
   currency_source: "CONFIGURED" | "PRICE_LIST";
   rate_mode: "FIXED" | "MANUAL" | "AUTOMATIC";
   automatic_source_url?: string | null;
+  extraction_method: "JSON_PATH" | "CSS_SELECTOR" | "XPATH" | "REGEX";
+  extraction_expression?: string | null;
+  decimal_separator: "." | ",";
+  daily_check_time: string;
+  next_check_at?: string | null;
+  last_check_at?: string | null;
+  last_check_status?: string | null;
+  last_check_message?: string | null;
   max_rate_age_hours: number;
   current_rate?: string | null;
   current_rate_effective_at?: string | null;
@@ -260,7 +268,19 @@ export interface SupplierExchangeRate {
   status: string;
   source_type: string;
   evidence_checksum?: string | null;
+  source_excerpt?: string | null;
+  source_content_type?: string | null;
   note?: string | null;
   created_by: string;
   created_at: string;
+}
+
+export interface CurrencySourceTestResult {
+  rate_to_rsd: string;
+  fetched_at: string;
+  source_excerpt: string;
+  evidence_checksum: string;
+  content_type: string;
+  previous_rate?: string | null;
+  difference_percent?: string | null;
 }

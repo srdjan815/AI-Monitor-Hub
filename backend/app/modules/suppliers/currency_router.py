@@ -16,11 +16,14 @@ from app.modules.suppliers.currency_schemas import (
     CurrencySettingList,
     CurrencySettingRead,
     CurrencySettingWrite,
+    CurrencySourceTestRead,
+    CurrencySourceTestRequest,
     ExchangeRateCreate,
     ExchangeRateRead,
     MonitorCurrencyRead,
 )
 from app.modules.suppliers.currency_service import SupplierCurrencyService
+from app.modules.suppliers.currency_automation_service import SupplierCurrencyAutomationService
 
 router = APIRouter(prefix="/supplier-currencies", tags=["supplier-currency-center"])
 
@@ -65,6 +68,16 @@ async def list_rates(
         ExchangeRateRead.model_validate(item)
         for item in await SupplierCurrencyService(session).rates(supplier_id, limit)
     ]
+
+
+@router.post("/{supplier_id}/test-source", response_model=CurrencySourceTestRead)
+async def test_currency_source(
+    supplier_id: uuid.UUID,
+    payload: CurrencySourceTestRequest,
+    session: AsyncSession = Depends(get_db),
+) -> CurrencySourceTestRead:
+    require_current_permission(CURRENCY_RATES_WRITE)
+    return await SupplierCurrencyAutomationService(session).test_source(supplier_id, payload)
 
 
 @router.post("/{supplier_id}/rates", response_model=ExchangeRateRead)

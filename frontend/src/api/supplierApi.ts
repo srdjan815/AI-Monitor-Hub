@@ -10,6 +10,7 @@ import type {
   SourceProbeResult,
   SupplierSchedule,
   SupplierCurrencySetting,
+  CurrencySourceTestResult,
   SupplierExchangeRate,
   PipelineRunQueued,
   Supplier
@@ -240,6 +241,11 @@ export const supplierApi = {
   addExchangeRate: (supplierId: string, body: Record<string, unknown>) =>
     api<SupplierExchangeRate>(
       `/suppliers/platform/supplier-currencies/${supplierId}/rates`,
+      { method: "POST", body }
+    ),
+  testCurrencySource: (supplierId: string, body: Record<string, unknown>) =>
+    api<CurrencySourceTestResult>(
+      `/suppliers/platform/supplier-currencies/${supplierId}/test-source`,
       { method: "POST", body }
     )
 };
