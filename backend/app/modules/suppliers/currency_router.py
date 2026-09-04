@@ -23,7 +23,13 @@ from app.modules.suppliers.currency_schemas import (
     MonitorCurrencyRead,
 )
 from app.modules.suppliers.currency_service import SupplierCurrencyService
-from app.modules.suppliers.currency_automation_service import SupplierCurrencyAutomationService
+from app.modules.suppliers.currency_automation_service import (
+    CurrencyPreflightError,
+    SupplierCurrencyAutomationService,
+)
+from app.modules.suppliers.currency_rate_http import CurrencyRateFetchError
+from app.modules.suppliers.currency_rate_parser import CurrencyRateParseError
+from app.modules.suppliers.errors import supplier_error
 
 router = APIRouter(prefix="/supplier-currencies", tags=["supplier-currency-center"])
 
@@ -78,6 +84,24 @@ async def test_currency_source(
 ) -> CurrencySourceTestRead:
     require_current_permission(CURRENCY_RATES_WRITE)
     return await SupplierCurrencyAutomationService(session).test_source(supplier_id, payload)
+
+
+@router.post("/{supplier_id}/refresh", response_model=ExchangeRateRead)
+async def refresh_currency_rate(
+    supplier_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ExchangeRateRead:
+    require_current_permission(CURRENCY_RATES_WRITE)
+    try:
+        rate = await SupplierCurrencyAutomationService(session).refresh(supplier_id)
+    except (
+        CurrencyPreflightError,
+        CurrencyRateFetchError,
+        CurrencyRateParseError,
+        ValueError,
+    ) as exc:
+        supplier_error(422, "currency_rate_refresh_failed", str(exc))
+    return ExchangeRateRead.model_validate(rate)
 
 
 @router.post("/{supplier_id}/rates", response_model=ExchangeRateRead)

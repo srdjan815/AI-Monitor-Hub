@@ -247,5 +247,10 @@ export const supplierApi = {
     api<CurrencySourceTestResult>(
       `/suppliers/platform/supplier-currencies/${supplierId}/test-source`,
       { method: "POST", body }
+    ),
+  refreshCurrencyRate: (supplierId: string) =>
+    api<SupplierExchangeRate>(
+      `/suppliers/platform/supplier-currencies/${supplierId}/refresh`,
+      { method: "POST" }
     )
 };

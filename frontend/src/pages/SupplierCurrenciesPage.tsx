@@ -168,7 +168,7 @@ export function SupplierCurrenciesPage() {
   const saveSetting = useMutation({
     mutationFn: async () => {
       await persistPortalCredentials();
-      return supplierApi.saveCurrencySetting(supplierId, {
+      const setting = await supplierApi.saveCurrencySetting(supplierId, {
         source_connection_id: currency === "RSD" ? null : sourceId,
         currency_code: currency,
         currency_source: currencySource,
@@ -191,6 +191,10 @@ export function SupplierCurrenciesPage() {
         expected_version:
           selected?.supplier_id === supplierId ? selected.version : null,
       });
+      if (rateMode === "AUTOMATIC") {
+        await supplierApi.refreshCurrencyRate(supplierId);
+      }
+      return setting;
     },
     onSuccess: async () => {
       setSettingOpen(false);
@@ -199,6 +203,9 @@ export function SupplierCurrenciesPage() {
       setPortalPassword("");
       await queryClient.invalidateQueries({
         queryKey: ["supplier-currencies"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["supplier-exchange-rates", supplierId],
       });
     },
   });
