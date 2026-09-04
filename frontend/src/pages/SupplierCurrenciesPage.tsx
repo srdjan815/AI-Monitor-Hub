@@ -138,13 +138,23 @@ export function SupplierCurrenciesPage() {
     () => new Set((settings.data?.items ?? []).map((item) => item.supplier_id)),
     [settings.data],
   );
+  const hasUsableFallback = Boolean(
+    fallbackMethod &&
+      fallbackExpression.trim() &&
+      !(
+        fallbackMethod === extractionMethod &&
+        fallbackExpression.trim() === extractionExpression.trim()
+      ),
+  );
   const sourcePayload = {
     source_connection_id: sourceId,
     source_url: automaticUrl,
     extraction_method: extractionMethod,
     extraction_expression: extractionExpression,
-    fallback_extraction_method: fallbackMethod || null,
-    fallback_extraction_expression: fallbackMethod ? fallbackExpression : null,
+    fallback_extraction_method: hasUsableFallback ? fallbackMethod : null,
+    fallback_extraction_expression: hasUsableFallback
+      ? fallbackExpression.trim()
+      : null,
     decimal_separator: decimalSeparator,
   };
   const persistPortalCredentials = async () => {
@@ -168,10 +178,12 @@ export function SupplierCurrenciesPage() {
         extraction_expression:
           rateMode === "AUTOMATIC" ? extractionExpression : null,
         fallback_extraction_method:
-          rateMode === "AUTOMATIC" && fallbackMethod ? fallbackMethod : null,
+          rateMode === "AUTOMATIC" && hasUsableFallback
+            ? fallbackMethod
+            : null,
         fallback_extraction_expression:
-          rateMode === "AUTOMATIC" && fallbackMethod
-            ? fallbackExpression
+          rateMode === "AUTOMATIC" && hasUsableFallback
+            ? fallbackExpression.trim()
             : null,
         decimal_separator: decimalSeparator,
         daily_check_time: `${dailyCheckTime}:00`,
@@ -644,15 +656,23 @@ export function SupplierCurrenciesPage() {
                   </Select>
                 </FormControl>
                 {fallbackMethod && (
-                  <TextField
-                    label="Rezervni izraz ili oznaka"
-                    helperText="Koristi se samo ako primarno pravilo ne pronađe vrednost."
-                    value={fallbackExpression}
-                    onChange={(e) => {
-                      setFallbackExpression(e.target.value);
-                      setTestResult(null);
-                    }}
-                  />
+                  <>
+                    <TextField
+                      label="Rezervni izraz ili oznaka"
+                      helperText="Koristi se samo ako primarno pravilo ne pronađe vrednost."
+                      value={fallbackExpression}
+                      onChange={(e) => {
+                        setFallbackExpression(e.target.value);
+                        setTestResult(null);
+                      }}
+                    />
+                    {fallbackExpression.trim() && !hasUsableFallback && (
+                      <Alert severity="info">
+                        Rezervno pravilo je isto kao primarno i biće
+                        sačuvano kao da nije zadato.
+                      </Alert>
+                    )}
+                  </>
                 )}
                 <Stack direction="row" gap={2}>
                   <TextField
