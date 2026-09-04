@@ -8,12 +8,7 @@ from app.core.limits import MAX_CURSOR_CHARS, MAX_LEGACY_OFFSET
 from app.db.session import get_db
 from app.modules.inventory.pagination import after_keyset, list_keyset, set_page_headers
 from app.modules.inventory.repository import InventoryRepository
-from app.modules.inventory.schemas import (
-    InventoryCreate,
-    InventoryList,
-    InventoryRead,
-    InventoryUpdate,
-)
+from app.modules.inventory.schemas import InventoryCreate, InventoryList, InventoryRead
 from app.modules.inventory.service import InventoryService
 
 router = APIRouter()
@@ -98,37 +93,3 @@ async def list_inventory(
         items=[InventoryRead.model_validate(row) for row in rows],
         total=total,
     )
-
-
-@router.get("/inventory/{inventory_id}", response_model=InventoryRead)
-async def get_inventory(
-    inventory_id: uuid.UUID,
-    session: AsyncSession = Depends(get_db),
-) -> InventoryRead:
-    inventory = await InventoryService(session).get_inventory(inventory_id)
-    return InventoryRead.model_validate(inventory)
-
-
-@router.patch("/inventory/{inventory_id}", response_model=InventoryRead)
-async def update_inventory(
-    inventory_id: uuid.UUID,
-    payload: InventoryUpdate,
-    session: AsyncSession = Depends(get_db),
-) -> InventoryRead:
-    inventory = await InventoryService(session).update_inventory(
-        inventory_id,
-        payload,
-    )
-    return InventoryRead.model_validate(inventory)
-
-
-@router.delete(
-    "/inventory/{inventory_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def deactivate_inventory(
-    inventory_id: uuid.UUID,
-    session: AsyncSession = Depends(get_db),
-) -> Response:
-    await InventoryService(session).deactivate_inventory(inventory_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
