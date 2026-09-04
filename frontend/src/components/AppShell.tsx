@@ -20,7 +20,8 @@ import {
   SchemaRounded,
   SettingsBrightnessRounded,
   StorageRounded,
-  SyncRounded
+  SyncRounded,
+  CurrencyExchangeRounded
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -63,6 +64,7 @@ const items = [
   { path: "/deltas", label: "Delta Runs", icon: DifferenceRounded },
   { path: "/incidents", label: "Incident centar", icon: ErrorOutlineRounded },
   { path: "/article-reviews", label: "Kontrola artikala", icon: FactCheckRounded },
+  { path: "/supplier-currencies", label: "Valute dobavljača", icon: CurrencyExchangeRounded },
   { path: "/archive", label: "Arhiva", icon: ArchiveRounded },
   { path: "/administration", label: "Administracija", icon: AdminPanelSettingsRounded }
 ];

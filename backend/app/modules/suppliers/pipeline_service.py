@@ -9,6 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.suppliers.acquisition_context import AcquisitionContext
 from app.modules.suppliers.acquisition_contracts import AcquisitionFailure
 from app.modules.suppliers.acquisition_service import SupplierAcquisitionService
+from app.modules.suppliers.currency_automation_service import (
+    CurrencyPreflightError,
+)
+from app.modules.suppliers.pipeline_currency_phase import run_currency_phase
 from app.modules.suppliers.delta_service import SupplierDeltaService
 from app.modules.suppliers.pipeline_contracts import (
     PipelineContext,
@@ -53,10 +57,11 @@ class SupplierPipelineOrchestrator(SupplierPipelineOrchestratorSupport):
         await self._running(context)
         references = PipelineReferences()
         try:
+            await run_currency_phase(self, context)
             phase_started, phase_clock = datetime.now(UTC), time.monotonic()
-            payload = await self.adapters.resolve(
-                context.source.source_type
-            ).acquire(context.source)
+            payload = await self.adapters.resolve(context.source.source_type).acquire(
+                context.source
+            )
             await self._phase(
                 context,
                 "FETCH",
@@ -122,9 +127,7 @@ class SupplierPipelineOrchestrator(SupplierPipelineOrchestratorSupport):
                 warning_count=(1 if status == "COMPATIBLE_WITH_WARNINGS" else 0),
                 error_count=(1 if status == "INCOMPATIBLE" else 0),
                 error_code=(
-                    "pipeline_schema_incompatible"
-                    if status == "INCOMPATIBLE"
-                    else None
+                    "pipeline_schema_incompatible" if status == "INCOMPATIBLE" else None
                 ),
                 status=("FAILED" if status == "INCOMPATIBLE" else "SUCCEEDED"),
             )
@@ -137,8 +140,15 @@ class SupplierPipelineOrchestrator(SupplierPipelineOrchestratorSupport):
                     references,
                     started,
                 )
-            return await self._complete_full_pipeline(
-                context, references, started
+            return await self._complete_full_pipeline(context, references, started)
+        except CurrencyPreflightError as exc:
+            return await self._business_failure(
+                context,
+                "CURRENCY_RATE",
+                exc.code,
+                exc.safe_message,
+                references,
+                started,
             )
         except AcquisitionFailure as exc:
             if exc.code == "acquisition_http_failed":

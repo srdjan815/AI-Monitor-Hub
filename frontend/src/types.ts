@@ -55,6 +55,7 @@ export interface Source {
   status: string;
   is_active: boolean;
   description?: string | null;
+  portal_supplier_code?: string | null;
   configuration: Record<string, unknown>;
   has_secret_reference: boolean;
   credentials_available: boolean;
@@ -89,7 +90,13 @@ export interface SupplierSchedule {
   source_name?: string;
   source_code?: string;
   status: "MANUAL" | "ENABLED" | "PAUSED";
-  schedule_type?: "DAILY" | "MULTI_DAILY" | "INTERVAL" | "WEEKDAYS" | "WEEKLY" | null;
+  schedule_type?:
+    | "DAILY"
+    | "MULTI_DAILY"
+    | "INTERVAL"
+    | "WEEKDAYS"
+    | "WEEKLY"
+    | null;
   timezone: string;
   schedule_configuration: {
     times?: string[];
@@ -236,4 +243,68 @@ export interface BulkResponse {
     error_code?: string;
     message: string;
   }>;
+}
+
+export interface SupplierCurrencySetting {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  source_connection_id?: string | null;
+  source_name?: string | null;
+  portal_supplier_code?: string | null;
+  currency_code: string;
+  currency_source: "CONFIGURED" | "PRICE_LIST";
+  rate_mode: "FIXED" | "MANUAL" | "AUTOMATIC";
+  automatic_source_url?: string | null;
+  extraction_method:
+    | "JSON_PATH"
+    | "CSS_SELECTOR"
+    | "XPATH"
+    | "REGEX"
+    | "TEXT_LABEL";
+  extraction_expression?: string | null;
+  fallback_extraction_method?:
+    | "JSON_PATH"
+    | "CSS_SELECTOR"
+    | "XPATH"
+    | "REGEX"
+    | "TEXT_LABEL"
+    | null;
+  fallback_extraction_expression?: string | null;
+  decimal_separator: "." | ",";
+  daily_check_time: string;
+  next_check_at?: string | null;
+  last_check_at?: string | null;
+  last_check_status?: string | null;
+  last_check_message?: string | null;
+  max_rate_age_hours: number;
+  current_rate?: string | null;
+  current_rate_effective_at?: string | null;
+  rate_status: "CURRENT" | "STALE" | "MISSING";
+  version: number;
+}
+
+export interface SupplierExchangeRate {
+  id: string;
+  rate_to_rsd: string;
+  effective_at: string;
+  status: string;
+  source_type: string;
+  evidence_checksum?: string | null;
+  source_excerpt?: string | null;
+  source_content_type?: string | null;
+  note?: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CurrencySourceTestResult {
+  rate_to_rsd: string;
+  fetched_at: string;
+  source_excerpt: string;
+  evidence_checksum: string;
+  content_type: string;
+  previous_rate?: string | null;
+  difference_percent?: string | null;
+  extraction_method_used: string;
 }

@@ -8,7 +8,7 @@ import {
   CloudDownloadRounded,
   KeyRounded,
   LinkRounded,
-  ScheduleRounded
+  ScheduleRounded,
 } from "@mui/icons-material";
 import {
   Accordion,
@@ -37,7 +37,7 @@ import {
   Switch,
   TextField,
   Tooltip,
-  Typography
+  Typography,
 } from "@mui/material";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -52,19 +52,40 @@ import { useWorkspace } from "../state/WorkspaceContext";
 import type { ApiError, Operation, Source, SourceProbeResult } from "../types";
 
 const methods = [
-  ["HTTP", "Direktan URL", "Cenovnik je dostupan preko stabilne internet adrese."],
-  ["PORTAL", "Portal sa prijavom", "Sistem se prijavljuje na B2B portal i zatim preuzima cenovnik."],
-  ["API", "API dobavljača", "Dobavljač nudi servis za automatsko preuzimanje podataka."],
+  [
+    "HTTP",
+    "Direktan URL",
+    "Cenovnik je dostupan preko stabilne internet adrese.",
+  ],
+  [
+    "PORTAL",
+    "Portal sa prijavom",
+    "Sistem se prijavljuje na B2B portal i zatim preuzima cenovnik.",
+  ],
+  [
+    "API",
+    "API dobavljača",
+    "Dobavljač nudi servis za automatsko preuzimanje podataka.",
+  ],
   ["FTP", "FTP", "Dobavljač ostavlja cenovnik na FTP serveru."],
   ["SFTP", "SFTP", "Bezbedno preuzimanje fajla sa udaljenog servera."],
   ["EMAIL", "Email", "Cenovnik stiže kao prilog email poruke."],
-  ["GOOGLE_DRIVE", "Google Drive", "Dobavljač deli fajl ili folder preko Google Drive-a."],
-  ["MANUAL_UPLOAD", "Ručno učitavanje", "Zaposleni preuzima fajl i učitava ga u aplikaciju."]
+  [
+    "GOOGLE_DRIVE",
+    "Google Drive",
+    "Dobavljač deli fajl ili folder preko Google Drive-a.",
+  ],
+  [
+    "MANUAL_UPLOAD",
+    "Ručno učitavanje",
+    "Zaposleni preuzima fajl i učitava ga u aplikaciju.",
+  ],
 ] as const;
 
 const initialForm = {
   method: "HTTP",
   name: "",
+  portal_supplier_code: "",
   format: "AUTO",
   url: "",
   endpoint: "",
@@ -80,7 +101,8 @@ const initialForm = {
   integration_profile: "GENERIC",
   catalog_endpoint: "/B2BService/HTTP/Product/GetProductsList.aspx",
   price_endpoint: "/B2BService/HTTP/Product/GetProductsPriceList.aspx",
-  barcode_service_url: "https://b2b.kimtec.rs/B2BService/B2BProductService.asmx",
+  barcode_service_url:
+    "https://b2b.kimtec.rs/B2BService/B2BProductService.asmx",
   pin_shop_id: "4",
   certificate_password: "",
   username: "",
@@ -111,7 +133,7 @@ const initialForm = {
   folder_id: "",
   shared_drive_id: "",
   maximum_mb: "50",
-  description: ""
+  description: "",
 };
 
 type ConnectionForm = typeof initialForm;
@@ -121,7 +143,7 @@ function pairs(value: string): Record<string, string> {
     value
       .split("\n")
       .map((line) => line.split("=", 2).map((item) => item.trim()))
-      .filter(([key, item]) => key && item)
+      .filter(([key, item]) => key && item),
   );
 }
 
@@ -144,7 +166,7 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       request_headers: pairs(form.public_headers),
       query_parameters: pairs(form.public_query),
       timeout_seconds,
-      verify_tls: form.verify_tls
+      verify_tls: form.verify_tls,
     };
   } else if (form.method === "HTTP" && form.login_required) {
     source_type = "API";
@@ -156,7 +178,7 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       request_headers: pairs(form.public_headers),
       query_parameters: pairs(form.public_query),
       timeout_seconds,
-      verify_tls: form.verify_tls
+      verify_tls: form.verify_tls,
     };
   } else if (form.method === "HTTP") {
     configuration = {
@@ -166,7 +188,7 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       query_parameters: pairs(form.public_query),
       timeout_seconds,
       verify_tls: form.verify_tls,
-      expected_content_type: form.format
+      expected_content_type: form.format,
     };
   } else if (form.method === "API") {
     configuration = {
@@ -181,24 +203,43 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       integration_profile: form.integration_profile,
       pin_shop_id:
         form.integration_profile === "PIN_SOAP" ? Number(form.pin_shop_id) : 4,
-      catalog_endpoint_path:
-        ["KIMTEC_MSAN", "ASBIS_IT4PROFIT"].includes(form.integration_profile) ? form.catalog_endpoint : null,
-      price_endpoint_path:
-        ["KIMTEC_MSAN", "ASBIS_IT4PROFIT"].includes(form.integration_profile) ? form.price_endpoint : null,
+      catalog_endpoint_path: ["KIMTEC_MSAN", "ASBIS_IT4PROFIT"].includes(
+        form.integration_profile,
+      )
+        ? form.catalog_endpoint
+        : null,
+      price_endpoint_path: ["KIMTEC_MSAN", "ASBIS_IT4PROFIT"].includes(
+        form.integration_profile,
+      )
+        ? form.price_endpoint
+        : null,
       barcode_service_url:
         form.integration_profile === "KIMTEC_MSAN"
           ? form.barcode_service_url
           : null,
-      imap_host: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_host : null,
-      imap_port: form.integration_profile === "ASBIS_IT4PROFIT" ? Number(form.imap_port) : 993,
+      imap_host:
+        form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_host : null,
+      imap_port:
+        form.integration_profile === "ASBIS_IT4PROFIT"
+          ? Number(form.imap_port)
+          : 993,
       // mail.monitor.rs currently requires OpenSSL legacy-DH compatibility.
       // Keep this scoped to the ASBIS integration; never lower TLS globally.
       imap_allow_legacy_dh: form.integration_profile === "ASBIS_IT4PROFIT",
-      imap_folder: form.integration_profile === "ASBIS_IT4PROFIT" ? "INBOX" : "INBOX",
-      imap_subject_filter: form.integration_profile === "ASBIS_IT4PROFIT" ? "ASBIS" : "ASBIS",
-      imap_sender_filter: form.integration_profile === "ASBIS_IT4PROFIT" ? form.sender || null : null,
-      imap_attachment_prefix: form.integration_profile === "ASBIS_IT4PROFIT" ? "HTML, PO actions, in mail body" : "HTML, PO actions, in mail body",
-      imap_received_within_hours: form.integration_profile === "ASBIS_IT4PROFIT" ? 720 : 720
+      imap_folder:
+        form.integration_profile === "ASBIS_IT4PROFIT" ? "INBOX" : "INBOX",
+      imap_subject_filter:
+        form.integration_profile === "ASBIS_IT4PROFIT" ? "ASBIS" : "ASBIS",
+      imap_sender_filter:
+        form.integration_profile === "ASBIS_IT4PROFIT"
+          ? form.sender || null
+          : null,
+      imap_attachment_prefix:
+        form.integration_profile === "ASBIS_IT4PROFIT"
+          ? "HTML, PO actions, in mail body"
+          : "HTML, PO actions, in mail body",
+      imap_received_within_hours:
+        form.integration_profile === "ASBIS_IT4PROFIT" ? 720 : 720,
     };
   } else if (form.method === "FTP") {
     configuration = {
@@ -209,7 +250,7 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       passive_mode: true,
       use_tls: form.verify_tls,
       filename_pattern: form.filename_pattern,
-      timeout_seconds
+      timeout_seconds,
     };
   } else if (form.method === "SFTP") {
     configuration = {
@@ -218,7 +259,7 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       username: form.username,
       remote_path: form.remote_path,
       filename_pattern: form.filename_pattern,
-      timeout_seconds
+      timeout_seconds,
     };
   } else if (form.method === "EMAIL") {
     configuration = {
@@ -227,29 +268,32 @@ function sourcePayload(form: ConnectionForm): Record<string, unknown> {
       sender_filter: form.sender || null,
       subject_filter: form.subject || null,
       attachment_filename_pattern: form.filename_pattern,
-      received_within_hours: Number(form.received_hours)
+      received_within_hours: Number(form.received_hours),
     };
   } else if (form.method === "GOOGLE_DRIVE") {
     configuration = {
       file_id: form.file_id || null,
       folder_id: form.folder_id || null,
       filename_pattern: form.filename_pattern || null,
-      shared_drive_id: form.shared_drive_id || null
+      shared_drive_id: form.shared_drive_id || null,
     };
   } else {
     configuration = {
       accepted_file_types:
-        form.format === "AUTO" ? ["CSV", "EXCEL", "XML", "JSON"] : [form.format],
+        form.format === "AUTO"
+          ? ["CSV", "EXCEL", "XML", "JSON"]
+          : [form.format],
       maximum_file_size_mb: Number(form.maximum_mb),
-      filename_pattern: form.filename_pattern || null
+      filename_pattern: form.filename_pattern || null,
     };
   }
   return {
     name: form.name,
+    portal_supplier_code: form.portal_supplier_code || null,
     source_type,
     configuration,
     description: form.description || null,
-    status: "DRAFT"
+    status: "DRAFT",
   };
 }
 
@@ -277,7 +321,7 @@ function formatDate(value: unknown): string {
   return typeof value === "string"
     ? new Intl.DateTimeFormat("sr-RS", {
         dateStyle: "medium",
-        timeStyle: "short"
+        timeStyle: "short",
       }).format(new Date(value))
     : "Nije dostupno";
 }
@@ -290,14 +334,16 @@ function detailValue(value: unknown, reason: string): string {
 
 function DetailSection({
   title,
-  children
+  children,
 }: {
   title: string;
   children: React.ReactNode;
 }) {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="h6" mb={1.5}>{title}</Typography>
+      <Typography variant="h6" mb={1.5}>
+        {title}
+      </Typography>
       <Stack gap={1}>{children}</Stack>
     </Paper>
   );
@@ -305,7 +351,7 @@ function DetailSection({
 
 function DetailRow({
   label,
-  value
+  value,
 }: {
   label: string;
   value: React.ReactNode;
@@ -354,18 +400,18 @@ export function SourcesPage() {
       supplierApi.suppliers({
         limit: 500,
         offset: 0,
-        active_only: true
-      })
+        active_only: true,
+      }),
   });
   const supplierNames = useMemo(
     () =>
       new Map(
         (suppliers.data?.items ?? []).map((supplier) => [
           supplier.id,
-          `${supplier.supplier_code} · ${supplier.company_name}`
-        ])
+          `${supplier.supplier_code} · ${supplier.company_name}`,
+        ]),
       ),
-    [suppliers.data?.items]
+    [suppliers.data?.items],
   );
   const sources = useQuery({
     queryKey: [
@@ -373,14 +419,14 @@ export function SourcesPage() {
       workspace.supplierId || "all-ready",
       page,
       showArchived,
-      suppliers.data?.items.map((supplier) => supplier.id).join(",")
+      suppliers.data?.items.map((supplier) => supplier.id).join(","),
     ],
     queryFn: async () => {
       if (workspace.supplierId) {
         return supplierApi.sources(workspace.supplierId, {
           limit: 25,
           offset: page * 25,
-          active_only: !showArchived
+          active_only: !showArchived,
         });
       }
       const pages = await Promise.all(
@@ -389,9 +435,9 @@ export function SourcesPage() {
             limit: 500,
             offset: 0,
             active_only: true,
-            status: "ACTIVE"
-          })
-        )
+            status: "ACTIVE",
+          }),
+        ),
       );
       const ready = pages
         .flatMap((result) => result.items)
@@ -399,16 +445,16 @@ export function SourcesPage() {
           (source) =>
             source.is_active &&
             source.status === "ACTIVE" &&
-            source.last_validation_status === "VALID"
+            source.last_validation_status === "VALID",
         )
         .sort((left, right) => left.name.localeCompare(right.name, "sr"));
       return {
         items: ready.slice(page * 25, page * 25 + 25),
-        total: ready.length
+        total: ready.length,
       };
     },
     enabled: Boolean(workspace.supplierId || suppliers.data),
-    placeholderData: (previous) => previous
+    placeholderData: (previous) => previous,
   });
   const sourceRoot = opened
     ? `/suppliers/${opened.supplier_id}/sources/${opened.id}`
@@ -416,30 +462,32 @@ export function SourcesPage() {
   const sourceSchedule = useQuery({
     queryKey: ["source-details", "schedule", opened?.id],
     queryFn: () => supplierApi.schedule(opened!.supplier_id, opened!.id),
-    enabled: Boolean(opened)
+    enabled: Boolean(opened),
   });
   const schemas = useQuery({
     queryKey: ["source-details", "schemas", opened?.id],
     queryFn: () =>
-      supplierApi.nestedCollection<Operation>(
-        `${sourceRoot}/schema-profiles`,
-        { limit: 100, offset: 0 }
-      ),
-    enabled: Boolean(opened)
+      supplierApi.nestedCollection<Operation>(`${sourceRoot}/schema-profiles`, {
+        limit: 100,
+        offset: 0,
+      }),
+    enabled: Boolean(opened),
   });
-  const schema = schemas.data?.items.find((item) => item.status === "ACTIVE")
-    ?? schemas.data?.items[0];
+  const schema =
+    schemas.data?.items.find((item) => item.status === "ACTIVE") ??
+    schemas.data?.items[0];
   const mappings = useQuery({
     queryKey: ["source-details", "mappings", opened?.id, schema?.id],
     queryFn: () =>
       supplierApi.nestedCollection<Operation>(
         `${sourceRoot}/schema-profiles/${schema?.id}/mapping-profiles`,
-        { limit: 100, offset: 0 }
+        { limit: 100, offset: 0 },
       ),
-    enabled: Boolean(opened && schema)
+    enabled: Boolean(opened && schema),
   });
-  const mapping = mappings.data?.items.find((item) => item.status === "ACTIVE")
-    ?? mappings.data?.items[0];
+  const mapping =
+    mappings.data?.items.find((item) => item.status === "ACTIVE") ??
+    mappings.data?.items[0];
   const acquisitions = useQuery({
     queryKey: ["source-details", "acquisitions", opened?.id],
     queryFn: () =>
@@ -447,9 +495,9 @@ export function SourcesPage() {
         opened!.supplier_id,
         opened!.id,
         "acquisitions",
-        { limit: 1, offset: 0 }
+        { limit: 1, offset: 0 },
       ),
-    enabled: Boolean(opened)
+    enabled: Boolean(opened),
   });
   const snapshots = useQuery({
     queryKey: ["source-details", "snapshots", opened?.id],
@@ -458,9 +506,9 @@ export function SourcesPage() {
         opened!.supplier_id,
         opened!.id,
         "snapshots",
-        { limit: 1, offset: 0 }
+        { limit: 1, offset: 0 },
       ),
-    enabled: Boolean(opened)
+    enabled: Boolean(opened),
   });
   const deltas = useQuery({
     queryKey: ["source-details", "deltas", opened?.id],
@@ -469,9 +517,9 @@ export function SourcesPage() {
         opened!.supplier_id,
         opened!.id,
         "deltas",
-        { limit: 1, offset: 0 }
+        { limit: 1, offset: 0 },
       ),
-    enabled: Boolean(opened)
+    enabled: Boolean(opened),
   });
   const acquisition = acquisitions.data?.items[0];
   const snapshot = snapshots.data?.items[0];
@@ -485,9 +533,12 @@ export function SourcesPage() {
         ? await supplierApi.updateSource(workspace.supplierId, draft.id, {
             ...sourcePayload(form),
             source_type: undefined,
-            version: draft.version
+            version: draft.version,
           })
-        : await supplierApi.createSource(workspace.supplierId, sourcePayload(form));
+        : await supplierApi.createSource(
+            workspace.supplierId,
+            sourcePayload(form),
+          );
       // Creation and credential storage are separate API operations. Remember
       // the created source before writing secrets so a credential failure can
       // be retried against the same source instead of attempting a duplicate.
@@ -500,33 +551,52 @@ export function SourcesPage() {
       const hasCredential =
         form.password || form.token || form.api_key || form.imap_password;
       if (hasCredential) {
-        await supplierApi.writeSourceCredentials(workspace.supplierId, source.id, {
-          placement:
-            form.method === "PORTAL"
-              ? "PORTAL_FORM"
-              : form.integration_profile === "ASBIS_IT4PROFIT"
-                ? "QUERY"
-                : form.integration_profile === "CT_SOAP"
-                ? "SOAP_BODY"
-                : form.placement,
-          username: form.username || null,
-          password: form.password || null,
-          token: form.token || null,
-          api_key: form.api_key || null,
-          imap_username: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_username || null : null,
-          imap_password: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_password || null : null,
-          username_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "USERNAME" : form.username_parameter,
-          password_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "PASSWORD" : form.password_parameter,
-          api_key_parameter: form.api_key_parameter
-        });
+        await supplierApi.writeSourceCredentials(
+          workspace.supplierId,
+          source.id,
+          {
+            placement:
+              form.method === "PORTAL"
+                ? "PORTAL_FORM"
+                : form.integration_profile === "ASBIS_IT4PROFIT"
+                  ? "QUERY"
+                  : form.integration_profile === "CT_SOAP"
+                    ? "SOAP_BODY"
+                    : form.placement,
+            username: form.username || null,
+            password: form.password || null,
+            token: form.token || null,
+            api_key: form.api_key || null,
+            imap_username:
+              form.integration_profile === "ASBIS_IT4PROFIT"
+                ? form.imap_username || null
+                : null,
+            imap_password:
+              form.integration_profile === "ASBIS_IT4PROFIT"
+                ? form.imap_password || null
+                : null,
+            username_parameter:
+              form.integration_profile === "ASBIS_IT4PROFIT"
+                ? "USERNAME"
+                : form.username_parameter,
+            password_parameter:
+              form.integration_profile === "ASBIS_IT4PROFIT"
+                ? "PASSWORD"
+                : form.password_parameter,
+            api_key_parameter: form.api_key_parameter,
+          },
+        );
         return supplierApi.source(workspace.supplierId, source.id);
       }
-      if (form.authentication_type === "CLIENT_CERTIFICATE" && certificateFile) {
+      if (
+        form.authentication_type === "CLIENT_CERTIFICATE" &&
+        certificateFile
+      ) {
         await supplierApi.writeSourceCertificate(
           workspace.supplierId,
           source.id,
           certificateFile,
-          form.certificate_password
+          form.certificate_password,
         );
         return supplierApi.source(workspace.supplierId, source.id);
       }
@@ -538,7 +608,7 @@ export function SourcesPage() {
       workspace.setSourceId(source.id);
       queryClient.invalidateQueries({ queryKey: ["sources"] });
     },
-    onError: (error: ApiError) => toast.error(error.message)
+    onError: (error: ApiError) => toast.error(error.message),
   });
 
   const testConnection = useMutation({
@@ -549,10 +619,13 @@ export function SourcesPage() {
           ? await supplierApi.probeUploadedSource(
               workspace.supplierId,
               source.id,
-              probeFile
+              probeFile,
             )
           : await supplierApi.probeSource(workspace.supplierId, source.id);
-      const refreshed = await supplierApi.source(workspace.supplierId, source.id);
+      const refreshed = await supplierApi.source(
+        workspace.supplierId,
+        source.id,
+      );
       return { result, refreshed };
     },
     onSuccess: ({ result, refreshed }) => {
@@ -560,18 +633,19 @@ export function SourcesPage() {
       setProbe(result);
       setProbeSourceId(refreshed.id);
       setStep(2);
-      if (result.successful) toast.success("Cenovnik je uspešno probno preuzet.");
+      if (result.successful)
+        toast.success("Cenovnik je uspešno probno preuzet.");
       else toast.error(result.message);
       queryClient.invalidateQueries({ queryKey: ["sources"] });
     },
-    onError: (error: ApiError) => toast.error(error.message)
+    onError: (error: ApiError) => toast.error(error.message),
   });
 
   const activate = useMutation({
     mutationFn: async (source: Source) =>
       supplierApi.updateSource(source.supplier_id, source.id, {
         version: source.version,
-        status: "ACTIVE"
+        status: "ACTIVE",
       }),
     onSuccess: (source) => {
       toast.success("Konekcija je aktivirana.");
@@ -580,7 +654,7 @@ export function SourcesPage() {
       setStep(3);
       queryClient.invalidateQueries({ queryKey: ["sources"] });
     },
-    onError: (error: ApiError) => toast.error(error.message)
+    onError: (error: ApiError) => toast.error(error.message),
   });
 
   const archive = useMutation({
@@ -591,21 +665,22 @@ export function SourcesPage() {
       setOpened(null);
       queryClient.invalidateQueries({ queryKey: ["sources"] });
     },
-    onError: (error: ApiError) => toast.error(error.message)
+    onError: (error: ApiError) => toast.error(error.message),
   });
   const archiveSelected = useMutation({
     mutationFn: async () => {
       const rows = (sources.data?.items ?? []).filter(
-        (source) => selected.includes(source.id) && source.is_active
+        (source) => selected.includes(source.id) && source.is_active,
       );
       const results = await Promise.allSettled(
         rows.map((source) =>
-          supplierApi.deactivateSource(source.supplier_id, source.id)
-        )
+          supplierApi.deactivateSource(source.supplier_id, source.id),
+        ),
       );
       return {
-        archived: results.filter((result) => result.status === "fulfilled").length,
-        failed: results.filter((result) => result.status === "rejected").length
+        archived: results.filter((result) => result.status === "fulfilled")
+          .length,
+        failed: results.filter((result) => result.status === "rejected").length,
       };
     },
     onSuccess: ({ archived, failed }) => {
@@ -613,7 +688,7 @@ export function SourcesPage() {
       if (failed) toast.error(`${failed} konekcija nije moguće arhivirati.`);
       setSelected([]);
       queryClient.invalidateQueries({ queryKey: ["sources"] });
-    }
+    },
   });
   const changeCredentials = useMutation({
     mutationFn: async () => {
@@ -626,7 +701,7 @@ export function SourcesPage() {
           opened.supplier_id,
           opened.id,
           certificateFile,
-          form.certificate_password
+          form.certificate_password,
         );
       }
       return supplierApi.writeSourceCredentials(opened.supplier_id, opened.id, {
@@ -634,25 +709,39 @@ export function SourcesPage() {
           form.integration_profile === "ASBIS_IT4PROFIT"
             ? "QUERY"
             : ["CT_SOAP", "PIN_SOAP"].includes(form.integration_profile)
-            ? "SOAP_BODY"
-            : form.placement,
+              ? "SOAP_BODY"
+              : form.placement,
         username: form.username || null,
         password: form.password || null,
         token: form.token || null,
         api_key: form.api_key || null,
-        imap_username: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_username || null : null,
-        imap_password: form.integration_profile === "ASBIS_IT4PROFIT" ? form.imap_password || null : null,
-        username_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "USERNAME" : form.username_parameter,
-        password_parameter: form.integration_profile === "ASBIS_IT4PROFIT" ? "PASSWORD" : form.password_parameter,
-        api_key_parameter: form.api_key_parameter
+        imap_username:
+          form.integration_profile === "ASBIS_IT4PROFIT"
+            ? form.imap_username || null
+            : null,
+        imap_password:
+          form.integration_profile === "ASBIS_IT4PROFIT"
+            ? form.imap_password || null
+            : null,
+        username_parameter:
+          form.integration_profile === "ASBIS_IT4PROFIT"
+            ? "USERNAME"
+            : form.username_parameter,
+        password_parameter:
+          form.integration_profile === "ASBIS_IT4PROFIT"
+            ? "PASSWORD"
+            : form.password_parameter,
+        api_key_parameter: form.api_key_parameter,
       });
     },
     onSuccess: () => {
-      toast.success("Pristupni podaci su promenjeni. Ponovite probno preuzimanje.");
+      toast.success(
+        "Pristupni podaci su promenjeni. Ponovite probno preuzimanje.",
+      );
       setCredentialsOpen(false);
       queryClient.invalidateQueries({ queryKey: ["sources"] });
     },
-    onError: (error: ApiError) => toast.error(error.message)
+    onError: (error: ApiError) => toast.error(error.message),
   });
   const columns = useMemo<Column<Source>[]>(
     () => [
@@ -661,35 +750,37 @@ export function SourcesPage() {
         label: "Dobavljač",
         tooltip: "Dobavljač kome konekcija pripada.",
         render: (row) => supplierNames.get(row.supplier_id) ?? row.supplier_id,
-        csv: (row) => supplierNames.get(row.supplier_id) ?? row.supplier_id
+        csv: (row) => supplierNames.get(row.supplier_id) ?? row.supplier_id,
       },
       {
         key: "name",
         label: "Konekcija",
         tooltip: "Naziv načina na koji dobavljač isporučuje cenovnik.",
         render: (row) => <Typography fontWeight={650}>{row.name}</Typography>,
-        csv: (row) => row.name
+        csv: (row) => row.name,
       },
       {
         key: "source_type",
         label: "Način preuzimanja",
         tooltip: "Kanal kojim cenovnik dolazi u sistem.",
         render: displayMethod,
-        csv: displayMethod
+        csv: displayMethod,
       },
       {
         key: "format",
         label: "Format",
         tooltip: "Očekivani format dobavljačkog cenovnika.",
         render: displayFormat,
-        csv: displayFormat
+        csv: displayFormat,
       },
       {
         key: "status",
         label: "Status",
         tooltip: "Nacrt, aktivna konekcija ili arhiviran zapis.",
-        render: (row) => <StatusChip value={row.is_active ? row.status : "ARCHIVED"} />,
-        csv: (row) => row.status
+        render: (row) => (
+          <StatusChip value={row.is_active ? row.status : "ARCHIVED"} />
+        ),
+        csv: (row) => row.status,
       },
       {
         key: "validation",
@@ -706,10 +797,10 @@ export function SourcesPage() {
             }
           />
         ),
-        csv: (row) => row.last_validation_status
-      }
+        csv: (row) => row.last_validation_status,
+      },
     ],
-    [supplierNames]
+    [supplierNames],
   );
 
   const update = (key: keyof ConnectionForm, value: string | boolean) =>
@@ -724,9 +815,11 @@ export function SourcesPage() {
             placement: "SOAP_BODY",
             http_method: "POST",
             format: "JSON",
-            url: current.url || "https://www.ct4partners.com/WS/CTProductsInStock.asmx",
+            url:
+              current.url ||
+              "https://www.ct4partners.com/WS/CTProductsInStock.asmx",
             endpoint: "",
-            name: current.name || "CT SOAP cenovnik"
+            name: current.name || "CT SOAP cenovnik",
           }
         : {
             ...current,
@@ -735,8 +828,9 @@ export function SourcesPage() {
               current.integration_profile === "CT_SOAP"
                 ? "GENERIC"
                 : current.integration_profile,
-            placement: current.placement === "SOAP_BODY" ? "HEADER" : current.placement
-          }
+            placement:
+              current.placement === "SOAP_BODY" ? "HEADER" : current.placement,
+          },
     );
   const selectSoapProfile = (value: string) =>
     setForm((current) =>
@@ -751,7 +845,7 @@ export function SourcesPage() {
             url: "https://partner.pinsoft.com/b2b/services/stock-webservice",
             endpoint: "",
             api_key_parameter: "guid",
-            name: current.name || "PIN / ALSO cenovnik"
+            name: current.name || "PIN / ALSO cenovnik",
           }
         : {
             ...current,
@@ -762,8 +856,8 @@ export function SourcesPage() {
             format: "JSON",
             url: "https://www.ct4partners.com/WS/CTProductsInStock.asmx",
             endpoint: "",
-            api_key_parameter: "X-API-Key"
-          }
+            api_key_parameter: "X-API-Key",
+          },
     );
   const selectIntegrationProfile = (value: string) =>
     setForm((current) =>
@@ -783,20 +877,20 @@ export function SourcesPage() {
             imap_port: "993",
             imap_username: "",
             format: "JSON",
-            name: current.name || "ASBIS - objedinjeni cenovnik"
+            name: current.name || "ASBIS - objedinjeni cenovnik",
           }
         : value === "KIMTEC_MSAN"
-        ? {
-            ...current,
-            integration_profile: value,
-            url: "https://b2b.kimtec.rs",
-            endpoint: "",
-            format: "JSON",
-            barcode_service_url:
-              "https://b2b.kimtec.rs/B2BService/B2BProductService.asmx",
-            name: current.name || "KimTec / M SAN - kompletan cenovnik"
-          }
-        : { ...current, integration_profile: value }
+          ? {
+              ...current,
+              integration_profile: value,
+              url: "https://b2b.kimtec.rs",
+              endpoint: "",
+              format: "JSON",
+              barcode_service_url:
+                "https://b2b.kimtec.rs/B2BService/B2BProductService.asmx",
+              name: current.name || "KimTec / M SAN - kompletan cenovnik",
+            }
+          : { ...current, integration_profile: value },
     );
   const networkSupported = ["HTTP", "API", "PORTAL"].includes(form.method);
   const portalReady =
@@ -807,12 +901,13 @@ export function SourcesPage() {
         form.username_field.trim() &&
         form.password_field.trim() &&
         form.username.trim() &&
-        form.password
+        form.password,
     );
   const certificateReady =
     form.authentication_type !== "CLIENT_CERTIFICATE" ||
     Boolean(
-      (certificateFile && form.certificate_password) || draft?.credentials_available
+      (certificateFile && form.certificate_password) ||
+        draft?.credentials_available,
     );
 
   return (
@@ -895,12 +990,14 @@ export function SourcesPage() {
                   disabled={
                     archiveSelected.isPending ||
                     !(sources.data?.items ?? []).some(
-                      (source) => selected.includes(source.id) && source.is_active
+                      (source) =>
+                        selected.includes(source.id) && source.is_active,
                     )
                   }
                   onClick={() => {
                     const count = (sources.data?.items ?? []).filter(
-                      (source) => selected.includes(source.id) && source.is_active
+                      (source) =>
+                        selected.includes(source.id) && source.is_active,
                     ).length;
                     if (
                       count > 0 &&
@@ -922,7 +1019,9 @@ export function SourcesPage() {
         open={Boolean(opened)}
         onClose={() => setOpened(null)}
         title={opened?.name ?? ""}
-        subtitle={opened ? `${displayMethod(opened)} · ${displayFormat(opened)}` : ""}
+        subtitle={
+          opened ? `${displayMethod(opened)} · ${displayFormat(opened)}` : ""
+        }
         actions={
           opened?.is_active ? (
             <>
@@ -936,10 +1035,13 @@ export function SourcesPage() {
               <Button
                 startIcon={<CloudDownloadRounded />}
                 onClick={async () => {
-                  const result = await supplierApi.probeSource(opened.supplier_id, opened.id);
+                  const result = await supplierApi.probeSource(
+                    opened.supplier_id,
+                    opened.id,
+                  );
                   const refreshed = await supplierApi.source(
                     opened.supplier_id,
-                    opened.id
+                    opened.id,
                   );
                   setProbe(result);
                   setProbeSourceId(opened.id);
@@ -992,10 +1094,10 @@ export function SourcesPage() {
                   setForm((current) => ({
                     ...current,
                     authentication_type: String(
-                      opened.configuration.authentication_type ?? "NONE"
+                      opened.configuration.authentication_type ?? "NONE",
                     ),
                     integration_profile: String(
-                      opened.configuration.integration_profile ?? "GENERIC"
+                      opened.configuration.integration_profile ?? "GENERIC",
                     ),
                     pin_shop_id: String(opened.configuration.pin_shop_id ?? 4),
                     username: "",
@@ -1012,7 +1114,7 @@ export function SourcesPage() {
                     api_key_parameter:
                       opened.configuration.integration_profile === "PIN_SOAP"
                         ? "guid"
-                        : current.api_key_parameter
+                        : current.api_key_parameter,
                   }));
                   setCredentialsOpen(true);
                 }}
@@ -1034,7 +1136,9 @@ export function SourcesPage() {
               <Button
                 color="warning"
                 startIcon={<ArchiveRounded />}
-                onClick={() => confirm("Arhivirati ovu konekciju?") && archive.mutate(opened)}
+                onClick={() =>
+                  confirm("Arhivirati ovu konekciju?") && archive.mutate(opened)
+                }
               >
                 Arhiviraj
               </Button>
@@ -1055,8 +1159,10 @@ export function SourcesPage() {
             >
               {opened.has_secret_reference && !opened.credentials_available
                 ? "Pristupni podaci više nisu dostupni. Unesite ih ponovo i ponovite probu."
-                : opened.last_validation_message?.replace(/^PROBE_(?:OK|FAILED): /, "") ||
-                  "Konekcija još nije probno preuzela cenovnik."}
+                : opened.last_validation_message?.replace(
+                    /^PROBE_(?:OK|FAILED): /,
+                    "",
+                  ) || "Konekcija još nije probno preuzela cenovnik."}
             </Alert>
             <Paper variant="outlined" sx={{ p: 2 }}>
               <Typography variant="h6">Administrativni pregled</Typography>
@@ -1065,7 +1171,14 @@ export function SourcesPage() {
               </Typography>
             </Paper>
             <DetailSection title="Connection">
-              <DetailRow label="Status" value={<StatusChip value={opened.is_active ? opened.status : "ARCHIVED"} />} />
+              <DetailRow
+                label="Status"
+                value={
+                  <StatusChip
+                    value={opened.is_active ? opened.status : "ARCHIVED"}
+                  />
+                }
+              />
               <DetailRow label="Tip konekcije" value={displayMethod(opened)} />
               <DetailRow label="Format" value={displayFormat(opened)} />
             </DetailSection>
@@ -1094,49 +1207,102 @@ export function SourcesPage() {
               />
             </DetailSection>
             <DetailSection title="Last Probe">
-              <DetailRow label="Datum" value={formatDate(opened.last_validation_at)} />
+              <DetailRow
+                label="Datum"
+                value={formatDate(opened.last_validation_at)}
+              />
               <DetailRow
                 label="Trajanje"
-                value={openedProbe ? `${openedProbe.duration_ms} ms` : "Detalji probe-a nisu trajno sačuvani."}
+                value={
+                  openedProbe
+                    ? `${openedProbe.duration_ms} ms`
+                    : "Detalji probe-a nisu trajno sačuvani."
+                }
               />
               <DetailRow
                 label="HTTP status"
-                value={detailValue(openedProbe?.http_status, "HTTP status nije trajno sačuvan.")}
+                value={detailValue(
+                  openedProbe?.http_status,
+                  "HTTP status nije trajno sačuvan.",
+                )}
               />
               <DetailRow
                 label="Veličina odgovora"
-                value={openedProbe ? `${openedProbe.size_bytes.toLocaleString("sr-RS")} B` : "Veličina nije trajno sačuvana."}
+                value={
+                  openedProbe
+                    ? `${openedProbe.size_bytes.toLocaleString("sr-RS")} B`
+                    : "Veličina nije trajno sačuvana."
+                }
               />
               <DetailRow
                 label="XML validan"
                 value={
                   openedProbe?.detected_format === "XML"
-                    ? openedProbe.successful ? "DA" : "NE"
-                    : openedProbe ? "Nije XML format." : "Rezultat formata nije trajno sačuvan."
+                    ? openedProbe.successful
+                      ? "DA"
+                      : "NE"
+                    : openedProbe
+                      ? "Nije XML format."
+                      : "Rezultat formata nije trajno sačuvan."
                 }
               />
             </DetailSection>
             <DetailSection title="Last Import">
               <DetailRow
                 label="Broj proizvoda"
-                value={detailValue(acquisition?.accepted_record_count, "Uspešan import još ne postoji.")}
+                value={detailValue(
+                  acquisition?.accepted_record_count,
+                  "Uspešan import još ne postoji.",
+                )}
               />
-              <DetailRow label="Broj kategorija" value="Acquisition ne beleži ovu metriku." />
-              <DetailRow label="Broj slika" value="Acquisition ne beleži ovu metriku." />
-              <DetailRow label="Broj opisa" value="Acquisition ne beleži ovu metriku." />
-              <DetailRow label="Encoding" value="Encoding nije deo postojećeg Acquisition DTO-a." />
+              <DetailRow
+                label="Broj kategorija"
+                value="Acquisition ne beleži ovu metriku."
+              />
+              <DetailRow
+                label="Broj slika"
+                value="Acquisition ne beleži ovu metriku."
+              />
+              <DetailRow
+                label="Broj opisa"
+                value="Acquisition ne beleži ovu metriku."
+              />
+              <DetailRow
+                label="Encoding"
+                value="Encoding nije deo postojećeg Acquisition DTO-a."
+              />
             </DetailSection>
             <DetailSection title="Schema">
               <DetailRow label="Postoji" value={schema ? "DA" : "NE"} />
               {schema ? (
                 <>
-                  <DetailRow label="Schema ID" value={String(schema.schema_code ?? schema.id)} />
-                  <DetailRow label="Verzija" value={detailValue(schema.version_number, "Nije dostupna.")} />
-                  <DetailRow label="Status" value={<StatusChip value={String(schema.status)} />} />
-                  <DetailRow label="Field count" value={detailValue(schema.field_count, "Schema postoji ali nije analizirana.")} />
-                  <DetailRow label="Poslednja analiza" value={formatDate(schema.updated_at)} />
+                  <DetailRow
+                    label="Schema ID"
+                    value={String(schema.schema_code ?? schema.id)}
+                  />
+                  <DetailRow
+                    label="Verzija"
+                    value={detailValue(schema.version_number, "Nije dostupna.")}
+                  />
+                  <DetailRow
+                    label="Status"
+                    value={<StatusChip value={String(schema.status)} />}
+                  />
+                  <DetailRow
+                    label="Field count"
+                    value={detailValue(
+                      schema.field_count,
+                      "Schema postoji ali nije analizirana.",
+                    )}
+                  />
+                  <DetailRow
+                    label="Poslednja analiza"
+                    value={formatDate(schema.updated_at)}
+                  />
                   {Number(schema.field_count ?? 0) === 0 && (
-                    <Alert severity="warning">Schema postoji ali nije analizirana.</Alert>
+                    <Alert severity="warning">
+                      Schema postoji ali nije analizirana.
+                    </Alert>
                   )}
                 </>
               ) : (
@@ -1147,19 +1313,30 @@ export function SourcesPage() {
               <DetailRow label="Postoji" value={mapping ? "DA" : "NE"} />
               {mapping ? (
                 <>
-                  <DetailRow label="Mapping ID" value={String(mapping.mapping_code ?? mapping.id)} />
-                  <DetailRow label="Status" value={<StatusChip value={String(mapping.status)} />} />
+                  <DetailRow
+                    label="Mapping ID"
+                    value={String(mapping.mapping_code ?? mapping.id)}
+                  />
+                  <DetailRow
+                    label="Status"
+                    value={<StatusChip value={String(mapping.status)} />}
+                  />
                 </>
               ) : (
                 <Alert severity="info">
-                  {schema ? "Mapping nije napravljen." : "Mapping nije moguć dok Schema nije kreirana."}
+                  {schema
+                    ? "Mapping nije napravljen."
+                    : "Mapping nije moguć dok Schema nije kreirana."}
                 </Alert>
               )}
             </DetailSection>
             <DetailSection title="Acquisition">
               <DetailRow label="Postoji" value={acquisition ? "DA" : "NE"} />
               {acquisition ? (
-                <DetailRow label="Status" value={<StatusChip value={String(acquisition.status)} />} />
+                <DetailRow
+                  label="Status"
+                  value={<StatusChip value={String(acquisition.status)} />}
+                />
               ) : (
                 <Alert severity="info">
                   {!schema
@@ -1173,31 +1350,46 @@ export function SourcesPage() {
             <DetailSection title="Snapshot">
               {snapshot ? (
                 <>
-                  <DetailRow label="Snapshot ID" value={String(snapshot.snapshot_code ?? snapshot.id)} />
-                  <DetailRow label="Datum" value={formatDate(snapshot.finalized_at ?? snapshot.created_at)} />
+                  <DetailRow
+                    label="Snapshot ID"
+                    value={String(snapshot.snapshot_code ?? snapshot.id)}
+                  />
+                  <DetailRow
+                    label="Datum"
+                    value={formatDate(
+                      snapshot.finalized_at ?? snapshot.created_at,
+                    )}
+                  />
                 </>
               ) : (
                 <Alert severity="info">
-                  {acquisition ? "Snapshot još nije kreiran za obrađeni import." : "Snapshot ne postoji jer Acquisition nije završen."}
+                  {acquisition
+                    ? "Snapshot još nije kreiran za obrađeni import."
+                    : "Snapshot ne postoji jer Acquisition nije završen."}
                 </Alert>
               )}
             </DetailSection>
             <DetailSection title="Delta">
               {delta ? (
                 <>
-                  <DetailRow label="Poslednji Delta Run" value={String(delta.delta_code ?? delta.id)} />
+                  <DetailRow
+                    label="Poslednji Delta Run"
+                    value={String(delta.delta_code ?? delta.id)}
+                  />
                   <DetailRow
                     label="Broj izmena"
                     value={
-                      Number(delta.added_items ?? 0)
-                      + Number(delta.modified_items ?? 0)
-                      + Number(delta.removed_items ?? 0)
+                      Number(delta.added_items ?? 0) +
+                      Number(delta.modified_items ?? 0) +
+                      Number(delta.removed_items ?? 0)
                     }
                   />
                 </>
               ) : (
                 <Alert severity="info">
-                  {snapshot ? "Delta Run još nije pokrenut." : "Delta nije moguć dok Snapshot ne postoji."}
+                  {snapshot
+                    ? "Delta Run još nije pokrenut."
+                    : "Delta nije moguć dok Snapshot ne postoji."}
                 </Alert>
               )}
             </DetailSection>
@@ -1205,12 +1397,24 @@ export function SourcesPage() {
         )}
       </DetailDrawer>
 
-      <Dialog open={wizardOpen} onClose={() => setWizardOpen(false)} fullWidth maxWidth="md">
+      <Dialog
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
         <DialogTitle>Povezivanje dobavljača sa cenovnikom</DialogTitle>
         <DialogContent>
           <Stepper activeStep={step} sx={{ py: 2 }}>
-            {["Način preuzimanja", "Podaci", "Probno preuzimanje", "Aktivacija"].map((label) => (
-              <Step key={label}><StepLabel>{label}</StepLabel></Step>
+            {[
+              "Način preuzimanja",
+              "Podaci",
+              "Probno preuzimanje",
+              "Aktivacija",
+            ].map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
             ))}
           </Stepper>
           {step === 0 && (
@@ -1223,26 +1427,35 @@ export function SourcesPage() {
                       height: "100%",
                       borderWidth: form.method === value ? 2 : 1,
                       borderColor:
-                        form.method === value
-                          ? "primary.main"
-                          : "divider",
+                        form.method === value ? "primary.main" : "divider",
                       bgcolor:
                         form.method === value
                           ? theme.palette.action.selected
                           : "background.paper",
                       transition:
-                        "border-color 150ms ease, background-color 150ms ease"
+                        "border-color 150ms ease, background-color 150ms ease",
                     })}
                   >
                     <CardActionArea onClick={() => update("method", value)}>
                       <CardContent>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
+                        >
                           <Typography variant="h6">{title}</Typography>
                           {form.method === value && (
-                            <CheckCircleRounded color="primary" aria-label="Izabrano" />
+                            <CheckCircleRounded
+                              color="primary"
+                              aria-label="Izabrano"
+                            />
                           )}
                         </Stack>
-                        <Typography color="text.secondary" variant="body2" mt={1}>
+                        <Typography
+                          color="text.secondary"
+                          variant="body2"
+                          mt={1}
+                        >
                           {description}
                         </Typography>
                       </CardContent>
@@ -1261,7 +1474,17 @@ export function SourcesPage() {
                 helperText="Na primer: Glavni XML cenovnik."
                 onChange={(event) => update("name", event.target.value)}
               />
-              {["HTTP", "API", "PORTAL", "MANUAL_UPLOAD"].includes(form.method) && (
+              <TextField
+                label="Šifra dobavljača na portalu"
+                value={form.portal_supplier_code}
+                onChange={(event) =>
+                  update("portal_supplier_code", event.target.value)
+                }
+                helperText="Partnerska šifra koju ovaj portal koristi; nije lozinka."
+              />
+              {["HTTP", "API", "PORTAL", "MANUAL_UPLOAD"].includes(
+                form.method,
+              ) && (
                 <TextField
                   select
                   label="Format cenovnika"
@@ -1270,14 +1493,20 @@ export function SourcesPage() {
                   onChange={(event) => update("format", event.target.value)}
                 >
                   {["AUTO", "XML", "EXCEL", "CSV", "JSON"].map((item) => (
-                    <MenuItem key={item} value={item}>{item === "AUTO" ? "Automatsko prepoznavanje" : item}</MenuItem>
+                    <MenuItem key={item} value={item}>
+                      {item === "AUTO" ? "Automatsko prepoznavanje" : item}
+                    </MenuItem>
                   ))}
                 </TextField>
               )}
               {["HTTP", "API", "PORTAL"].includes(form.method) && (
                 <>
                   <TextField
-                    label={form.method === "API" ? "Osnovni URL" : "URL za preuzimanje"}
+                    label={
+                      form.method === "API"
+                        ? "Osnovni URL"
+                        : "URL za preuzimanje"
+                    }
                     required
                     value={form.url}
                     helperText="Adresa sa koje sistem preuzima cenovnik."
@@ -1285,182 +1514,529 @@ export function SourcesPage() {
                   />
                   {form.method === "API" && (
                     <>
-                      <TextField select label="Profil integracije" value={form.integration_profile} onChange={(event) => selectIntegrationProfile(event.target.value)}>
+                      <TextField
+                        select
+                        label="Profil integracije"
+                        value={form.integration_profile}
+                        onChange={(event) =>
+                          selectIntegrationProfile(event.target.value)
+                        }
+                      >
                         <MenuItem value="GENERIC">Opšti API</MenuItem>
-                        <MenuItem value="ASBIS_IT4PROFIT">ASBIS (2 XML + akcije iz emaila)</MenuItem>
-                        <MenuItem value="KIMTEC_MSAN">KimTec / M SAN B2B</MenuItem>
+                        <MenuItem value="ASBIS_IT4PROFIT">
+                          ASBIS (2 XML + akcije iz emaila)
+                        </MenuItem>
+                        <MenuItem value="KIMTEC_MSAN">
+                          KimTec / M SAN B2B
+                        </MenuItem>
                       </TextField>
                       {form.integration_profile === "ASBIS_IT4PROFIT" ? (
                         <>
-                          <Alert severity="info">Katalog i stanje/cene spajaju se sa poslednjim ASBIS akcijskim ZIP prilogom po šifri artikla.</Alert>
-                          <TextField label="Prvi XML — katalog proizvoda" value={form.catalog_endpoint} helperText={`${form.url.replace(/\/$/, "")}/${form.catalog_endpoint.replace(/^\//, "")} (USERNAME i PASSWORD sistem dodaje bez prikazivanja)`} onChange={(event) => update("catalog_endpoint", event.target.value)} />
-                          <TextField label="Drugi XML — cene i stanje" value={form.price_endpoint} helperText={`${form.url.replace(/\/$/, "")}/${form.price_endpoint.replace(/^\//, "")} (USERNAME i PASSWORD sistem dodaje bez prikazivanja)`} onChange={(event) => update("price_endpoint", event.target.value)} />
-                          <TextField label="IMAP server" value={form.imap_host} onChange={(event) => update("imap_host", event.target.value)} />
-                          <TextField label="IMAP port" value={form.imap_port} onChange={(event) => update("imap_port", event.target.value)} />
-                          <TextField label="Dozvoljeni pošiljalac" value={form.sender} helperText="Opciono, ali preporučeno: email adresa ili stabilan deo From zaglavlja ASBIS poruke." onChange={(event) => update("sender", event.target.value)} />
-                          <TextField label="IMAP korisničko ime" value={form.imap_username} onChange={(event) => update("imap_username", event.target.value)} />
-                          <TextField type="password" label="IMAP lozinka" value={form.imap_password} onChange={(event) => update("imap_password", event.target.value)} />
+                          <Alert severity="info">
+                            Katalog i stanje/cene spajaju se sa poslednjim ASBIS
+                            akcijskim ZIP prilogom po šifri artikla.
+                          </Alert>
+                          <TextField
+                            label="Prvi XML — katalog proizvoda"
+                            value={form.catalog_endpoint}
+                            helperText={`${form.url.replace(/\/$/, "")}/${form.catalog_endpoint.replace(/^\//, "")} (USERNAME i PASSWORD sistem dodaje bez prikazivanja)`}
+                            onChange={(event) =>
+                              update("catalog_endpoint", event.target.value)
+                            }
+                          />
+                          <TextField
+                            label="Drugi XML — cene i stanje"
+                            value={form.price_endpoint}
+                            helperText={`${form.url.replace(/\/$/, "")}/${form.price_endpoint.replace(/^\//, "")} (USERNAME i PASSWORD sistem dodaje bez prikazivanja)`}
+                            onChange={(event) =>
+                              update("price_endpoint", event.target.value)
+                            }
+                          />
+                          <TextField
+                            label="IMAP server"
+                            value={form.imap_host}
+                            onChange={(event) =>
+                              update("imap_host", event.target.value)
+                            }
+                          />
+                          <TextField
+                            label="IMAP port"
+                            value={form.imap_port}
+                            onChange={(event) =>
+                              update("imap_port", event.target.value)
+                            }
+                          />
+                          <TextField
+                            label="Dozvoljeni pošiljalac"
+                            value={form.sender}
+                            helperText="Opciono, ali preporučeno: email adresa ili stabilan deo From zaglavlja ASBIS poruke."
+                            onChange={(event) =>
+                              update("sender", event.target.value)
+                            }
+                          />
+                          <TextField
+                            label="IMAP korisničko ime"
+                            value={form.imap_username}
+                            onChange={(event) =>
+                              update("imap_username", event.target.value)
+                            }
+                          />
+                          <TextField
+                            type="password"
+                            label="IMAP lozinka"
+                            value={form.imap_password}
+                            onChange={(event) =>
+                              update("imap_password", event.target.value)
+                            }
+                          />
                         </>
                       ) : (
-                        <TextField label="Endpoint" value={form.endpoint} helperText="Putanja API operacije, na primer /v1/products." onChange={(event) => update("endpoint", event.target.value)} />
+                        <TextField
+                          label="Endpoint"
+                          value={form.endpoint}
+                          helperText="Putanja API operacije, na primer /v1/products."
+                          onChange={(event) =>
+                            update("endpoint", event.target.value)
+                          }
+                        />
                       )}
                     </>
                   )}
                   {form.method === "PORTAL" && (
                     <>
                       <Alert severity="info">
-                        Sistem otvara login stranicu, čuva session cookie samo tokom
-                        ovog izvršavanja i zatim preuzima cenovnik.
+                        Sistem otvara login stranicu, čuva session cookie samo
+                        tokom ovog izvršavanja i zatim preuzima cenovnik.
                       </Alert>
                       <TextField
                         label="URL stranice za prijavu"
                         required
                         value={form.login_url}
                         helperText="Adresa na kojoj se prikazuje forma za prijavu na B2B portal."
-                        onChange={(event) => update("login_url", event.target.value)}
+                        onChange={(event) =>
+                          update("login_url", event.target.value)
+                        }
                       />
                       <TextField
                         label="Korisničko ime"
                         required
                         value={form.username}
-                        onChange={(event) => update("username", event.target.value)}
+                        onChange={(event) =>
+                          update("username", event.target.value)
+                        }
                       />
                       <TextField
                         type="password"
                         label="Lozinka"
                         required
                         value={form.password}
-                        onChange={(event) => update("password", event.target.value)}
+                        onChange={(event) =>
+                          update("password", event.target.value)
+                        }
                       />
                     </>
                   )}
                   {form.method !== "PORTAL" && (
                     <FormControlLabel
-                      control={<Switch checked={form.login_required || form.method === "API"} onChange={(event) => update("login_required", event.target.checked)} disabled={form.method === "API"} />}
+                      control={
+                        <Switch
+                          checked={form.login_required || form.method === "API"}
+                          onChange={(event) =>
+                            update("login_required", event.target.checked)
+                          }
+                          disabled={form.method === "API"}
+                        />
+                      }
                       label="Potrebna je prijava"
                     />
                   )}
-                  {form.method !== "PORTAL" && (form.login_required || form.method === "API") && (
-                    <>
-                      <TextField
-                        select
-                        label="Način prijave"
-                        value={form.authentication_type}
-                        onChange={(event) => selectAuthenticationType(event.target.value)}
-                      >
-                        <MenuItem value="NONE">Bez prijave</MenuItem>
-                        <MenuItem value="BASIC">Korisničko ime i lozinka</MenuItem>
-                        <MenuItem value="BEARER">Bearer token</MenuItem>
-                        <MenuItem value="API_KEY">API ključ</MenuItem>
-                        <MenuItem value="CLIENT_CERTIFICATE">Klijentski sertifikat (mTLS)</MenuItem>
-                        <MenuItem value="SOAP_BODY">SOAP servis (CT / PIN-ALSO)</MenuItem>
-                      </TextField>
-                      {form.integration_profile !== "ASBIS_IT4PROFIT" && !(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && (
-                        <TextField select label="Gde dobavljač očekuje podatke za prijavu" value={form.placement} onChange={(event) => update("placement", event.target.value)}>
-                          <MenuItem value="HEADER">Bezbednosno zaglavlje</MenuItem>
-                          <MenuItem value="QUERY">Parametri adrese (npr. DS Computers)</MenuItem>
+                  {form.method !== "PORTAL" &&
+                    (form.login_required || form.method === "API") && (
+                      <>
+                        <TextField
+                          select
+                          label="Način prijave"
+                          value={form.authentication_type}
+                          onChange={(event) =>
+                            selectAuthenticationType(event.target.value)
+                          }
+                        >
+                          <MenuItem value="NONE">Bez prijave</MenuItem>
+                          <MenuItem value="BASIC">
+                            Korisničko ime i lozinka
+                          </MenuItem>
+                          <MenuItem value="BEARER">Bearer token</MenuItem>
+                          <MenuItem value="API_KEY">API ključ</MenuItem>
+                          <MenuItem value="CLIENT_CERTIFICATE">
+                            Klijentski sertifikat (mTLS)
+                          </MenuItem>
+                          <MenuItem value="SOAP_BODY">
+                            SOAP servis (CT / PIN-ALSO)
+                          </MenuItem>
                         </TextField>
-                      )}
-                      {form.integration_profile === "ASBIS_IT4PROFIT" && (
-                        <Alert severity="info">ASBIS API prijava je fiksno podešena kroz URL parametre USERNAME i PASSWORD.</Alert>
-                      )}
-                      {(form.authentication_type === "BASIC" ||
-                        form.authentication_type === "API_KEY" ||
-                        (form.authentication_type === "SOAP_BODY" &&
-                          form.integration_profile === "CT_SOAP")) && (
-                        <TextField label="Korisničko ime" value={form.username} onChange={(event) => update("username", event.target.value)} />
-                      )}
-                      {(form.authentication_type === "BASIC" ||
-                        (form.authentication_type === "SOAP_BODY" &&
-                          form.integration_profile === "CT_SOAP")) && (
-                        <TextField type="password" label="Lozinka" value={form.password} onChange={(event) => update("password", event.target.value)} />
-                      )}
-                      {form.authentication_type === "SOAP_BODY" && (
-                        <>
-                          <TextField select label="SOAP profil integracije" value={form.integration_profile} onChange={(event) => selectSoapProfile(event.target.value)}>
-                            <MenuItem value="CT_SOAP">CT Computers</MenuItem>
-                            <MenuItem value="PIN_SOAP">PIN / ALSO Srbija</MenuItem>
-                          </TextField>
-                          {form.integration_profile === "PIN_SOAP" ? (
-                            <>
-                              <Alert severity="info">Preuzimaju se samo artikli koje PIN/ALSO označi kao dostupne na stanju. GUID se trajno čuva van baze.</Alert>
-                              <TextField label="Klijentski kod (GUID)" type="password" value={form.api_key} onChange={(event) => update("api_key", event.target.value)} />
-                              <TextField label="Shop ID" value={form.pin_shop_id} onChange={(event) => update("pin_shop_id", event.target.value)} helperText="Podrazumevana vrednost prema dokumentaciji je 4." />
-                            </>
-                          ) : (
-                            <Alert severity="info">Pristupni podaci se trajno čuvaju van baze. Sistem ih šalje samo unutar CT SOAP zahteva; javna IP adresa aplikacije mora biti odobrena kod dobavljača.</Alert>
+                        {form.integration_profile !== "ASBIS_IT4PROFIT" &&
+                          !["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(
+                            form.authentication_type,
+                          ) && (
+                            <TextField
+                              select
+                              label="Gde dobavljač očekuje podatke za prijavu"
+                              value={form.placement}
+                              onChange={(event) =>
+                                update("placement", event.target.value)
+                              }
+                            >
+                              <MenuItem value="HEADER">
+                                Bezbednosno zaglavlje
+                              </MenuItem>
+                              <MenuItem value="QUERY">
+                                Parametri adrese (npr. DS Computers)
+                              </MenuItem>
+                            </TextField>
                           )}
-                        </>
-                      )}
-                      {form.authentication_type === "BEARER" && (
-                        <TextField type="password" label="Token" value={form.token} onChange={(event) => update("token", event.target.value)} />
-                      )}
-                      {form.authentication_type === "API_KEY" && (
-                        <TextField type="password" label="API ključ ili lozinka" value={form.api_key} onChange={(event) => update("api_key", event.target.value)} />
-                      )}
-                      {form.authentication_type === "CLIENT_CERTIFICATE" && (
-                        <>
-                          <TextField select label="Profil integracije" value={form.integration_profile} onChange={(event) => selectIntegrationProfile(event.target.value)}>
-                            <MenuItem value="GENERIC">Opšti mTLS API</MenuItem>
-                            <MenuItem value="KIMTEC_MSAN">KimTec / M SAN B2B</MenuItem>
-                          </TextField>
-                          {form.integration_profile === "KIMTEC_MSAN" && (
-                            <>
-                              <Alert severity="info">Sistem preuzima katalog, cenovnik i EAN barkodove istim sertifikatom i spaja ih po ProductCode.</Alert>
-                              <TextField label="Endpoint kataloga" value={form.catalog_endpoint} onChange={(event) => update("catalog_endpoint", event.target.value)} />
-                              <TextField label="Endpoint cenovnika" value={form.price_endpoint} onChange={(event) => update("price_endpoint", event.target.value)} />
-                              <TextField label="SOAP servis za EAN barkodove" value={form.barcode_service_url} onChange={(event) => update("barcode_service_url", event.target.value)} />
-                            </>
+                        {form.integration_profile === "ASBIS_IT4PROFIT" && (
+                          <Alert severity="info">
+                            ASBIS API prijava je fiksno podešena kroz URL
+                            parametre USERNAME i PASSWORD.
+                          </Alert>
+                        )}
+                        {(form.authentication_type === "BASIC" ||
+                          form.authentication_type === "API_KEY" ||
+                          (form.authentication_type === "SOAP_BODY" &&
+                            form.integration_profile === "CT_SOAP")) && (
+                          <TextField
+                            label="Korisničko ime"
+                            value={form.username}
+                            onChange={(event) =>
+                              update("username", event.target.value)
+                            }
+                          />
+                        )}
+                        {(form.authentication_type === "BASIC" ||
+                          (form.authentication_type === "SOAP_BODY" &&
+                            form.integration_profile === "CT_SOAP")) && (
+                          <TextField
+                            type="password"
+                            label="Lozinka"
+                            value={form.password}
+                            onChange={(event) =>
+                              update("password", event.target.value)
+                            }
+                          />
+                        )}
+                        {form.authentication_type === "SOAP_BODY" && (
+                          <>
+                            <TextField
+                              select
+                              label="SOAP profil integracije"
+                              value={form.integration_profile}
+                              onChange={(event) =>
+                                selectSoapProfile(event.target.value)
+                              }
+                            >
+                              <MenuItem value="CT_SOAP">CT Computers</MenuItem>
+                              <MenuItem value="PIN_SOAP">
+                                PIN / ALSO Srbija
+                              </MenuItem>
+                            </TextField>
+                            {form.integration_profile === "PIN_SOAP" ? (
+                              <>
+                                <Alert severity="info">
+                                  Preuzimaju se samo artikli koje PIN/ALSO
+                                  označi kao dostupne na stanju. GUID se trajno
+                                  čuva van baze.
+                                </Alert>
+                                <TextField
+                                  label="Klijentski kod (GUID)"
+                                  type="password"
+                                  value={form.api_key}
+                                  onChange={(event) =>
+                                    update("api_key", event.target.value)
+                                  }
+                                />
+                                <TextField
+                                  label="Shop ID"
+                                  value={form.pin_shop_id}
+                                  onChange={(event) =>
+                                    update("pin_shop_id", event.target.value)
+                                  }
+                                  helperText="Podrazumevana vrednost prema dokumentaciji je 4."
+                                />
+                              </>
+                            ) : (
+                              <Alert severity="info">
+                                Pristupni podaci se trajno čuvaju van baze.
+                                Sistem ih šalje samo unutar CT SOAP zahteva;
+                                javna IP adresa aplikacije mora biti odobrena
+                                kod dobavljača.
+                              </Alert>
+                            )}
+                          </>
+                        )}
+                        {form.authentication_type === "BEARER" && (
+                          <TextField
+                            type="password"
+                            label="Token"
+                            value={form.token}
+                            onChange={(event) =>
+                              update("token", event.target.value)
+                            }
+                          />
+                        )}
+                        {form.authentication_type === "API_KEY" && (
+                          <TextField
+                            type="password"
+                            label="API ključ ili lozinka"
+                            value={form.api_key}
+                            onChange={(event) =>
+                              update("api_key", event.target.value)
+                            }
+                          />
+                        )}
+                        {form.authentication_type === "CLIENT_CERTIFICATE" && (
+                          <>
+                            <TextField
+                              select
+                              label="Profil integracije"
+                              value={form.integration_profile}
+                              onChange={(event) =>
+                                selectIntegrationProfile(event.target.value)
+                              }
+                            >
+                              <MenuItem value="GENERIC">
+                                Opšti mTLS API
+                              </MenuItem>
+                              <MenuItem value="KIMTEC_MSAN">
+                                KimTec / M SAN B2B
+                              </MenuItem>
+                            </TextField>
+                            {form.integration_profile === "KIMTEC_MSAN" && (
+                              <>
+                                <Alert severity="info">
+                                  Sistem preuzima katalog, cenovnik i EAN
+                                  barkodove istim sertifikatom i spaja ih po
+                                  ProductCode.
+                                </Alert>
+                                <TextField
+                                  label="Endpoint kataloga"
+                                  value={form.catalog_endpoint}
+                                  onChange={(event) =>
+                                    update(
+                                      "catalog_endpoint",
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                                <TextField
+                                  label="Endpoint cenovnika"
+                                  value={form.price_endpoint}
+                                  onChange={(event) =>
+                                    update("price_endpoint", event.target.value)
+                                  }
+                                />
+                                <TextField
+                                  label="SOAP servis za EAN barkodove"
+                                  value={form.barcode_service_url}
+                                  onChange={(event) =>
+                                    update(
+                                      "barcode_service_url",
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </>
+                            )}
+                            <Button component="label" variant="outlined">
+                              {certificateFile
+                                ? certificateFile.name
+                                : "Izaberi .p12 / .pfx sertifikat"}
+                              <input
+                                hidden
+                                type="file"
+                                accept=".p12,.pfx,application/x-pkcs12"
+                                onChange={(event) =>
+                                  setCertificateFile(
+                                    event.target.files?.[0] ?? null,
+                                  )
+                                }
+                              />
+                            </Button>
+                            <TextField
+                              type="password"
+                              label="Lozinka sertifikata"
+                              value={form.certificate_password}
+                              helperText="Unosi se samo pri prvom čuvanju ili zameni sertifikata."
+                              onChange={(event) =>
+                                update(
+                                  "certificate_password",
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </>
+                        )}
+                        {!["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(
+                          form.authentication_type,
+                        ) &&
+                          form.placement === "QUERY" && (
+                            <Stack
+                              direction={{ xs: "column", sm: "row" }}
+                              gap={2}
+                            >
+                              <TextField
+                                fullWidth
+                                label="Naziv parametra korisničkog imena"
+                                value={form.username_parameter}
+                                onChange={(event) =>
+                                  update(
+                                    "username_parameter",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                              <TextField
+                                fullWidth
+                                label="Naziv parametra lozinke"
+                                value={form.password_parameter}
+                                onChange={(event) =>
+                                  update(
+                                    "password_parameter",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </Stack>
                           )}
-                          <Button component="label" variant="outlined">
-                            {certificateFile ? certificateFile.name : "Izaberi .p12 / .pfx sertifikat"}
-                            <input hidden type="file" accept=".p12,.pfx,application/x-pkcs12" onChange={(event) => setCertificateFile(event.target.files?.[0] ?? null)} />
-                          </Button>
-                          <TextField type="password" label="Lozinka sertifikata" value={form.certificate_password} helperText="Unosi se samo pri prvom čuvanju ili zameni sertifikata." onChange={(event) => update("certificate_password", event.target.value)} />
-                        </>
-                      )}
-                      {!(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && form.placement === "QUERY" && (
-                        <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
-                          <TextField fullWidth label="Naziv parametra korisničkog imena" value={form.username_parameter} onChange={(event) => update("username_parameter", event.target.value)} />
-                          <TextField fullWidth label="Naziv parametra lozinke" value={form.password_parameter} onChange={(event) => update("password_parameter", event.target.value)} />
-                        </Stack>
-                      )}
-                    </>
-                  )}
+                      </>
+                    )}
                 </>
               )}
               {["FTP", "SFTP"].includes(form.method) && (
                 <>
-                  <TextField label="Server" required value={form.host} onChange={(event) => update("host", event.target.value)} />
-                  <TextField label="Port" value={form.port} helperText="Ostavite prazno za standardni port." onChange={(event) => update("port", event.target.value)} />
-                  <TextField label="Korisničko ime" value={form.username} onChange={(event) => update("username", event.target.value)} />
-                  <TextField type="password" label="Lozinka ili ključ" value={form.password} onChange={(event) => update("password", event.target.value)} />
-                  <TextField label="Udaljena putanja" value={form.remote_path} onChange={(event) => update("remote_path", event.target.value)} />
-                  <TextField label="Šablon naziva fajla" value={form.filename_pattern} onChange={(event) => update("filename_pattern", event.target.value)} />
+                  <TextField
+                    label="Server"
+                    required
+                    value={form.host}
+                    onChange={(event) => update("host", event.target.value)}
+                  />
+                  <TextField
+                    label="Port"
+                    value={form.port}
+                    helperText="Ostavite prazno za standardni port."
+                    onChange={(event) => update("port", event.target.value)}
+                  />
+                  <TextField
+                    label="Korisničko ime"
+                    value={form.username}
+                    onChange={(event) => update("username", event.target.value)}
+                  />
+                  <TextField
+                    type="password"
+                    label="Lozinka ili ključ"
+                    value={form.password}
+                    onChange={(event) => update("password", event.target.value)}
+                  />
+                  <TextField
+                    label="Udaljena putanja"
+                    value={form.remote_path}
+                    onChange={(event) =>
+                      update("remote_path", event.target.value)
+                    }
+                  />
+                  <TextField
+                    label="Šablon naziva fajla"
+                    value={form.filename_pattern}
+                    onChange={(event) =>
+                      update("filename_pattern", event.target.value)
+                    }
+                  />
                 </>
               )}
               {form.method === "EMAIL" && (
                 <>
-                  <TextField label="Mailbox" required value={form.mailbox} onChange={(event) => update("mailbox", event.target.value)} />
-                  <TextField label="Folder" value={form.folder} onChange={(event) => update("folder", event.target.value)} />
-                  <TextField label="Pošiljalac" value={form.sender} onChange={(event) => update("sender", event.target.value)} />
-                  <TextField label="Deo naslova poruke" value={form.subject} onChange={(event) => update("subject", event.target.value)} />
-                  <TextField label="Šablon naziva priloga" required value={form.filename_pattern} onChange={(event) => update("filename_pattern", event.target.value)} />
-                  <TextField type="password" label="Pristupni podaci" value={form.password} onChange={(event) => update("password", event.target.value)} />
+                  <TextField
+                    label="Mailbox"
+                    required
+                    value={form.mailbox}
+                    onChange={(event) => update("mailbox", event.target.value)}
+                  />
+                  <TextField
+                    label="Folder"
+                    value={form.folder}
+                    onChange={(event) => update("folder", event.target.value)}
+                  />
+                  <TextField
+                    label="Pošiljalac"
+                    value={form.sender}
+                    onChange={(event) => update("sender", event.target.value)}
+                  />
+                  <TextField
+                    label="Deo naslova poruke"
+                    value={form.subject}
+                    onChange={(event) => update("subject", event.target.value)}
+                  />
+                  <TextField
+                    label="Šablon naziva priloga"
+                    required
+                    value={form.filename_pattern}
+                    onChange={(event) =>
+                      update("filename_pattern", event.target.value)
+                    }
+                  />
+                  <TextField
+                    type="password"
+                    label="Pristupni podaci"
+                    value={form.password}
+                    onChange={(event) => update("password", event.target.value)}
+                  />
                 </>
               )}
               {form.method === "GOOGLE_DRIVE" && (
                 <>
-                  <TextField label="File ID" value={form.file_id} onChange={(event) => update("file_id", event.target.value)} />
-                  <TextField label="Folder ID" value={form.folder_id} onChange={(event) => update("folder_id", event.target.value)} />
-                  <TextField label="Šablon naziva fajla" value={form.filename_pattern} onChange={(event) => update("filename_pattern", event.target.value)} />
-                  <TextField label="Shared Drive ID" value={form.shared_drive_id} onChange={(event) => update("shared_drive_id", event.target.value)} />
+                  <TextField
+                    label="File ID"
+                    value={form.file_id}
+                    onChange={(event) => update("file_id", event.target.value)}
+                  />
+                  <TextField
+                    label="Folder ID"
+                    value={form.folder_id}
+                    onChange={(event) =>
+                      update("folder_id", event.target.value)
+                    }
+                  />
+                  <TextField
+                    label="Šablon naziva fajla"
+                    value={form.filename_pattern}
+                    onChange={(event) =>
+                      update("filename_pattern", event.target.value)
+                    }
+                  />
+                  <TextField
+                    label="Shared Drive ID"
+                    value={form.shared_drive_id}
+                    onChange={(event) =>
+                      update("shared_drive_id", event.target.value)
+                    }
+                  />
                 </>
               )}
               {form.method === "MANUAL_UPLOAD" && (
                 <>
-                  <TextField label="Maksimalna veličina fajla (MB)" value={form.maximum_mb} onChange={(event) => update("maximum_mb", event.target.value)} />
-                  <TextField label="Šablon naziva fajla" value={form.filename_pattern} onChange={(event) => update("filename_pattern", event.target.value)} />
+                  <TextField
+                    label="Maksimalna veličina fajla (MB)"
+                    value={form.maximum_mb}
+                    onChange={(event) =>
+                      update("maximum_mb", event.target.value)
+                    }
+                  />
+                  <TextField
+                    label="Šablon naziva fajla"
+                    value={form.filename_pattern}
+                    onChange={(event) =>
+                      update("filename_pattern", event.target.value)
+                    }
+                  />
                   <Button component="label" variant="outlined">
                     {probeFile ? probeFile.name : "Izaberi probni fajl"}
                     <input
@@ -1473,7 +2049,8 @@ export function SourcesPage() {
                     />
                   </Button>
                   <Typography variant="caption" color="text.secondary">
-                    Probni fajl se analizira u memoriji i ne pokreće Acquisition.
+                    Probni fajl se analizira u memoriji i ne pokreće
+                    Acquisition.
                   </Typography>
                 </>
               )}
@@ -1483,29 +2060,64 @@ export function SourcesPage() {
                   <Stack gap={2}>
                     {["HTTP", "API", "PORTAL"].includes(form.method) && (
                       <>
-                        <TextField select label="Metod" value={form.http_method} onChange={(event) => update("http_method", event.target.value)}>
-                          <MenuItem value="GET">GET</MenuItem><MenuItem value="POST">POST</MenuItem>
+                        <TextField
+                          select
+                          label="Metod"
+                          value={form.http_method}
+                          onChange={(event) =>
+                            update("http_method", event.target.value)
+                          }
+                        >
+                          <MenuItem value="GET">GET</MenuItem>
+                          <MenuItem value="POST">POST</MenuItem>
                         </TextField>
-                        <TextField multiline minRows={2} label="Javni parametri" value={form.public_query} helperText="Jedan parametar po redu: naziv=vrednost. Ne unosite lozinke." onChange={(event) => update("public_query", event.target.value)} />
-                        <TextField multiline minRows={2} label="Javna zaglavlja" value={form.public_headers} helperText="Jedno zaglavlje po redu: naziv=vrednost." onChange={(event) => update("public_headers", event.target.value)} />
+                        <TextField
+                          multiline
+                          minRows={2}
+                          label="Javni parametri"
+                          value={form.public_query}
+                          helperText="Jedan parametar po redu: naziv=vrednost. Ne unosite lozinke."
+                          onChange={(event) =>
+                            update("public_query", event.target.value)
+                          }
+                        />
+                        <TextField
+                          multiline
+                          minRows={2}
+                          label="Javna zaglavlja"
+                          value={form.public_headers}
+                          helperText="Jedno zaglavlje po redu: naziv=vrednost."
+                          onChange={(event) =>
+                            update("public_headers", event.target.value)
+                          }
+                        />
                         {form.method === "PORTAL" && (
                           <Paper variant="outlined" sx={{ p: 2 }}>
                             <Typography fontWeight={700} mb={0.5}>
                               Tehnički nazivi login polja
                             </Typography>
-                            <Typography variant="body2" color="text.secondary" mb={2}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              mb={2}
+                            >
                               Ovo nisu dodatni pristupni podaci. Menjaju se samo
                               kada portal koristi drugačije HTML nazive polja.
                               Za EPI Computers unesite „user“ i „pass“.
                             </Typography>
-                            <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                            <Stack
+                              direction={{ xs: "column", sm: "row" }}
+                              gap={2}
+                            >
                               <TextField
                                 fullWidth
                                 label="HTML polje korisničkog imena"
                                 required
                                 value={form.username_field}
                                 helperText="Najčešće: username ili user."
-                                onChange={(event) => update("username_field", event.target.value)}
+                                onChange={(event) =>
+                                  update("username_field", event.target.value)
+                                }
                               />
                               <TextField
                                 fullWidth
@@ -1513,7 +2125,9 @@ export function SourcesPage() {
                                 required
                                 value={form.password_field}
                                 helperText="Najčešće: password ili pass."
-                                onChange={(event) => update("password_field", event.target.value)}
+                                onChange={(event) =>
+                                  update("password_field", event.target.value)
+                                }
                               />
                             </Stack>
                             <Stack gap={2} mt={2}>
@@ -1521,7 +2135,9 @@ export function SourcesPage() {
                                 label="URL za slanje prijave (opciono)"
                                 value={form.login_submit_url}
                                 helperText="Ostavite prazno da sistem automatski koristi action iz login forme."
-                                onChange={(event) => update("login_submit_url", event.target.value)}
+                                onChange={(event) =>
+                                  update("login_submit_url", event.target.value)
+                                }
                               />
                               <TextField
                                 multiline
@@ -1529,29 +2145,59 @@ export function SourcesPage() {
                                 label="Dodatna javna polja login forme"
                                 value={form.login_form_fields}
                                 helperText="Samo netajna polja, jedno po redu: naziv=vrednost. Hidden/CSRF polja sistem preuzima automatski."
-                                onChange={(event) => update("login_form_fields", event.target.value)}
+                                onChange={(event) =>
+                                  update(
+                                    "login_form_fields",
+                                    event.target.value,
+                                  )
+                                }
                               />
                             </Stack>
                           </Paper>
                         )}
                       </>
                     )}
-                    <TextField label="Maksimalno čekanje (sekunde)" value={form.timeout} onChange={(event) => update("timeout", event.target.value)} />
-                    <FormControlLabel control={<Checkbox checked={form.verify_tls} onChange={(event) => update("verify_tls", event.target.checked)} />} label="Proveri bezbednosni sertifikat" />
+                    <TextField
+                      label="Maksimalno čekanje (sekunde)"
+                      value={form.timeout}
+                      onChange={(event) =>
+                        update("timeout", event.target.value)
+                      }
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={form.verify_tls}
+                          onChange={(event) =>
+                            update("verify_tls", event.target.checked)
+                          }
+                        />
+                      }
+                      label="Proveri bezbednosni sertifikat"
+                    />
                   </Stack>
                 </AccordionDetails>
               </Accordion>
-              <TextField multiline minRows={2} label="Opis" value={form.description} onChange={(event) => update("description", event.target.value)} />
+              <TextField
+                multiline
+                minRows={2}
+                label="Opis"
+                value={form.description}
+                onChange={(event) => update("description", event.target.value)}
+              />
               {!networkSupported && form.method !== "MANUAL_UPLOAD" && (
                 <Alert severity="info">
-                  Automatsko preuzimanje za ovaj tip izvora biće dostupno u narednoj fazi razvoja. Podešavanja možete sačuvati kao nacrt.
+                  Automatsko preuzimanje za ovaj tip izvora biće dostupno u
+                  narednoj fazi razvoja. Podešavanja možete sačuvati kao nacrt.
                 </Alert>
               )}
             </Stack>
           )}
           {step === 2 && probe && (
             <Stack gap={2}>
-              <Alert severity={probe.successful ? "success" : "error"}>{probe.message}</Alert>
+              <Alert severity={probe.successful ? "success" : "error"}>
+                {probe.message}
+              </Alert>
               <Grid container spacing={1}>
                 {probe.steps.map((item) => (
                   <Grid item xs={12} sm={6} key={item.label}>
@@ -1566,12 +2212,20 @@ export function SourcesPage() {
                   </Grid>
                 ))}
               </Grid>
-              <Typography>Format: {probe.detected_format ?? "nije prepoznat"}</Typography>
-              <Typography>Veličina: {probe.size_bytes.toLocaleString("sr-RS")} bajtova</Typography>
-              <Typography>Pronađeni zapisi: {probe.approximate_record_count ?? "—"}</Typography>
+              <Typography>
+                Format: {probe.detected_format ?? "nije prepoznat"}
+              </Typography>
+              <Typography>
+                Veličina: {probe.size_bytes.toLocaleString("sr-RS")} bajtova
+              </Typography>
+              <Typography>
+                Pronađeni zapisi: {probe.approximate_record_count ?? "—"}
+              </Typography>
               {probe.preview.length > 0 && (
                 <Box sx={{ overflowX: "auto" }}>
-                  <Typography variant="h6" mb={1}>Pregled prvih zapisa</Typography>
+                  <Typography variant="h6" mb={1}>
+                    Pregled prvih zapisa
+                  </Typography>
                   <Stack gap={1}>
                     {probe.preview.map((row, index) => (
                       <Paper key={index} variant="outlined" sx={{ p: 1.5 }}>
@@ -1581,7 +2235,10 @@ export function SourcesPage() {
                         <Grid container spacing={1} mt={0.25}>
                           {Object.entries(row).map(([key, value]) => (
                             <Grid item xs={12} sm={6} md={4} key={key}>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
                                 {key}
                               </Typography>
                               <Typography sx={{ overflowWrap: "anywhere" }}>
@@ -1598,8 +2255,12 @@ export function SourcesPage() {
               <Accordion>
                 <AccordionSummary>Tehnički detalji</AccordionSummary>
                 <AccordionDetails>
-                  <Typography>HTTP status: {probe.http_status ?? "—"}</Typography>
-                  <Typography>Content type: {probe.content_type ?? "—"}</Typography>
+                  <Typography>
+                    HTTP status: {probe.http_status ?? "—"}
+                  </Typography>
+                  <Typography>
+                    Content type: {probe.content_type ?? "—"}
+                  </Typography>
                   <Typography>Trajanje: {probe.duration_ms} ms</Typography>
                   <Typography>Checksum: {probe.checksum ?? "—"}</Typography>
                 </AccordionDetails>
@@ -1608,17 +2269,29 @@ export function SourcesPage() {
           )}
           {step === 3 && (
             <Alert severity="success">
-              Konekcija je aktivna. Sledeći koraci su podešavanje Schema i Mapping profila.
+              Konekcija je aktivna. Sledeći koraci su podešavanje Schema i
+              Mapping profila.
             </Alert>
           )}
         </DialogContent>
         <Divider />
         <DialogActions>
           <Button onClick={() => setWizardOpen(false)}>Zatvori</Button>
-          {step === 0 && <Button variant="contained" onClick={() => setStep(1)}>Nastavi</Button>}
+          {step === 0 && (
+            <Button variant="contained" onClick={() => setStep(1)}>
+              Nastavi
+            </Button>
+          )}
           {step === 1 && (
             <>
-              <Button onClick={() => saveDraft.mutate()} disabled={!form.name.trim() || !portalReady || saveDraft.isPending}>Sačuvaj kao nacrt</Button>
+              <Button
+                onClick={() => saveDraft.mutate()}
+                disabled={
+                  !form.name.trim() || !portalReady || saveDraft.isPending
+                }
+              >
+                Sačuvaj kao nacrt
+              </Button>
               {networkSupported || form.method === "MANUAL_UPLOAD" ? (
                 <Button
                   variant="contained"
@@ -1632,96 +2305,210 @@ export function SourcesPage() {
                     (form.method === "MANUAL_UPLOAD" && !probeFile)
                   }
                 >
-                  {form.method === "MANUAL_UPLOAD" ? "Probno učitaj fajl" : "Probno preuzmi cenovnik"}
+                  {form.method === "MANUAL_UPLOAD"
+                    ? "Probno učitaj fajl"
+                    : "Probno preuzmi cenovnik"}
                 </Button>
               ) : (
-                <Button variant="contained" onClick={() => saveDraft.mutate()} disabled={!form.name.trim()}>Sačuvaj nacrt</Button>
+                <Button
+                  variant="contained"
+                  onClick={() => saveDraft.mutate()}
+                  disabled={!form.name.trim()}
+                >
+                  Sačuvaj nacrt
+                </Button>
               )}
             </>
           )}
           {step === 2 && draft && (
-            <Button variant="contained" disabled={!probe?.successful || activate.isPending} onClick={() => activate.mutate(draft)}>
+            <Button
+              variant="contained"
+              disabled={!probe?.successful || activate.isPending}
+              onClick={() => activate.mutate(draft)}
+            >
               Aktiviraj konekciju
             </Button>
           )}
         </DialogActions>
       </Dialog>
-      <Dialog open={credentialsOpen} onClose={() => setCredentialsOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={credentialsOpen}
+        onClose={() => setCredentialsOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Promeni pristupne podatke</DialogTitle>
         <DialogContent>
           <Stack gap={2} mt={1}>
-            <TextField select label="Način prijave" value={form.authentication_type} onChange={(event) => selectAuthenticationType(event.target.value)}>
+            <TextField
+              select
+              label="Način prijave"
+              value={form.authentication_type}
+              onChange={(event) => selectAuthenticationType(event.target.value)}
+            >
               <MenuItem value="BASIC">Korisničko ime i lozinka</MenuItem>
               <MenuItem value="BEARER">Bearer token</MenuItem>
               <MenuItem value="API_KEY">API ključ</MenuItem>
-              <MenuItem value="CLIENT_CERTIFICATE">Klijentski sertifikat (mTLS)</MenuItem>
+              <MenuItem value="CLIENT_CERTIFICATE">
+                Klijentski sertifikat (mTLS)
+              </MenuItem>
               <MenuItem value="SOAP_BODY">SOAP servis (CT / PIN-ALSO)</MenuItem>
             </TextField>
-            {form.integration_profile !== "ASBIS_IT4PROFIT" && !(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && <TextField select label="Gde dobavljač očekuje pristupne podatke" value={form.placement} onChange={(event) => update("placement", event.target.value)}>
-              <MenuItem value="HEADER">Bezbednosno zaglavlje</MenuItem>
-              <MenuItem value="QUERY">Parametri adrese</MenuItem>
-            </TextField>}
+            {form.integration_profile !== "ASBIS_IT4PROFIT" &&
+              !["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(
+                form.authentication_type,
+              ) && (
+                <TextField
+                  select
+                  label="Gde dobavljač očekuje pristupne podatke"
+                  value={form.placement}
+                  onChange={(event) => update("placement", event.target.value)}
+                >
+                  <MenuItem value="HEADER">Bezbednosno zaglavlje</MenuItem>
+                  <MenuItem value="QUERY">Parametri adrese</MenuItem>
+                </TextField>
+              )}
             {form.integration_profile === "ASBIS_IT4PROFIT" && (
-              <Alert severity="info">ASBIS API koristi fiksne URL parametre USERNAME i PASSWORD.</Alert>
+              <Alert severity="info">
+                ASBIS API koristi fiksne URL parametre USERNAME i PASSWORD.
+              </Alert>
             )}
             {(form.authentication_type === "BASIC" ||
               (form.authentication_type === "SOAP_BODY" &&
                 form.integration_profile === "CT_SOAP")) && (
               <>
-                <TextField label="Korisničko ime" value={form.username} onChange={(event) => update("username", event.target.value)} />
-                <TextField type="password" label="Lozinka" value={form.password} onChange={(event) => update("password", event.target.value)} />
+                <TextField
+                  label="Korisničko ime"
+                  value={form.username}
+                  onChange={(event) => update("username", event.target.value)}
+                />
+                <TextField
+                  type="password"
+                  label="Lozinka"
+                  value={form.password}
+                  onChange={(event) => update("password", event.target.value)}
+                />
               </>
             )}
             {form.authentication_type === "BEARER" && (
-              <TextField type="password" label="Token" value={form.token} onChange={(event) => update("token", event.target.value)} />
+              <TextField
+                type="password"
+                label="Token"
+                value={form.token}
+                onChange={(event) => update("token", event.target.value)}
+              />
             )}
             {form.authentication_type === "API_KEY" && (
-              <TextField type="password" label="API ključ" value={form.api_key} onChange={(event) => update("api_key", event.target.value)} />
+              <TextField
+                type="password"
+                label="API ključ"
+                value={form.api_key}
+                onChange={(event) => update("api_key", event.target.value)}
+              />
             )}
             {form.integration_profile === "ASBIS_IT4PROFIT" && (
               <>
-                <Alert severity="info">API i email lozinke čuvaju se zajedno u postojećem zaštićenom fajlu, van baze.</Alert>
-                <TextField label="IMAP korisničko ime" value={form.imap_username} onChange={(event) => update("imap_username", event.target.value)} />
-                <TextField type="password" label="IMAP lozinka" value={form.imap_password} onChange={(event) => update("imap_password", event.target.value)} />
-              </>
-            )}
-            {form.authentication_type === "SOAP_BODY" && form.integration_profile === "PIN_SOAP" && (
-              <>
-                <TextField type="password" label="Klijentski kod (GUID)" value={form.api_key} onChange={(event) => update("api_key", event.target.value)} />
-                <TextField label="Shop ID" value={form.pin_shop_id} onChange={(event) => update("pin_shop_id", event.target.value)} helperText="Podrazumevana vrednost je 4." />
-              </>
-            )}
-            {!(["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(form.authentication_type)) && form.placement === "QUERY" && (
-              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                <Alert severity="info">
+                  API i email lozinke čuvaju se zajedno u postojećem zaštićenom
+                  fajlu, van baze.
+                </Alert>
                 <TextField
-                  fullWidth
-                  label="Naziv parametra korisničkog imena"
-                  value={form.username_parameter}
-                  onChange={(event) => update("username_parameter", event.target.value)}
+                  label="IMAP korisničko ime"
+                  value={form.imap_username}
+                  onChange={(event) =>
+                    update("imap_username", event.target.value)
+                  }
                 />
                 <TextField
-                  fullWidth
-                  label="Naziv parametra lozinke"
-                  value={form.password_parameter}
-                  onChange={(event) => update("password_parameter", event.target.value)}
+                  type="password"
+                  label="IMAP lozinka"
+                  value={form.imap_password}
+                  onChange={(event) =>
+                    update("imap_password", event.target.value)
+                  }
                 />
-              </Stack>
+              </>
             )}
+            {form.authentication_type === "SOAP_BODY" &&
+              form.integration_profile === "PIN_SOAP" && (
+                <>
+                  <TextField
+                    type="password"
+                    label="Klijentski kod (GUID)"
+                    value={form.api_key}
+                    onChange={(event) => update("api_key", event.target.value)}
+                  />
+                  <TextField
+                    label="Shop ID"
+                    value={form.pin_shop_id}
+                    onChange={(event) =>
+                      update("pin_shop_id", event.target.value)
+                    }
+                    helperText="Podrazumevana vrednost je 4."
+                  />
+                </>
+              )}
+            {!["CLIENT_CERTIFICATE", "SOAP_BODY"].includes(
+              form.authentication_type,
+            ) &&
+              form.placement === "QUERY" && (
+                <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                  <TextField
+                    fullWidth
+                    label="Naziv parametra korisničkog imena"
+                    value={form.username_parameter}
+                    onChange={(event) =>
+                      update("username_parameter", event.target.value)
+                    }
+                  />
+                  <TextField
+                    fullWidth
+                    label="Naziv parametra lozinke"
+                    value={form.password_parameter}
+                    onChange={(event) =>
+                      update("password_parameter", event.target.value)
+                    }
+                  />
+                </Stack>
+              )}
             {form.authentication_type === "CLIENT_CERTIFICATE" && (
               <>
-                <Alert severity="info">Novi sertifikat će zameniti postojeći tek nakon uspešne provere fajla i lozinke.</Alert>
+                <Alert severity="info">
+                  Novi sertifikat će zameniti postojeći tek nakon uspešne
+                  provere fajla i lozinke.
+                </Alert>
                 <Button component="label" variant="outlined">
-                  {certificateFile ? certificateFile.name : "Izaberi novi .p12 / .pfx sertifikat"}
-                  <input hidden type="file" accept=".p12,.pfx,application/x-pkcs12" onChange={(event) => setCertificateFile(event.target.files?.[0] ?? null)} />
+                  {certificateFile
+                    ? certificateFile.name
+                    : "Izaberi novi .p12 / .pfx sertifikat"}
+                  <input
+                    hidden
+                    type="file"
+                    accept=".p12,.pfx,application/x-pkcs12"
+                    onChange={(event) =>
+                      setCertificateFile(event.target.files?.[0] ?? null)
+                    }
+                  />
                 </Button>
-                <TextField type="password" label="Lozinka sertifikata" value={form.certificate_password} onChange={(event) => update("certificate_password", event.target.value)} />
+                <TextField
+                  type="password"
+                  label="Lozinka sertifikata"
+                  value={form.certificate_password}
+                  onChange={(event) =>
+                    update("certificate_password", event.target.value)
+                  }
+                />
               </>
             )}
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCredentialsOpen(false)}>Otkaži</Button>
-          <Button variant="contained" onClick={() => changeCredentials.mutate()} disabled={changeCredentials.isPending}>
+          <Button
+            variant="contained"
+            onClick={() => changeCredentials.mutate()}
+            disabled={changeCredentials.isPending}
+          >
             Sačuvaj pristupne podatke
           </Button>
         </DialogActions>

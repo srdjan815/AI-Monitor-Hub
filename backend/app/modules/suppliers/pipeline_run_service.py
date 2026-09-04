@@ -53,7 +53,7 @@ class SupplierPipelineRunService:
             trigger_type=trigger,
             automation_depth=automation_depth,
             status="PENDING",
-            current_phase="FETCH",
+            current_phase="CURRENCY_RATE",
             phase_results={},
             idempotency_key=idempotency_key,
             schedule_occurrence_at=schedule_occurrence_at,

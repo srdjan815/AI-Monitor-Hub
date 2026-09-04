@@ -90,6 +90,7 @@ class SupplierSourceService(SupplierSourceServiceSupport):
             configuration=configuration,
             secret_reference=data.secret_reference,
             description=self._optional(data.description),
+            portal_supplier_code=self._optional(data.portal_supplier_code),
         )
         try:
             await self.repository.create_source(source)
@@ -206,7 +207,11 @@ class SupplierSourceService(SupplierSourceServiceSupport):
         if source is None:
             supplier_error(404, "supplier_source_not_found", "Konekcija nije pronađena")
         if not source.is_active:
-            supplier_error(409, "supplier_source_inactive", "Arhivirana konekcija se ne može menjati")
+            supplier_error(
+                409,
+                "supplier_source_inactive",
+                "Arhivirana konekcija se ne može menjati",
+            )
         prefix = {
             "QUERY": "query:",
             "PORTAL_FORM": "portal:",

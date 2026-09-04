@@ -28,9 +28,26 @@ class SupplierPipelineIncidentService:
             "pipeline_worker_dead_letter": "PIPELINE_WORKER_FAILED",
             "pipeline_worker_execution_failed": "PIPELINE_WORKER_FAILED",
             "pipeline_worker_terminal_mismatch": "PIPELINE_STATE_RECOVERED",
+            "KURS_NEDOSTAJE": "PIPELINE_CURRENCY_RATE_BLOCKED",
+            "KURS_ZASTAREO": "PIPELINE_CURRENCY_RATE_BLOCKED",
+            "KURS_SUMNJIVA_PROMENA": "PIPELINE_CURRENCY_RATE_BLOCKED",
+            "IZVOR_KURSA_NEDOSTUPAN": "PIPELINE_CURRENCY_SOURCE_UNAVAILABLE",
+            "KONFIGURACIJA_KURSA_NEISPRAVNA": "PIPELINE_CONFIGURATION_MISSING",
         }
         incident_type = incident_types.get(code, "PIPELINE_EXECUTION_FAILED")
-        severity = "HIGH" if code == "acquisition_http_failed" else "MEDIUM"
+        severity = (
+            "HIGH"
+            if code
+            in {
+                "acquisition_http_failed",
+                "KURS_NEDOSTAJE",
+                "KURS_ZASTAREO",
+                "KURS_SUMNJIVA_PROMENA",
+                "IZVOR_KURSA_NEDOSTUPAN",
+                "KONFIGURACIJA_KURSA_NEISPRAVNA",
+            }
+            else "MEDIUM"
+        )
         priority = "P2" if severity == "HIGH" else "P3"
         try:
             await self.support.create_or_occurrence(
@@ -105,6 +122,14 @@ class SupplierPipelineIncidentService:
 
     @staticmethod
     def _recommended_action(code: str) -> str:
+        if code in {"KURS_NEDOSTAJE", "KURS_ZASTAREO"}:
+            return "Unesite ili osvežite kurs dobavljača pre ponovnog pokretanja."
+        if code == "KURS_SUMNJIVA_PROMENA":
+            return "Ručno proverite promenu kursa veću od 20% pre nastavka."
+        if code == "IZVOR_KURSA_NEDOSTUPAN":
+            return "Proverite adresu i dostupnost izvora kursa, zatim ponovite obradu."
+        if code == "KONFIGURACIJA_KURSA_NEISPRAVNA":
+            return "Povežite valutu sa istom aktivnom konekcijom kao cenovnik."
         if code == "pipeline_active_contract_missing":
             return "Aktivirajte analizu i mapiranje, pa ponovo pokrenite pipeline."
         if code == "pipeline_schema_incompatible":

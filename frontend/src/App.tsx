@@ -26,6 +26,9 @@ const IncidentsPage = lazy(() =>
 const ArticleReviewsPage = lazy(() =>
   import("./pages/ArticleReviewsPage").then((module) => ({ default: module.ArticleReviewsPage }))
 );
+const SupplierCurrenciesPage = lazy(() =>
+  import("./pages/SupplierCurrenciesPage").then((module) => ({ default: module.SupplierCurrenciesPage }))
+);
 const ArchivePage = lazy(() =>
   import("./pages/ArchivePage").then((module) => ({ default: module.ArchivePage }))
 );
@@ -74,6 +77,7 @@ function ProtectedRoutes() {
         />
         <Route path="/incidents" element={protectedPage("/incidents", <IncidentsPage />)} />
         <Route path="/article-reviews" element={protectedPage("/article-reviews", <ArticleReviewsPage />)} />
+        <Route path="/supplier-currencies" element={protectedPage("/supplier-currencies", <SupplierCurrenciesPage />)} />
         <Route path="/archive" element={protectedPage("/archive", <ArchivePage />)} />
         <Route path="/administration" element={protectedPage("/administration", <AdministrationPage />)} />
         <Route path="/automation" element={protectedPage("/automation", <AutomationPage />)} />
