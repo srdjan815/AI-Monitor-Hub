@@ -9,23 +9,23 @@ import {
   LinkRounded,
   ScheduleRounded,
 } from "@mui/icons-material";
-import { Alert, Button, FormControlLabel, Paper, Stack, Switch, Tooltip, Typography } from "@mui/material";
+import { Button, FormControlLabel, Stack, Switch, Tooltip, Typography } from "@mui/material";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 import { supplierApi } from "../api/supplierApi";
 import { DetailDrawer } from "../components/DetailDrawer";
-import { EntityTable, type Column } from "../components/EntityTable";
+import { EntityTable } from "../components/EntityTable";
 import { PageHeader } from "../components/PageHeader";
-import { StatusChip } from "../components/StatusChip";
 import { WorkspaceSelector } from "../components/WorkspaceSelector";
 import { useAuth } from "../state/AuthContext";
 import { useWorkspace } from "../state/WorkspaceContext";
 import type { ApiError, Operation, Source, SourceProbeResult } from "../types";
 
-import { DetailRow, DetailSection } from "./sources/SourceDetails";
 import { SourceCredentialsDialog } from "./sources/SourceCredentialsDialog";
 import { SourceWizardDialog } from "./sources/SourceWizardDialog";
-import { detailValue, displayFormat, displayMethod, formatDate } from "./sources/sourceDisplay";
+import { useSourceColumns } from "./sources/useSourceColumns";
+import { displayFormat, displayMethod } from "./sources/sourceDisplay";
+import { SourceDiagnosticDetails } from "./sources/SourceDiagnosticDetails";
 import { initialForm, isCertificateReady, isPortalReady, sourcePayload, withAuthenticationType, withIntegrationProfile, withSoapProfile, type ConnectionForm } from "./sources/sourceForm";
 
 export function SourcesPage() {
@@ -401,65 +401,7 @@ export function SourcesPage() {
     },
     onError: (error: ApiError) => toast.error(error.message),
   });
-  const columns = useMemo<Column<Source>[]>(
-    () => [
-      {
-        key: "supplier",
-        label: "Dobavljač",
-        tooltip: "Dobavljač kome konekcija pripada.",
-        render: (row) => supplierNames.get(row.supplier_id) ?? row.supplier_id,
-        csv: (row) => supplierNames.get(row.supplier_id) ?? row.supplier_id,
-      },
-      {
-        key: "name",
-        label: "Konekcija",
-        tooltip: "Naziv načina na koji dobavljač isporučuje cenovnik.",
-        render: (row) => <Typography fontWeight={650}>{row.name}</Typography>,
-        csv: (row) => row.name,
-      },
-      {
-        key: "source_type",
-        label: "Način preuzimanja",
-        tooltip: "Kanal kojim cenovnik dolazi u sistem.",
-        render: displayMethod,
-        csv: displayMethod,
-      },
-      {
-        key: "format",
-        label: "Format",
-        tooltip: "Očekivani format dobavljačkog cenovnika.",
-        render: displayFormat,
-        csv: displayFormat,
-      },
-      {
-        key: "status",
-        label: "Status",
-        tooltip: "Nacrt, aktivna konekcija ili arhiviran zapis.",
-        render: (row) => (
-          <StatusChip value={row.is_active ? row.status : "ARCHIVED"} />
-        ),
-        csv: (row) => row.status,
-      },
-      {
-        key: "validation",
-        label: "Poslednji test",
-        tooltip: "Rezultat poslednjeg probnog preuzimanja.",
-        render: (row) => (
-          <StatusChip
-            value={
-              row.last_validation_status === "VALID"
-                ? "READY"
-                : row.last_validation_status === "INVALID"
-                  ? "FAILED"
-                  : "PENDING"
-            }
-          />
-        ),
-        csv: (row) => row.last_validation_status,
-      },
-    ],
-    [supplierNames],
-  );
+  const columns = useSourceColumns(supplierNames);
 
   const update = (key: keyof ConnectionForm, value: string | boolean) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -714,253 +656,16 @@ export function SourcesPage() {
         }
       >
         {opened && (
-          <Stack gap={2}>
-            <Alert
-              severity={
-                opened.has_secret_reference && !opened.credentials_available
-                  ? "warning"
-                  : opened.last_validation_status === "VALID"
-                    ? "success"
-                    : "info"
-              }
-            >
-              {opened.has_secret_reference && !opened.credentials_available
-                ? "Pristupni podaci više nisu dostupni. Unesite ih ponovo i ponovite probu."
-                : opened.last_validation_message?.replace(
-                    /^PROBE_(?:OK|FAILED): /,
-                    "",
-                  ) || "Konekcija još nije probno preuzela cenovnik."}
-            </Alert>
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="h6">Administrativni pregled</Typography>
-              <Typography color="text.secondary" mt={0.5}>
-                Centralna dijagnostika toka od konekcije do Delta obrade.
-              </Typography>
-            </Paper>
-            <DetailSection title="Connection">
-              <DetailRow
-                label="Status"
-                value={
-                  <StatusChip
-                    value={opened.is_active ? opened.status : "ARCHIVED"}
-                  />
-                }
-              />
-              <DetailRow label="Tip konekcije" value={displayMethod(opened)} />
-              <DetailRow label="Format" value={displayFormat(opened)} />
-            </DetailSection>
-            <DetailSection title="Automatski raspored">
-              <DetailRow
-                label="Status"
-                value={
-                  <StatusChip value={sourceSchedule.data?.status ?? "MANUAL"} />
-                }
-              />
-              <DetailRow
-                label="Sledeće pokretanje"
-                value={formatDate(sourceSchedule.data?.next_run_at)}
-              />
-              <DetailRow
-                label="Poslednje pokretanje"
-                value={formatDate(sourceSchedule.data?.last_run_at)}
-              />
-              <DetailRow
-                label="Poslednji rezultat"
-                value={sourceSchedule.data?.last_result ?? "Još nije izvršeno"}
-              />
-              <DetailRow
-                label="Uzastopne greške"
-                value={sourceSchedule.data?.consecutive_failures ?? 0}
-              />
-            </DetailSection>
-            <DetailSection title="Last Probe">
-              <DetailRow
-                label="Datum"
-                value={formatDate(opened.last_validation_at)}
-              />
-              <DetailRow
-                label="Trajanje"
-                value={
-                  openedProbe
-                    ? `${openedProbe.duration_ms} ms`
-                    : "Detalji probe-a nisu trajno sačuvani."
-                }
-              />
-              <DetailRow
-                label="HTTP status"
-                value={detailValue(
-                  openedProbe?.http_status,
-                  "HTTP status nije trajno sačuvan.",
-                )}
-              />
-              <DetailRow
-                label="Veličina odgovora"
-                value={
-                  openedProbe
-                    ? `${openedProbe.size_bytes.toLocaleString("sr-RS")} B`
-                    : "Veličina nije trajno sačuvana."
-                }
-              />
-              <DetailRow
-                label="XML validan"
-                value={
-                  openedProbe?.detected_format === "XML"
-                    ? openedProbe.successful
-                      ? "DA"
-                      : "NE"
-                    : openedProbe
-                      ? "Nije XML format."
-                      : "Rezultat formata nije trajno sačuvan."
-                }
-              />
-            </DetailSection>
-            <DetailSection title="Last Import">
-              <DetailRow
-                label="Broj proizvoda"
-                value={detailValue(
-                  acquisition?.accepted_record_count,
-                  "Uspešan import još ne postoji.",
-                )}
-              />
-              <DetailRow
-                label="Broj kategorija"
-                value="Acquisition ne beleži ovu metriku."
-              />
-              <DetailRow
-                label="Broj slika"
-                value="Acquisition ne beleži ovu metriku."
-              />
-              <DetailRow
-                label="Broj opisa"
-                value="Acquisition ne beleži ovu metriku."
-              />
-              <DetailRow
-                label="Encoding"
-                value="Encoding nije deo postojećeg Acquisition DTO-a."
-              />
-            </DetailSection>
-            <DetailSection title="Schema">
-              <DetailRow label="Postoji" value={schema ? "DA" : "NE"} />
-              {schema ? (
-                <>
-                  <DetailRow
-                    label="Schema ID"
-                    value={String(schema.schema_code ?? schema.id)}
-                  />
-                  <DetailRow
-                    label="Verzija"
-                    value={detailValue(schema.version_number, "Nije dostupna.")}
-                  />
-                  <DetailRow
-                    label="Status"
-                    value={<StatusChip value={String(schema.status)} />}
-                  />
-                  <DetailRow
-                    label="Field count"
-                    value={detailValue(
-                      schema.field_count,
-                      "Schema postoji ali nije analizirana.",
-                    )}
-                  />
-                  <DetailRow
-                    label="Poslednja analiza"
-                    value={formatDate(schema.updated_at)}
-                  />
-                  {Number(schema.field_count ?? 0) === 0 && (
-                    <Alert severity="warning">
-                      Schema postoji ali nije analizirana.
-                    </Alert>
-                  )}
-                </>
-              ) : (
-                <Alert severity="info">Schema nije kreirana.</Alert>
-              )}
-            </DetailSection>
-            <DetailSection title="Mapping">
-              <DetailRow label="Postoji" value={mapping ? "DA" : "NE"} />
-              {mapping ? (
-                <>
-                  <DetailRow
-                    label="Mapping ID"
-                    value={String(mapping.mapping_code ?? mapping.id)}
-                  />
-                  <DetailRow
-                    label="Status"
-                    value={<StatusChip value={String(mapping.status)} />}
-                  />
-                </>
-              ) : (
-                <Alert severity="info">
-                  {schema
-                    ? "Mapping nije napravljen."
-                    : "Mapping nije moguć dok Schema nije kreirana."}
-                </Alert>
-              )}
-            </DetailSection>
-            <DetailSection title="Acquisition">
-              <DetailRow label="Postoji" value={acquisition ? "DA" : "NE"} />
-              {acquisition ? (
-                <DetailRow
-                  label="Status"
-                  value={<StatusChip value={String(acquisition.status)} />}
-                />
-              ) : (
-                <Alert severity="info">
-                  {!schema
-                    ? "Acquisition nije moguć dok Schema nije kreirana."
-                    : !mapping
-                      ? "Acquisition nije moguć dok Mapping nije napravljen."
-                      : "Acquisition još nije pokrenut."}
-                </Alert>
-              )}
-            </DetailSection>
-            <DetailSection title="Snapshot">
-              {snapshot ? (
-                <>
-                  <DetailRow
-                    label="Snapshot ID"
-                    value={String(snapshot.snapshot_code ?? snapshot.id)}
-                  />
-                  <DetailRow
-                    label="Datum"
-                    value={formatDate(
-                      snapshot.finalized_at ?? snapshot.created_at,
-                    )}
-                  />
-                </>
-              ) : (
-                <Alert severity="info">
-                  {acquisition
-                    ? "Snapshot još nije kreiran za obrađeni import."
-                    : "Snapshot ne postoji jer Acquisition nije završen."}
-                </Alert>
-              )}
-            </DetailSection>
-            <DetailSection title="Delta">
-              {delta ? (
-                <>
-                  <DetailRow
-                    label="Poslednji Delta Run"
-                    value={String(delta.delta_code ?? delta.id)}
-                  />
-                  <DetailRow
-                    label="Broj izmena"
-                    value={
-                      Number(delta.added_items ?? 0) +
-                      Number(delta.modified_items ?? 0) +
-                      Number(delta.removed_items ?? 0)
-                    }
-                  />
-                </>
-              ) : (
-                <Alert severity="info">
-                  {snapshot
-                    ? "Delta Run još nije pokrenut."
-                    : "Delta nije moguć dok Snapshot ne postoji."}
-                </Alert>
-              )}
-            </DetailSection>
-          </Stack>
+          <SourceDiagnosticDetails
+            opened={opened}
+            sourceSchedule={sourceSchedule.data ?? undefined}
+            openedProbe={openedProbe}
+            schema={schema}
+            mapping={mapping}
+            acquisition={acquisition}
+            snapshot={snapshot}
+            delta={delta}
+          />
         )}
       </DetailDrawer>
 
