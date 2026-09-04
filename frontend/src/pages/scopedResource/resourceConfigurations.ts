@@ -69,4 +69,3 @@ export const resourceConfigurations: Record<string, ResourceConfiguration> = {
     ]
   }
 };
-

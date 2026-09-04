@@ -54,7 +54,6 @@ export function suggestedTarget(name: string): string {
   ];
   return suggestions.find(([pattern]) => pattern.test(normalized))?.[1] ?? "";
 }
-
 export function initialSuggestions(fields: AnalysisField[]): Record<string, string> {
   const used = new Set<string>();
   const result: Record<string, string> = {};
@@ -106,4 +105,3 @@ export function loadAnalysis(): StoredAnalysis | null {
     return null;
   }
 }
-
