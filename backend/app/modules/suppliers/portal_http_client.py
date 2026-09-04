@@ -29,6 +29,7 @@ async def portal_request(
     query: dict[str, str],
     timeout_seconds: int,
     verify_tls: bool,
+    maximum_bytes: int | None = None,
 ) -> HttpResponse:
     return await asyncio.to_thread(
         _portal_request,
@@ -44,6 +45,7 @@ async def portal_request(
         query,
         timeout_seconds,
         verify_tls,
+        maximum_bytes,
     )
 
 
@@ -60,6 +62,7 @@ def _portal_request(
     query: dict[str, str],
     timeout_seconds: int,
     verify_tls: bool,
+    maximum_bytes: int | None,
 ) -> HttpResponse:
     context = ssl.create_default_context()
     if not verify_tls:
@@ -121,7 +124,7 @@ def _portal_request(
         ) as response:
             return HttpResponse(
                 status_code=response.status,
-                content=response.read(),
+                content=response.read(maximum_bytes + 1 if maximum_bytes else -1),
                 content_type=response.headers.get_content_type(),
                 filename=response.headers.get_filename(),
             )

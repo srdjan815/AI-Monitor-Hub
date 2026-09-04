@@ -38,7 +38,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-async def _validate_url(url: str) -> None:
+async def validate_rate_url(url: str) -> None:
     parsed = urllib.parse.urlsplit(url)
     if (
         parsed.scheme != "https"
@@ -64,6 +64,10 @@ async def _validate_url(url: str) -> None:
         raise CurrencyRateFetchError(
             "Privatne, lokalne i rezervisane mrežne adrese nisu dozvoljene"
         )
+
+
+# Internal compatibility alias for existing focused tests.
+_validate_url = validate_rate_url
 
 
 def _read_once(url: str, timeout: float) -> tuple[int, bytes, str, str | None]:
@@ -96,7 +100,7 @@ def _read_once(url: str, timeout: float) -> tuple[int, bytes, str, str | None]:
 async def fetch_rate_document(url: str, timeout: float = 10.0) -> FetchedDocument:
     current = url
     for redirect in range(MAX_REDIRECTS + 1):
-        await _validate_url(current)
+        await validate_rate_url(current)
         status, content, content_type, location = await asyncio.to_thread(
             _read_once, current, timeout
         )
@@ -119,4 +123,20 @@ async def fetch_rate_document(url: str, timeout: float = 10.0) -> FetchedDocumen
     raise CurrencyRateFetchError("Izvor nije moguće preuzeti")
 
 
-__all__ = ["CurrencyRateFetchError", "FetchedDocument", "fetch_rate_document"]
+def validated_document(content: bytes, content_type: str) -> FetchedDocument:
+    normalized_type = content_type.split(";", 1)[0].strip().lower()
+    if not any(normalized_type.startswith(value) for value in ALLOWED_TYPES):
+        raise CurrencyRateFetchError("Tip sadržaja izvora nije dozvoljen")
+    if len(content) > MAX_BYTES:
+        raise CurrencyRateFetchError("Odgovor izvora je veći od dozvoljene veličine")
+    return FetchedDocument(content, normalized_type, hashlib.sha256(content).hexdigest())
+
+
+__all__ = [
+    "CurrencyRateFetchError",
+    "FetchedDocument",
+    "MAX_BYTES",
+    "fetch_rate_document",
+    "validate_rate_url",
+    "validated_document",
+]

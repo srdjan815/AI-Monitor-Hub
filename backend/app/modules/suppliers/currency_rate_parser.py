@@ -18,6 +18,27 @@ class CurrencyRateParseError(ValueError):
 class ParsedRate:
     value: Decimal
     excerpt: str
+    method_used: str
+
+
+class _VisibleTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.hidden_depth = 0
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() in {"script", "style", "noscript"}:
+            self.hidden_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() in {"script", "style", "noscript"} and self.hidden_depth:
+            self.hidden_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        value = " ".join(data.split())
+        if not self.hidden_depth and value:
+            self.parts.append(value)
 
 
 class _SimpleSelectorParser(HTMLParser):
@@ -78,6 +99,8 @@ def _extract(content: str, method: str, expression: str) -> str:
         if method == "CSS_SELECTOR":
             parser = _SimpleSelectorParser(expression)
             parser.feed(content)
+            if not parser.parts:
+                raise CurrencyRateParseError("CSS selektor nije pronađen")
             return " ".join(parser.parts)
         if method == "XPATH":
             if ".." in expression or expression.startswith("/"):
@@ -91,6 +114,22 @@ def _extract(content: str, method: str, expression: str) -> str:
             if match is None:
                 raise CurrencyRateParseError("Obrazac nije pronađen")
             return match.group(1) if match.lastindex else match.group(0)
+        if method == "TEXT_LABEL":
+            text_parser = _VisibleTextParser()
+            text_parser.feed(content)
+            label = " ".join(expression.split()).rstrip(":").casefold()
+            candidates: list[str] = []
+            for index, part in enumerate(text_parser.parts):
+                normalized = part.rstrip(":").casefold()
+                if normalized == label and index + 1 < len(text_parser.parts):
+                    candidates.append(f"{part}: {text_parser.parts[index + 1]}")
+                elif normalized.startswith(f"{label}:"):
+                    candidates.append(part)
+            if len(candidates) != 1:
+                raise CurrencyRateParseError(
+                    "Tekstualna oznaka mora biti pronađena tačno jednom"
+                )
+            return candidates[0]
     except (
         json.JSONDecodeError,
         ElementTree.ParseError,
@@ -104,10 +143,22 @@ def _extract(content: str, method: str, expression: str) -> str:
 
 
 def parse_rate(
-    content: bytes, method: str, expression: str, separator: str
+    content: bytes,
+    method: str,
+    expression: str,
+    separator: str,
+    fallback_method: str | None = None,
+    fallback_expression: str | None = None,
 ) -> ParsedRate:
     text = content.decode("utf-8", errors="replace")
-    raw = " ".join(_extract(text, method, expression).split())
+    method_used = method
+    try:
+        raw = " ".join(_extract(text, method, expression).split())
+    except CurrencyRateParseError:
+        if not fallback_method or not fallback_expression:
+            raise
+        raw = " ".join(_extract(text, fallback_method, fallback_expression).split())
+        method_used = fallback_method
     match = regex.search(r"[-+]?\d(?:[\d.,\s]*\d)?", raw, timeout=0.05)
     if match is None:
         raise CurrencyRateParseError("Pronađena vrednost ne sadrži broj")
@@ -123,7 +174,7 @@ def parse_rate(
     exponent = cast(int, value.as_tuple().exponent)
     if max(0, -exponent) > 8:
         raise CurrencyRateParseError("Kurs može imati najviše osam decimala")
-    return ParsedRate(value=value, excerpt=raw[:1000])
+    return ParsedRate(value=value, excerpt=raw[:1000], method_used=method_used)
 
 
 __all__ = ["CurrencyRateParseError", "ParsedRate", "parse_rate"]

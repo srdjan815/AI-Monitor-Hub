@@ -16,10 +16,7 @@ from app.modules.suppliers.currency_models import (
     SupplierCurrencySetting,
     SupplierExchangeRate,
 )
-from app.modules.suppliers.currency_rate_http import (
-    CurrencyRateFetchError,
-    fetch_rate_document,
-)
+from app.modules.suppliers.currency_rate_http import CurrencyRateFetchError
 from app.modules.suppliers.currency_rate_parser import (
     CurrencyRateParseError,
     parse_rate,
@@ -28,6 +25,7 @@ from app.modules.suppliers.currency_schemas import (
     CurrencySourceTestRead,
     CurrencySourceTestRequest,
 )
+from app.modules.suppliers.currency_source_fetch import fetch_currency_document
 from app.modules.suppliers.errors import supplier_error
 from app.modules.suppliers.models import Supplier, SupplierSource
 
@@ -96,14 +94,16 @@ class SupplierCurrencyAutomationService:
             supplier_error(404, "supplier_not_found", "Dobavljač nije pronađen")
         try:
             source = await self._source(supplier_id, payload.source_connection_id)
-            document = await fetch_rate_document(
-                self._resolved_url(str(payload.source_url), source)
+            document = await fetch_currency_document(
+                source, self._resolved_url(str(payload.source_url), source)
             )
             parsed = parse_rate(
                 document.content,
                 payload.extraction_method,
                 payload.extraction_expression,
                 payload.decimal_separator,
+                payload.fallback_extraction_method,
+                payload.fallback_extraction_expression,
             )
         except (
             CurrencyPreflightError,
@@ -128,6 +128,7 @@ class SupplierCurrencyAutomationService:
             content_type=document.content_type,
             previous_rate=previous.rate_to_rsd if previous else None,
             difference_percent=difference,
+            extraction_method_used=parsed.method_used,
         )
 
     async def _source(
@@ -187,14 +188,16 @@ class SupplierCurrencyAutomationService:
         source = await self._source(supplier_id, setting.source_connection_id)
         checked_at = datetime.now(UTC)
         try:
-            document = await fetch_rate_document(
-                self._resolved_url(setting.automatic_source_url, source)
+            document = await fetch_currency_document(
+                source, self._resolved_url(setting.automatic_source_url, source)
             )
             parsed = parse_rate(
                 document.content,
                 setting.extraction_method,
                 setting.extraction_expression,
                 setting.decimal_separator,
+                setting.fallback_extraction_method,
+                setting.fallback_extraction_expression,
             )
             previous = await self._latest(setting.id, checked_at)
             if previous and not Decimal(
@@ -210,7 +213,10 @@ class SupplierCurrencyAutomationService:
                 evidence_checksum=document.checksum,
                 source_excerpt=parsed.excerpt,
                 source_content_type=document.content_type,
-                note=f"Automatski preuzeto sa {setting.automatic_source_url}",
+                note=(
+                    f"Automatski preuzeto sa {setting.automatic_source_url}; "
+                    f"metoda={parsed.method_used}"
+                ),
                 created_by="currency-scheduler",
             )
             self.session.add(rate)

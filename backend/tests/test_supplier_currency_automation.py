@@ -59,6 +59,35 @@ def test_parser_rejects_invalid_or_overprecise_rate() -> None:
         parse_rate(b'{"rate":"1.123456789"}', "JSON_PATH", "$.rate", ".")
 
 
+def test_text_label_selects_exact_business_rate() -> None:
+    content = b"""
+        <section><span>Kurs odlozeno:</span><strong>123.4</strong></section>
+        <section><span>Kurs avans:</span><strong>118.7</strong></section>
+    """
+    parsed = parse_rate(content, "TEXT_LABEL", "Kurs avans", ".")
+    assert parsed.value == Decimal("118.7")
+    assert parsed.method_used == "TEXT_LABEL"
+
+
+def test_text_label_rejects_ambiguous_matches() -> None:
+    content = b"<p>Kurs avans: 118.7</p><p>Kurs avans: 119.0</p>"
+    with pytest.raises(CurrencyRateParseError, match="tačno jednom"):
+        parse_rate(content, "TEXT_LABEL", "Kurs avans", ".")
+
+
+def test_parser_uses_configured_fallback_only_after_primary_failure() -> None:
+    parsed = parse_rate(
+        b"<span>Kurs avans:</span><b>118.7</b>",
+        "CSS_SELECTOR",
+        "span#missing",
+        ".",
+        "TEXT_LABEL",
+        "Kurs avans",
+    )
+    assert parsed.value == Decimal("118.7")
+    assert parsed.method_used == "TEXT_LABEL"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "url",

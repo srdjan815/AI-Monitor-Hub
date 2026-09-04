@@ -89,8 +89,12 @@ class SupplierCurrencySetting(UUIDMixin, TimestampMixin, Base):
             name="foreign_rate_not_fixed",
         ),
         CheckConstraint(
-            "extraction_method IN ('JSON_PATH','CSS_SELECTOR','XPATH','REGEX')",
+            "extraction_method IN ('JSON_PATH','CSS_SELECTOR','XPATH','REGEX','TEXT_LABEL')",
             name="extraction_method_valid",
+        ),
+        CheckConstraint(
+            "fallback_extraction_method IS NULL OR fallback_extraction_method IN ('JSON_PATH','CSS_SELECTOR','XPATH','REGEX','TEXT_LABEL')",
+            name="fallback_extraction_method_valid",
         ),
         CheckConstraint(
             "decimal_separator IN ('.', ',')", name="decimal_separator_valid"
@@ -112,6 +116,8 @@ class SupplierCurrencySetting(UUIDMixin, TimestampMixin, Base):
         String(24), nullable=False, default="JSON_PATH", server_default="JSON_PATH"
     )
     extraction_expression: Mapped[str | None] = mapped_column(String(1000))
+    fallback_extraction_method: Mapped[str | None] = mapped_column(String(24))
+    fallback_extraction_expression: Mapped[str | None] = mapped_column(String(1000))
     decimal_separator: Mapped[str] = mapped_column(
         String(1), nullable=False, default=".", server_default="."
     )

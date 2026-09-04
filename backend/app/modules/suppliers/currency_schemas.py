@@ -9,7 +9,9 @@ from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_valida
 
 CurrencySource = Literal["CONFIGURED", "PRICE_LIST"]
 RateMode = Literal["FIXED", "MANUAL", "AUTOMATIC"]
-ExtractionMethod = Literal["JSON_PATH", "CSS_SELECTOR", "XPATH", "REGEX"]
+ExtractionMethod = Literal[
+    "JSON_PATH", "CSS_SELECTOR", "XPATH", "REGEX", "TEXT_LABEL"
+]
 SUPPORTED_CURRENCIES = frozenset(
     {
         "RSD",
@@ -44,6 +46,10 @@ class CurrencySettingWrite(BaseModel):
     extraction_expression: str | None = Field(
         default=None, min_length=1, max_length=1000
     )
+    fallback_extraction_method: ExtractionMethod | None = None
+    fallback_extraction_expression: str | None = Field(
+        default=None, min_length=1, max_length=1000
+    )
     decimal_separator: Literal[".", ","] = "."
     daily_check_time: time = time(6, 0)
     max_rate_age_hours: int = Field(default=48, ge=1, le=8760)
@@ -71,6 +77,15 @@ class CurrencySettingWrite(BaseModel):
             raise ValueError("Automatski kurs zahteva konekciju dobavljača")
         if self.rate_mode == "AUTOMATIC" and not self.extraction_expression:
             raise ValueError("Automatski kurs zahteva izraz za pronalaženje vrednosti")
+        if bool(self.fallback_extraction_method) != bool(
+            self.fallback_extraction_expression
+        ):
+            raise ValueError("Rezervni način i rezervni izraz moraju biti zadati zajedno")
+        if (
+            self.fallback_extraction_method == self.extraction_method
+            and self.fallback_extraction_expression == self.extraction_expression
+        ):
+            raise ValueError("Rezervno pravilo mora biti različito od primarnog")
         if self.automatic_source_url and self.automatic_source_url.scheme != "https":
             raise ValueError("Automatski izvor kursa mora koristiti HTTPS")
         return self
@@ -122,6 +137,8 @@ class CurrencySettingRead(BaseModel):
     automatic_source_url: str | None
     extraction_method: str
     extraction_expression: str | None
+    fallback_extraction_method: str | None
+    fallback_extraction_expression: str | None
     decimal_separator: str
     daily_check_time: time
     next_check_at: datetime | None
@@ -166,6 +183,10 @@ class CurrencySourceTestRequest(BaseModel):
     source_url: AnyHttpUrl = Field(max_length=2000)
     extraction_method: ExtractionMethod
     extraction_expression: str = Field(min_length=1, max_length=1000)
+    fallback_extraction_method: ExtractionMethod | None = None
+    fallback_extraction_expression: str | None = Field(
+        default=None, min_length=1, max_length=1000
+    )
     decimal_separator: Literal[".", ","] = "."
 
     @field_validator("source_url")
@@ -174,6 +195,14 @@ class CurrencySourceTestRequest(BaseModel):
         if value.scheme != "https":
             raise ValueError("Izvor kursa mora koristiti HTTPS")
         return value
+
+    @model_validator(mode="after")
+    def validate_fallback(self) -> CurrencySourceTestRequest:
+        if bool(self.fallback_extraction_method) != bool(
+            self.fallback_extraction_expression
+        ):
+            raise ValueError("Rezervni način i rezervni izraz moraju biti zadati zajedno")
+        return self
 
 
 class CurrencySourceTestRead(BaseModel):
@@ -184,6 +213,7 @@ class CurrencySourceTestRead(BaseModel):
     content_type: str
     previous_rate: Decimal | None
     difference_percent: Decimal | None
+    extraction_method_used: str
 
 
 __all__ = [

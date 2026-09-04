@@ -28,6 +28,8 @@ def currency_setting_read(
         automatic_source_url=setting.automatic_source_url,
         extraction_method=setting.extraction_method,
         extraction_expression=setting.extraction_expression,
+        fallback_extraction_method=setting.fallback_extraction_method,
+        fallback_extraction_expression=setting.fallback_extraction_expression,
         decimal_separator=setting.decimal_separator,
         daily_check_time=setting.daily_check_time,
         next_check_at=setting.next_check_at,

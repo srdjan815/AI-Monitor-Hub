@@ -256,8 +256,21 @@ export interface SupplierCurrencySetting {
   currency_source: "CONFIGURED" | "PRICE_LIST";
   rate_mode: "FIXED" | "MANUAL" | "AUTOMATIC";
   automatic_source_url?: string | null;
-  extraction_method: "JSON_PATH" | "CSS_SELECTOR" | "XPATH" | "REGEX";
+  extraction_method:
+    | "JSON_PATH"
+    | "CSS_SELECTOR"
+    | "XPATH"
+    | "REGEX"
+    | "TEXT_LABEL";
   extraction_expression?: string | null;
+  fallback_extraction_method?:
+    | "JSON_PATH"
+    | "CSS_SELECTOR"
+    | "XPATH"
+    | "REGEX"
+    | "TEXT_LABEL"
+    | null;
+  fallback_extraction_expression?: string | null;
   decimal_separator: "." | ",";
   daily_check_time: string;
   next_check_at?: string | null;
@@ -293,4 +306,5 @@ export interface CurrencySourceTestResult {
   content_type: string;
   previous_rate?: string | null;
   difference_percent?: string | null;
+  extraction_method_used: string;
 }

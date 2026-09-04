@@ -170,6 +170,8 @@ class SupplierCurrencyService:
                 ),
                 extraction_method=payload.extraction_method,
                 extraction_expression=payload.extraction_expression,
+                fallback_extraction_method=payload.fallback_extraction_method,
+                fallback_extraction_expression=payload.fallback_extraction_expression,
                 decimal_separator=payload.decimal_separator,
                 daily_check_time=payload.daily_check_time,
                 max_rate_age_hours=payload.max_rate_age_hours,
@@ -190,6 +192,8 @@ class SupplierCurrencyService:
             setting.max_rate_age_hours = payload.max_rate_age_hours
             setting.extraction_method = payload.extraction_method
             setting.extraction_expression = payload.extraction_expression
+            setting.fallback_extraction_method = payload.fallback_extraction_method
+            setting.fallback_extraction_expression = payload.fallback_extraction_expression
             setting.decimal_separator = payload.decimal_separator
             setting.daily_check_time = payload.daily_check_time
             setting.version += 1
@@ -314,36 +318,30 @@ class SupplierCurrencyService:
         setting = await self.active_setting(supplier_id)
         if setting is None:
             return []
-        return list(
-            (
-                await self.session.scalars(
-                    select(SupplierExchangeRate)
-                    .where(SupplierExchangeRate.currency_setting_id == setting.id)
-                    .order_by(
-                        SupplierExchangeRate.effective_at.desc(),
-                        SupplierExchangeRate.id.desc(),
-                    )
-                    .limit(limit)
-                )
-            ).all()
+        rows = await self.session.scalars(
+            select(SupplierExchangeRate)
+            .where(SupplierExchangeRate.currency_setting_id == setting.id)
+            .order_by(
+                SupplierExchangeRate.effective_at.desc(),
+                SupplierExchangeRate.id.desc(),
+            )
+            .limit(limit)
         )
+        return list(rows.all())
 
     async def events(
         self, supplier_id: uuid.UUID, limit: int = 100
     ) -> CurrencyEventList:
-        rows = list(
-            (
-                await self.session.scalars(
-                    select(SupplierCurrencyEvent)
-                    .where(SupplierCurrencyEvent.supplier_id == supplier_id)
-                    .order_by(
-                        SupplierCurrencyEvent.created_at.desc(),
-                        SupplierCurrencyEvent.id.desc(),
-                    )
-                    .limit(limit)
-                )
-            ).all()
+        result = await self.session.scalars(
+            select(SupplierCurrencyEvent)
+            .where(SupplierCurrencyEvent.supplier_id == supplier_id)
+            .order_by(
+                SupplierCurrencyEvent.created_at.desc(),
+                SupplierCurrencyEvent.id.desc(),
+            )
+            .limit(limit)
         )
+        rows = list(result.all())
         return CurrencyEventList(
             items=[CurrencyEventRead.model_validate(row) for row in rows],
             total=len(rows),

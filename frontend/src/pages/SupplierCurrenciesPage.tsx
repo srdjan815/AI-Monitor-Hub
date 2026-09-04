@@ -46,6 +46,12 @@ const sourceLabels = {
   CONFIGURED: "Valuta iz podešavanja",
   PRICE_LIST: "Valuta iz cenovnika",
 } as const;
+type ExtractionMethod =
+  | "JSON_PATH"
+  | "CSS_SELECTOR"
+  | "XPATH"
+  | "REGEX"
+  | "TEXT_LABEL";
 
 export function SupplierCurrenciesPage() {
   const queryClient = useQueryClient();
@@ -64,10 +70,13 @@ export function SupplierCurrenciesPage() {
     "FIXED",
   );
   const [automaticUrl, setAutomaticUrl] = useState("");
-  const [extractionMethod, setExtractionMethod] = useState<
-    "JSON_PATH" | "CSS_SELECTOR" | "XPATH" | "REGEX"
-  >("JSON_PATH");
+  const [extractionMethod, setExtractionMethod] =
+    useState<ExtractionMethod>("TEXT_LABEL");
   const [extractionExpression, setExtractionExpression] = useState("");
+  const [fallbackMethod, setFallbackMethod] = useState<ExtractionMethod | "">(
+    "",
+  );
+  const [fallbackExpression, setFallbackExpression] = useState("");
   const [decimalSeparator, setDecimalSeparator] = useState<"." | ",">(".");
   const [dailyCheckTime, setDailyCheckTime] = useState("06:00");
   const [testResult, setTestResult] = useState<CurrencySourceTestResult | null>(
@@ -126,6 +135,8 @@ export function SupplierCurrenciesPage() {
     source_url: automaticUrl,
     extraction_method: extractionMethod,
     extraction_expression: extractionExpression,
+    fallback_extraction_method: fallbackMethod || null,
+    fallback_extraction_expression: fallbackMethod ? fallbackExpression : null,
     decimal_separator: decimalSeparator,
   };
   const saveSetting = useMutation({
@@ -139,6 +150,12 @@ export function SupplierCurrenciesPage() {
         extraction_method: extractionMethod,
         extraction_expression:
           rateMode === "AUTOMATIC" ? extractionExpression : null,
+        fallback_extraction_method:
+          rateMode === "AUTOMATIC" && fallbackMethod ? fallbackMethod : null,
+        fallback_extraction_expression:
+          rateMode === "AUTOMATIC" && fallbackMethod
+            ? fallbackExpression
+            : null,
         decimal_separator: decimalSeparator,
         daily_check_time: `${dailyCheckTime}:00`,
         max_rate_age_hours: 48,
@@ -185,8 +202,10 @@ export function SupplierCurrenciesPage() {
     setCurrencySource("CONFIGURED");
     setRateMode("FIXED");
     setAutomaticUrl("");
-    setExtractionMethod("JSON_PATH");
+    setExtractionMethod("TEXT_LABEL");
     setExtractionExpression("");
+    setFallbackMethod("");
+    setFallbackExpression("");
     setDecimalSeparator(".");
     setDailyCheckTime("06:00");
     setTestResult(null);
@@ -202,6 +221,8 @@ export function SupplierCurrenciesPage() {
     setAutomaticUrl(row.automatic_source_url ?? "");
     setExtractionMethod(row.extraction_method);
     setExtractionExpression(row.extraction_expression ?? "");
+    setFallbackMethod(row.fallback_extraction_method ?? "");
+    setFallbackExpression(row.fallback_extraction_expression ?? "");
     setDecimalSeparator(row.decimal_separator);
     setDailyCheckTime(row.daily_check_time.slice(0, 5));
     setTestResult(null);
@@ -512,6 +533,7 @@ export function SupplierCurrenciesPage() {
                     <MenuItem value="CSS_SELECTOR">CSS selektor</MenuItem>
                     <MenuItem value="XPATH">XPath</MenuItem>
                     <MenuItem value="REGEX">Regularni izraz</MenuItem>
+                    <MenuItem value="TEXT_LABEL">Tekstualna oznaka</MenuItem>
                   </Select>
                 </FormControl>
                 <TextField
@@ -519,7 +541,9 @@ export function SupplierCurrenciesPage() {
                   helperText={
                     extractionMethod === "JSON_PATH"
                       ? "Primer: $.exchangeRate.value"
-                      : "Vrednost mora jednoznačno pronaći kurs"
+                      : extractionMethod === "TEXT_LABEL"
+                        ? "Unesite tačan naziv, na primer: Kurs avans"
+                        : "Vrednost mora jednoznačno pronaći kurs"
                   }
                   value={extractionExpression}
                   onChange={(e) => {
@@ -527,6 +551,38 @@ export function SupplierCurrenciesPage() {
                     setTestResult(null);
                   }}
                 />
+                <FormControl>
+                  <InputLabel>Rezervni način (opciono)</InputLabel>
+                  <Select
+                    value={fallbackMethod}
+                    label="Rezervni način (opciono)"
+                    onChange={(e) => {
+                      setFallbackMethod(
+                        e.target.value as ExtractionMethod | "",
+                      );
+                      setFallbackExpression("");
+                      setTestResult(null);
+                    }}
+                  >
+                    <MenuItem value="">Bez rezervnog pravila</MenuItem>
+                    <MenuItem value="JSON_PATH">JSON putanja</MenuItem>
+                    <MenuItem value="CSS_SELECTOR">CSS selektor</MenuItem>
+                    <MenuItem value="XPATH">XPath</MenuItem>
+                    <MenuItem value="REGEX">Regularni izraz</MenuItem>
+                    <MenuItem value="TEXT_LABEL">Tekstualna oznaka</MenuItem>
+                  </Select>
+                </FormControl>
+                {fallbackMethod && (
+                  <TextField
+                    label="Rezervni izraz ili oznaka"
+                    helperText="Koristi se samo ako primarno pravilo ne pronađe vrednost."
+                    value={fallbackExpression}
+                    onChange={(e) => {
+                      setFallbackExpression(e.target.value);
+                      setTestResult(null);
+                    }}
+                  />
+                )}
                 <Stack direction="row" gap={2}>
                   <TextField
                     select
@@ -558,6 +614,7 @@ export function SupplierCurrenciesPage() {
                     !sourceId ||
                     !automaticUrl ||
                     !extractionExpression ||
+                    (Boolean(fallbackMethod) && !fallbackExpression) ||
                     testSource.isPending
                   }
                   onClick={() => testSource.mutate()}
@@ -566,7 +623,8 @@ export function SupplierCurrenciesPage() {
                 </Button>
                 {testResult && (
                   <Alert severity="success">
-                    Pročitan kurs: {testResult.rate_to_rsd} RSD. Izvor: „
+                    Pročitan kurs: {testResult.rate_to_rsd} RSD. Metoda:{" "}
+                    {testResult.extraction_method_used}. Izvor: „
                     {testResult.source_excerpt}“
                     {testResult.difference_percent != null
                       ? `; promena ${testResult.difference_percent}%`
@@ -587,7 +645,10 @@ export function SupplierCurrenciesPage() {
               saveSetting.isPending ||
               (currency !== "RSD" && !sourceId) ||
               (rateMode === "AUTOMATIC" &&
-                (!automaticUrl || !extractionExpression || !testResult))
+                (!automaticUrl ||
+                  !extractionExpression ||
+                  !testResult ||
+                  (Boolean(fallbackMethod) && !fallbackExpression)))
             }
             onClick={() => saveSetting.mutate()}
           >
