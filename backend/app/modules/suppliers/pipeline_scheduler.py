@@ -142,7 +142,7 @@ class SupplierPipelineScheduler:
                         trigger_type="SCHEDULED",
                         automation_depth=schedule.automation_depth,
                         status="PENDING",
-                        current_phase="FETCH",
+                        current_phase="CURRENCY_RATE",
                         phase_results={},
                         idempotency_key=idempotency,
                         schedule_occurrence_at=occurrence,

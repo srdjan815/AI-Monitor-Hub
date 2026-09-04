@@ -68,6 +68,10 @@ class SupplierCurrencySetting(UUIDMixin, TimestampMixin, Base):
             "next_check_at",
             postgresql_where=text("is_active AND rate_mode = 'AUTOMATIC'"),
         ),
+        Index(
+            "ix_supplier_currency_settings_source_connection",
+            "source_connection_id",
+        ),
         CheckConstraint("currency_code ~ '^[A-Z]{3}$'", name="currency_iso_format"),
         CheckConstraint(
             "currency_source IN ('CONFIGURED','PRICE_LIST')",
@@ -94,6 +98,9 @@ class SupplierCurrencySetting(UUIDMixin, TimestampMixin, Base):
     )
     supplier_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("supplier_sources.id", ondelete="RESTRICT")
     )
     currency_code: Mapped[str] = mapped_column(String(3), nullable=False)
     currency_source: Mapped[str] = mapped_column(

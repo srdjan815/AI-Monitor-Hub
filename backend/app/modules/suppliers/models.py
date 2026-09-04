@@ -209,6 +209,7 @@ class SupplierSource(UUIDMixin, TimestampMixin, Base):
     configuration: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     secret_reference: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(String(2000))
+    portal_supplier_code: Mapped[str | None] = mapped_column(String(128))
     last_validation_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_validation_status: Mapped[str | None] = mapped_column(String(32))
     last_validation_message: Mapped[str | None] = mapped_column(String(1000))

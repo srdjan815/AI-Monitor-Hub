@@ -35,6 +35,7 @@ SUPPORTED_CURRENCIES = frozenset(
 
 
 class CurrencySettingWrite(BaseModel):
+    source_connection_id: uuid.UUID | None = None
     currency_code: str = Field(min_length=3, max_length=3)
     currency_source: CurrencySource = "CONFIGURED"
     rate_mode: RateMode
@@ -66,6 +67,8 @@ class CurrencySettingWrite(BaseModel):
             raise ValueError("Fiksni kurs je dozvoljen samo za RSD")
         if self.rate_mode == "AUTOMATIC" and self.automatic_source_url is None:
             raise ValueError("Automatski kurs zahteva HTTPS adresu izvora")
+        if self.rate_mode == "AUTOMATIC" and self.source_connection_id is None:
+            raise ValueError("Automatski kurs zahteva konekciju dobavljača")
         if self.rate_mode == "AUTOMATIC" and not self.extraction_expression:
             raise ValueError("Automatski kurs zahteva izraz za pronalaženje vrednosti")
         if self.automatic_source_url and self.automatic_source_url.scheme != "https":
@@ -110,6 +113,9 @@ class CurrencySettingRead(BaseModel):
     id: uuid.UUID
     supplier_id: uuid.UUID
     supplier_name: str
+    source_connection_id: uuid.UUID | None
+    source_name: str | None
+    portal_supplier_code: str | None
     currency_code: str
     currency_source: str
     rate_mode: str
@@ -156,6 +162,7 @@ class CurrencyEventList(BaseModel):
 
 
 class CurrencySourceTestRequest(BaseModel):
+    source_connection_id: uuid.UUID
     source_url: AnyHttpUrl = Field(max_length=2000)
     extraction_method: ExtractionMethod
     extraction_expression: str = Field(min_length=1, max_length=1000)

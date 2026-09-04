@@ -12,11 +12,16 @@ def currency_setting_read(
     supplier_name: str,
     rate: SupplierExchangeRate | None,
     status: str,
+    source_name: str | None = None,
+    portal_supplier_code: str | None = None,
 ) -> CurrencySettingRead:
     return CurrencySettingRead(
         id=setting.id,
         supplier_id=setting.supplier_id,
         supplier_name=supplier_name,
+        source_connection_id=setting.source_connection_id,
+        source_name=source_name,
+        portal_supplier_code=portal_supplier_code,
         currency_code=setting.currency_code,
         currency_source=setting.currency_source,
         rate_mode=setting.rate_mode,

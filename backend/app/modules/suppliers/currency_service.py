@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import cast
@@ -13,8 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import current_actor_id
 from app.modules.suppliers.currency_automation_service import next_daily_check
-from app.modules.suppliers.currency_contracts import SnapshotCurrencyPlan
-from app.modules.suppliers.currency_snapshot_policy import build_snapshot_currency_plan
 from app.modules.suppliers.currency_models import (
     MonitorCurrencySetting,
     SupplierCurrencyEvent,
@@ -32,7 +29,7 @@ from app.modules.suppliers.currency_schemas import (
     ExchangeRateCreate,
 )
 from app.modules.suppliers.errors import supplier_error
-from app.modules.suppliers.models import Supplier
+from app.modules.suppliers.models import Supplier, SupplierSource
 
 
 class SupplierCurrencyService:
@@ -87,15 +84,24 @@ class SupplierCurrencyService:
             filters.append(SupplierCurrencySetting.supplier_id == supplier_id)
         rows = (
             await self.session.execute(
-                select(SupplierCurrencySetting, Supplier.company_name)
-                .join(Supplier)
+                select(
+                    SupplierCurrencySetting,
+                    Supplier.company_name,
+                    SupplierSource.name,
+                    SupplierSource.portal_supplier_code,
+                )
+                .join(Supplier, Supplier.id == SupplierCurrencySetting.supplier_id)
+                .outerjoin(
+                    SupplierSource,
+                    SupplierSource.id == SupplierCurrencySetting.source_connection_id,
+                )
                 .where(*filters)
                 .order_by(Supplier.company_name, SupplierCurrencySetting.id)
             )
         ).all()
         items: list[CurrencySettingRead] = []
         now = datetime.now(UTC)
-        for setting, name in rows:
+        for setting, name, source_name, portal_code in rows:
             rate = await self.latest_rate(setting.id, now)
             status = "MISSING"
             if rate:
@@ -106,7 +112,11 @@ class SupplierCurrencyService:
                     <= timedelta(hours=setting.max_rate_age_hours)
                     else "STALE"
                 )
-            items.append(currency_setting_read(setting, name, rate, status))
+            items.append(
+                currency_setting_read(
+                    setting, name, rate, status, source_name, portal_code
+                )
+            )
         return CurrencySettingList(items=items, total=len(items))
 
     async def upsert(
@@ -119,6 +129,22 @@ class SupplierCurrencyService:
         )
         if supplier is None:
             supplier_error(404, "supplier_not_found", "Dobavljač nije pronađen")
+        source = None
+        if payload.source_connection_id is not None:
+            source = await self.session.scalar(
+                select(SupplierSource).where(
+                    SupplierSource.id == payload.source_connection_id,
+                    SupplierSource.supplier_id == supplier_id,
+                    SupplierSource.is_active.is_(True),
+                    SupplierSource.status == "ACTIVE",
+                )
+            )
+            if source is None:
+                supplier_error(
+                    422,
+                    "currency_source_connection_invalid",
+                    "Izabrana konekcija ne pripada aktivnom dobavljaču",
+                )
         setting = await self.active_setting(supplier_id, lock=True)
         if setting and (
             payload.expected_version is None
@@ -133,6 +159,7 @@ class SupplierCurrencyService:
         if setting is None:
             setting = SupplierCurrencySetting(
                 supplier_id=supplier_id,
+                source_connection_id=payload.source_connection_id,
                 currency_code=payload.currency_code,
                 currency_source=payload.currency_source,
                 rate_mode=payload.rate_mode,
@@ -152,6 +179,7 @@ class SupplierCurrencyService:
             action = "SETTING_CREATED"
         else:
             setting.currency_code = payload.currency_code
+            setting.source_connection_id = payload.source_connection_id
             setting.currency_source = payload.currency_source
             setting.rate_mode = payload.rate_mode
             setting.automatic_source_url = (
@@ -208,7 +236,12 @@ class SupplierCurrencyService:
         await self.session.refresh(setting)
         rate = await self.latest_rate(setting.id)
         return currency_setting_read(
-            setting, supplier.company_name, rate, "CURRENT" if rate else "MISSING"
+            setting,
+            supplier.company_name,
+            rate,
+            "CURRENT" if rate else "MISSING",
+            source.name if source else None,
+            source.portal_supplier_code if source else None,
         )
 
     async def add_rate(
@@ -315,8 +348,3 @@ class SupplierCurrencyService:
             items=[CurrencyEventRead.model_validate(row) for row in rows],
             total=len(rows),
         )
-
-    async def snapshot_plan(
-        self, supplier_id: uuid.UUID, records: Sequence[object], at: datetime
-    ) -> SnapshotCurrencyPlan | None:
-        return await build_snapshot_currency_plan(self, supplier_id, records, at)

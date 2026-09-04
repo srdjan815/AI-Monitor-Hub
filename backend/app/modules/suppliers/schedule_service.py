@@ -256,7 +256,7 @@ class SupplierScheduleService:
             trigger_type="MANUAL",
             automation_depth=data.automation_depth,
             status="PENDING",
-            current_phase="FETCH",
+            current_phase="CURRENCY_RATE",
             phase_results={},
             idempotency_key=data.idempotency_key,
             created_by=current_actor_id() or "system",

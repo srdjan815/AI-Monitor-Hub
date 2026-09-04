@@ -18,6 +18,7 @@ from app.modules.suppliers.schema_profile_models import SupplierSchemaField
 
 PipelineStatus = Literal["SUCCEEDED", "FAILED", "SKIPPED", "CANCELLED"]
 PipelinePhase = Literal[
+    "CURRENCY_RATE",
     "FETCH",
     "ARTIFACT_SAVE",
     "TECHNICAL_VALIDATE",
@@ -65,9 +66,10 @@ class PipelinePhaseResult:
     reference_id: str | None = None
     processed_records: int = 0
     error_count: int = 0
+    result_code: str | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        result: dict[str, object] = {
             "status": self.status,
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
@@ -78,6 +80,9 @@ class PipelinePhaseResult:
             "processed_records": self.processed_records,
             "error_count": self.error_count,
         }
+        if self.result_code is not None:
+            result["result_code"] = self.result_code
+        return result
 
 
 @dataclass(slots=True)
@@ -98,9 +103,7 @@ class PipelineResult:
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     references: PipelineReferences = field(default_factory=PipelineReferences)
-    telemetry: dict[str, int | float | str | bool | None] = field(
-        default_factory=dict
-    )
+    telemetry: dict[str, int | float | str | bool | None] = field(default_factory=dict)
 
     @property
     def successful(self) -> bool:

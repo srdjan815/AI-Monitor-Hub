@@ -55,6 +55,7 @@ export interface Source {
   status: string;
   is_active: boolean;
   description?: string | null;
+  portal_supplier_code?: string | null;
   configuration: Record<string, unknown>;
   has_secret_reference: boolean;
   credentials_available: boolean;
@@ -89,7 +90,13 @@ export interface SupplierSchedule {
   source_name?: string;
   source_code?: string;
   status: "MANUAL" | "ENABLED" | "PAUSED";
-  schedule_type?: "DAILY" | "MULTI_DAILY" | "INTERVAL" | "WEEKDAYS" | "WEEKLY" | null;
+  schedule_type?:
+    | "DAILY"
+    | "MULTI_DAILY"
+    | "INTERVAL"
+    | "WEEKDAYS"
+    | "WEEKLY"
+    | null;
   timezone: string;
   schedule_configuration: {
     times?: string[];
@@ -242,6 +249,9 @@ export interface SupplierCurrencySetting {
   id: string;
   supplier_id: string;
   supplier_name: string;
+  source_connection_id?: string | null;
+  source_name?: string | null;
+  portal_supplier_code?: string | null;
   currency_code: string;
   currency_source: "CONFIGURED" | "PRICE_LIST";
   rate_mode: "FIXED" | "MANUAL" | "AUTOMATIC";

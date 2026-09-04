@@ -54,6 +54,8 @@ class SupplierSourceServiceSupport:
             proposed["last_validation_message"] = None
         if "description" in supplied:
             proposed["description"] = self._optional(data.description)
+        if "portal_supplier_code" in supplied:
+            proposed["portal_supplier_code"] = self._optional(data.portal_supplier_code)
         if "status" in supplied:
             assert data.status is not None
             proposed["status"] = data.status.value

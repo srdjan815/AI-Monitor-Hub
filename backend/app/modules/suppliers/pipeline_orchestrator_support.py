@@ -161,6 +161,7 @@ class SupplierPipelineOrchestratorSupport:
         error_count: int = 0,
         error_code: str | None = None,
         status: str = "SUCCEEDED",
+        result_code: str | None = None,
     ) -> PipelineResult:
         completed_at = datetime.now(UTC)
         phase_result = PipelinePhaseResult(
@@ -173,6 +174,7 @@ class SupplierPipelineOrchestratorSupport:
             reference_id=reference_id,
             processed_records=processed_records,
             error_count=error_count,
+            result_code=result_code,
         )
         phase_results = {
             **context.run.phase_results,
@@ -239,7 +241,9 @@ class SupplierPipelineOrchestratorSupport:
                 )
         await self.session.commit()
         fresh_context = await self._context(source_id, run_id)
-        await SupplierPipelineIncidentService(self.session).record_failure(fresh_context, code, message)
+        await SupplierPipelineIncidentService(self.session).record_failure(
+            fresh_context, code, message
+        )
 
     async def _success(
         self,
@@ -268,7 +272,9 @@ class SupplierPipelineOrchestratorSupport:
         await self._schedule_result(context, "SUCCEEDED", duration)
         await self.session.commit()
         if context.run.automation_depth == "FULL_PIPELINE":
-            await SupplierPipelineIncidentService(self.session).resolve_after_success(context)
+            await SupplierPipelineIncidentService(self.session).resolve_after_success(
+                context
+            )
         return PipelineResult(
             status="SUCCEEDED",
             completed_phase=phase,  # type: ignore[arg-type]
@@ -315,6 +321,7 @@ class SupplierPipelineOrchestratorSupport:
             references=references,
             telemetry={"duration_ms": duration, "business_failure": True},
         )
+
     async def _schedule_result(
         self, context: PipelineContext, status: str, duration: int
     ) -> None:
@@ -330,4 +337,6 @@ class SupplierPipelineOrchestratorSupport:
             consecutive_failures=failures,
             version=context.schedule.version,
         )
+
+
 __all__ = ["SupplierPipelineOrchestratorSupport"]

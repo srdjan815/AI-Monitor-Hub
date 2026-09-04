@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import socket
+import uuid
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from pydantic import ValidationError
 
+from app.modules.suppliers.currency_automation_service import (
+    CurrencyPreflightError,
+    SupplierCurrencyAutomationService,
+)
 from app.modules.suppliers.currency_rate_http import (
     CurrencyRateFetchError,
     _validate_url,
@@ -90,6 +98,7 @@ def test_currency_mode_contract() -> None:
             automatic_source_url="https://example.com",
         )
     value = CurrencySettingWrite(
+        source_connection_id=uuid.uuid4(),
         currency_code="EUR",
         rate_mode="AUTOMATIC",
         automatic_source_url="https://example.com/rate",
@@ -97,3 +106,51 @@ def test_currency_mode_contract() -> None:
         extraction_expression="$.rate",
     )
     assert value.currency_code == "EUR"
+
+
+def test_portal_supplier_code_is_safely_inserted() -> None:
+    source = SimpleNamespace(portal_supplier_code="PARTNER/42")
+    resolved = SupplierCurrencyAutomationService._resolved_url(
+        "https://example.com/rate?partner=%7Bsupplier_code%7D", source
+    )
+    assert resolved.endswith("partner=PARTNER%2F42")
+
+
+@pytest.mark.asyncio
+async def test_pipeline_preflight_rejects_wrong_source() -> None:
+    service = SupplierCurrencyAutomationService(AsyncMock())
+    service._setting = AsyncMock(
+        return_value=SimpleNamespace(
+            currency_code="EUR",
+            source_connection_id=uuid.uuid4(),
+            rate_mode="MANUAL",
+        )
+    )
+    source = SimpleNamespace(id=uuid.uuid4(), supplier_id=uuid.uuid4())
+    with pytest.raises(CurrencyPreflightError) as captured:
+        await service.preflight(source)
+    assert captured.value.code == "KONFIGURACIJA_KURSA_NEISPRAVNA"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_preflight_rejects_stale_manual_rate() -> None:
+    source_id = uuid.uuid4()
+    service = SupplierCurrencyAutomationService(AsyncMock())
+    service._setting = AsyncMock(
+        return_value=SimpleNamespace(
+            id=uuid.uuid4(),
+            currency_code="EUR",
+            source_connection_id=source_id,
+            rate_mode="MANUAL",
+            max_rate_age_hours=24,
+        )
+    )
+    service._latest = AsyncMock(
+        return_value=SimpleNamespace(
+            effective_at=datetime.now(UTC) - timedelta(hours=25)
+        )
+    )
+    source = SimpleNamespace(id=source_id, supplier_id=uuid.uuid4())
+    with pytest.raises(CurrencyPreflightError) as captured:
+        await service.preflight(source)
+    assert captured.value.code == "KURS_ZASTAREO"

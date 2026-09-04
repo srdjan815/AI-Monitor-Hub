@@ -56,6 +56,13 @@ class SupplierSourceCreate(BaseModel):
         max_length=2000,
         description="Administrativni opis namene izvora.",
     )
+    portal_supplier_code: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+        description="Partnerska šifra dobavljača na ovom portalu.",
+    )
     status: SupplierSourceStatus = Field(
         default=SupplierSourceStatus.DRAFT,
         description=(
@@ -90,6 +97,9 @@ class SupplierSourceUpdate(BaseModel):
     )
     secret_reference: str | None = Field(default=None, max_length=500)
     description: str | None = Field(default=None, max_length=2000)
+    portal_supplier_code: str | None = Field(
+        default=None, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+    )
     status: SupplierSourceStatus | None = None
     source_type: SupplierSourceType | None = Field(
         default=None,
@@ -141,6 +151,7 @@ class SupplierSourceRead(BaseModel):
         )
     )
     description: str | None
+    portal_supplier_code: str | None
     last_validation_at: datetime | None
     last_validation_status: SupplierSourceValidationStatus | None
     last_validation_message: str | None

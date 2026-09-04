@@ -11,6 +11,7 @@ from app.core.security import current_actor_id
 from app.modules.suppliers.errors import supplier_error
 from app.modules.suppliers.currency_conversion import convert_supplier_price
 from app.modules.suppliers.currency_service import SupplierCurrencyService
+from app.modules.suppliers.currency_snapshot_policy import build_snapshot_currency_plan
 from app.modules.suppliers.snapshot_fingerprints import (
     item_fingerprint,
     payload_checksum,
@@ -76,8 +77,8 @@ class SupplierSnapshotService:
             )
         now = datetime.now(UTC)
         currency_service = SupplierCurrencyService(self.session)
-        currency_plan = await currency_service.snapshot_plan(
-            run.supplier_id, records, run.completed_at or now
+        currency_plan = await build_snapshot_currency_plan(
+            currency_service, run.supplier_id, records, run.completed_at or now
         )
         snapshot = SupplierSnapshot(
             supplier_id=run.supplier_id,
