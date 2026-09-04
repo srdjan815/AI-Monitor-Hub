@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
+    "build": "npm run check:architecture && tsc -b && vite build",
+    "check:architecture": "node scripts/check-architecture.mjs",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
     "test": "vitest run"

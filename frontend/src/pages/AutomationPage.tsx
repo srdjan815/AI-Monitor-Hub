@@ -3,20 +3,8 @@ import { PlayArrowRounded, ScheduleRounded } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  Box,
   Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormControlLabel,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
-  TextField,
   Tooltip,
   Typography
 } from "@mui/material";
@@ -26,24 +14,12 @@ import { supplierApi } from "../api/supplierApi";
 import { EntityTable, type Column } from "../components/EntityTable";
 import { PageHeader } from "../components/PageHeader";
 import { StatusChip } from "../components/StatusChip";
-import type { ApiError, Source, SupplierSchedule } from "../types";
+import type { ApiError, SupplierSchedule } from "../types";
 import { normalizeScheduleTimes } from "./scheduleTime";
 import { useAuth } from "../state/AuthContext";
 
-const initialForm = {
-  status: "ENABLED",
-  schedule_type: "DAILY",
-  times: "06:00",
-  weekdays: [1, 2, 3, 4, 5] as number[],
-  interval_hours: 6,
-  automation_depth: "FULL_PIPELINE",
-  timeout_seconds: 300,
-  max_attempts: 3
-};
-
-const ALL_SUPPLIERS = "__all_suppliers__";
-
-const dayNames = ["Ponedeljak", "Utorak", "Sreda", "Četvrtak", "Petak", "Subota", "Nedelja"];
+import { ScheduleDialog } from "./automation/ScheduleDialog";
+import { ALL_SUPPLIERS, initialScheduleForm as initialForm } from "./automation/scheduleModel";
 
 export function AutomationPage() {
   const auth = useAuth();
@@ -352,207 +328,24 @@ export function AutomationPage() {
           ) : undefined
         }
       />
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>{editing ? "Izmeni automatski raspored" : "Novi automatski raspored"}</DialogTitle>
-        <DialogContent>
-          <Stack gap={2} mt={1}>
-            <FormControl fullWidth>
-              <InputLabel id="automation-supplier-label">Dobavljač</InputLabel>
-              <Select
-                labelId="automation-supplier-label"
-                label="Dobavljač"
-                value={supplierId}
-                disabled={Boolean(editing)}
-                onChange={(event) => {
-                  setSupplierId(event.target.value);
-                  setSourceId("");
-                }}
-              >
-                {!editing && (
-                  <MenuItem value={ALL_SUPPLIERS}>Svi dobavljači</MenuItem>
-                )}
-                {suppliers.data?.items.map((supplier) => (
-                  <MenuItem key={supplier.id} value={supplier.id}>
-                    {supplier.supplier_code} · {supplier.company_name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl
-              fullWidth
-              disabled={
-                !supplierId ||
-                supplierId === ALL_SUPPLIERS ||
-                Boolean(editing)
-              }
-            >
-              <InputLabel id="automation-source-label">Konekcija</InputLabel>
-              <Select
-                labelId="automation-source-label"
-                label="Konekcija"
-                value={sourceId}
-                onChange={(event) => setSourceId(event.target.value)}
-              >
-                {supplierId === ALL_SUPPLIERS && (
-                  <MenuItem value="">Sve konekcije redom</MenuItem>
-                )}
-                {sources.data?.items.map((source: Source) => (
-                  <MenuItem key={source.id} value={source.id}>
-                    {source.source_code} · {source.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {supplierId === ALL_SUPPLIERS && (
-              <Alert severity="info">
-                {allSources.isLoading
-                  ? "Učitavanje konekcija..."
-                  : `Raspored će dobiti ${(allSources.data ?? []).filter(({ source }) => source.status === "ACTIVE").length} spremnih konekcija. ${(allSources.data ?? []).filter(({ source }) => source.status !== "ACTIVE").length} nespremnih biće preskočeno i evidentirano u Incident centru. Worker obrađuje red jednu po jednu; neuspeh jedne ne zaustavlja ostale.`}
-              </Alert>
-            )}
-            <FormControl fullWidth>
-              <InputLabel id="automation-status-label">Status rasporeda</InputLabel>
-              <Select
-                labelId="automation-status-label"
-                label="Status rasporeda"
-                value={form.status}
-                onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}
-              >
-                <MenuItem value="ENABLED">Uključen</MenuItem>
-                <MenuItem value="PAUSED">Pauziran</MenuItem>
-                <MenuItem value="MANUAL">Samo ručno</MenuItem>
-              </Select>
-            </FormControl>
-            {form.status !== "MANUAL" && (
-              <>
-                <FormControl fullWidth>
-                  <InputLabel id="automation-type-label">Način ponavljanja</InputLabel>
-                  <Select
-                    labelId="automation-type-label"
-                    label="Način ponavljanja"
-                    value={form.schedule_type}
-                    onChange={(event) =>
-                      setForm((value) => ({ ...value, schedule_type: event.target.value }))
-                    }
-                  >
-                    <MenuItem value="DAILY">Svakog dana</MenuItem>
-                    <MenuItem value="MULTI_DAILY">Više puta dnevno</MenuItem>
-                    <MenuItem value="INTERVAL">Na svakih N sati</MenuItem>
-                    <MenuItem value="WEEKDAYS">Radnim danima</MenuItem>
-                    <MenuItem value="WEEKLY">Izabrani dani u nedelji</MenuItem>
-                  </Select>
-                </FormControl>
-                {form.schedule_type === "INTERVAL" ? (
-                  <TextField
-                    type="number"
-                    label="Interval u satima"
-                    value={form.interval_hours}
-                    inputProps={{ min: 1, max: 720 }}
-                    onChange={(event) =>
-                      setForm((value) => ({
-                        ...value,
-                        interval_hours: Number(event.target.value)
-                      }))
-                    }
-                  />
-                ) : (
-                  <TextField
-                    label="Vreme pokretanja"
-                    value={form.times}
-                    helperText="Obavezan format je HH:MM. Za više termina koristite zarez, na primer: 08:30, 10:00, 12:00, 14:00 (bez tačke na kraju)."
-                    onChange={(event) =>
-                      setForm((value) => ({ ...value, times: event.target.value }))
-                    }
-                  />
-                )}
-                {form.schedule_type === "WEEKLY" && (
-                  <Box>
-                    <Typography variant="body2" mb={0.5}>Dani u nedelji</Typography>
-                    <Stack direction="row" flexWrap="wrap">
-                      {dayNames.map((name, index) => (
-                        <FormControlLabel
-                          key={name}
-                          label={name}
-                          control={
-                            <Checkbox
-                              checked={form.weekdays.includes(index + 1)}
-                              onChange={(event) =>
-                                setForm((value) => ({
-                                  ...value,
-                                  weekdays: event.target.checked
-                                    ? [...value.weekdays, index + 1].sort()
-                                    : value.weekdays.filter((day) => day !== index + 1)
-                                }))
-                              }
-                            />
-                          }
-                        />
-                      ))}
-                    </Stack>
-                  </Box>
-                )}
-              </>
-            )}
-            <FormControl fullWidth>
-              <InputLabel id="automation-depth-label">Dubina automatizacije</InputLabel>
-              <Select
-                labelId="automation-depth-label"
-                label="Dubina automatizacije"
-                value={form.automation_depth}
-                onChange={(event) =>
-                  setForm((value) => ({ ...value, automation_depth: event.target.value }))
-                }
-              >
-                <MenuItem value="FETCH_ONLY">Samo preuzmi i sačuvaj</MenuItem>
-                <MenuItem value="FETCH_AND_ANALYZE">Preuzmi i analiziraj Schema</MenuItem>
-                <MenuItem value="FULL_PIPELINE">Kompletan pipeline do Snapshot-a i Delta-e</MenuItem>
-              </Select>
-            </FormControl>
-            <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Timeout u sekundama"
-                value={form.timeout_seconds}
-                onChange={(event) =>
-                  setForm((value) => ({
-                    ...value,
-                    timeout_seconds: Number(event.target.value)
-                  }))
-                }
-              />
-              <TextField
-                fullWidth
-                type="number"
-                label="Broj pokušaja"
-                value={form.max_attempts}
-                onChange={(event) =>
-                  setForm((value) => ({
-                    ...value,
-                    max_attempts: Number(event.target.value)
-                  }))
-                }
-              />
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Otkaži</Button>
-          <Button
-            variant="contained"
-            disabled={
-              save.isPending ||
-              !supplierId ||
-              (supplierId === ALL_SUPPLIERS
-                ? allSources.isLoading || !allSources.data?.length
-                : !sourceId)
-            }
-            onClick={() => save.mutate()}
-          >
-            Sačuvaj raspored
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ScheduleDialog
+        open={dialogOpen}
+        editing={editing}
+        supplierId={supplierId}
+        sourceId={sourceId}
+        suppliers={suppliers.data?.items ?? []}
+        sources={sources.data?.items ?? []}
+        allSourcesLoading={allSources.isLoading}
+        readyCount={(allSources.data ?? []).filter(({ source }) => source.status === "ACTIVE").length}
+        skippedCount={(allSources.data ?? []).filter(({ source }) => source.status !== "ACTIVE").length}
+        form={form}
+        saving={save.isPending}
+        onClose={() => setDialogOpen(false)}
+        onSupplierId={setSupplierId}
+        onSourceId={setSourceId}
+        setForm={setForm}
+        onSave={() => save.mutate()}
+      />
     </>
   );
 }
