@@ -9,6 +9,8 @@ import type {
   Source,
   SourceProbeResult,
   SupplierSchedule,
+  SupplierCurrencySetting,
+  SupplierExchangeRate,
   PipelineRunQueued,
   Supplier
 } from "../types";
@@ -217,5 +219,27 @@ export const supplierApi = {
     api<ArticleReview>(`/suppliers/platform/article-reviews/${id}/${action}`, {
       method: "POST",
       body: { expected_version: expectedVersion, comment }
-    })
+    }),
+  monitorCurrency: () =>
+    api<{ currency_code: "RSD"; rate_to_rsd: string; version: number }>(
+      "/suppliers/platform/supplier-currencies/monitor"
+    ),
+  currencySettings: () =>
+    api<Page<SupplierCurrencySetting>>(
+      "/suppliers/platform/supplier-currencies"
+    ),
+  saveCurrencySetting: (supplierId: string, body: Record<string, unknown>) =>
+    api<SupplierCurrencySetting>(
+      `/suppliers/platform/supplier-currencies/${supplierId}`,
+      { method: "PUT", body }
+    ),
+  exchangeRates: (supplierId: string) =>
+    api<SupplierExchangeRate[]>(
+      `/suppliers/platform/supplier-currencies/${supplierId}/rates`
+    ),
+  addExchangeRate: (supplierId: string, body: Record<string, unknown>) =>
+    api<SupplierExchangeRate>(
+      `/suppliers/platform/supplier-currencies/${supplierId}/rates`,
+      { method: "POST", body }
+    )
 };

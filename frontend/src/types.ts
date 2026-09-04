@@ -237,3 +237,30 @@ export interface BulkResponse {
     message: string;
   }>;
 }
+
+export interface SupplierCurrencySetting {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  currency_code: string;
+  currency_source: "CONFIGURED" | "PRICE_LIST";
+  rate_mode: "FIXED" | "MANUAL" | "AUTOMATIC";
+  automatic_source_url?: string | null;
+  max_rate_age_hours: number;
+  current_rate?: string | null;
+  current_rate_effective_at?: string | null;
+  rate_status: "CURRENT" | "STALE" | "MISSING";
+  version: number;
+}
+
+export interface SupplierExchangeRate {
+  id: string;
+  rate_to_rsd: string;
+  effective_at: string;
+  status: string;
+  source_type: string;
+  evidence_checksum?: string | null;
+  note?: string | null;
+  created_by: string;
+  created_at: string;
+}

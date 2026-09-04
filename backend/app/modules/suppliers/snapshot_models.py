@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -94,6 +96,14 @@ class SupplierSnapshot(UUIDMixin, TimestampMixin, Base):
     )
     schema_version_reference: Mapped[int] = mapped_column(Integer, nullable=False)
     mapping_version_reference: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency_setting_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("supplier_currency_settings.id", ondelete="RESTRICT")
+    )
+    exchange_rate_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("supplier_exchange_rates.id", ondelete="RESTRICT")
+    )
+    source_currency: Mapped[str | None] = mapped_column(String(3))
+    exchange_rate_to_rsd: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     storage_state: Mapped[str] = mapped_column(String(16), nullable=False)
     total_items: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import current_actor_id
 from app.modules.suppliers.errors import supplier_error
+from app.modules.suppliers.currency_conversion import convert_supplier_price
+from app.modules.suppliers.currency_service import SupplierCurrencyService
 from app.modules.suppliers.snapshot_fingerprints import (
     item_fingerprint,
     payload_checksum,
@@ -73,6 +75,10 @@ class SupplierSnapshotService:
                 "Broj prihvaćenih staged zapisa nije usklađen",
             )
         now = datetime.now(UTC)
+        currency_service = SupplierCurrencyService(self.session)
+        currency_plan = await currency_service.snapshot_plan(
+            run.supplier_id, records, run.completed_at or now
+        )
         snapshot = SupplierSnapshot(
             supplier_id=run.supplier_id,
             source_connection_id=run.source_connection_id,
@@ -82,6 +88,12 @@ class SupplierSnapshotService:
             mapping_profile_id=run.mapping_profile_id,
             schema_version_reference=run.schema_version_reference,
             mapping_version_reference=run.mapping_version_reference,
+            currency_setting_id=currency_plan.setting.id if currency_plan else None,
+            exchange_rate_id=currency_plan.rate.id if currency_plan else None,
+            source_currency=currency_plan.currency_code if currency_plan else None,
+            exchange_rate_to_rsd=(
+                currency_plan.rate.rate_to_rsd if currency_plan else None
+            ),
             status="BUILDING",
             storage_state="ONLINE",
             total_items=0,
@@ -112,9 +124,10 @@ class SupplierSnapshotService:
             payloads: list[dict[str, object]] = []
             fingerprints: list[str] = []
             for record in records:
-                links = extract_image_links(record.mapped_data)
+                mapped_data = convert_supplier_price(record.mapped_data, currency_plan)
+                links = extract_image_links(mapped_data)
                 fingerprint = item_fingerprint(
-                    record.mapped_data,
+                    mapped_data,
                     links,
                     record.source_key,
                     record.source_identifier,
@@ -124,7 +137,7 @@ class SupplierSnapshotService:
                     {
                         "record_number": record.record_number,
                         "item_fingerprint": fingerprint,
-                        "mapped_data": record.mapped_data,
+                        "mapped_data": mapped_data,
                         "source_image_links": links,
                     }
                 )
@@ -136,7 +149,7 @@ class SupplierSnapshotService:
                         source_key=record.source_key,
                         source_identifier=record.source_identifier,
                         item_fingerprint=fingerprint,
-                        mapped_data=record.mapped_data,
+                        mapped_data=mapped_data,
                         source_image_links=links,
                     )
                 )

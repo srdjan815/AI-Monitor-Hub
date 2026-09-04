@@ -33,6 +33,7 @@ from app.modules.suppliers.incident_workflow_router import (
 from app.modules.suppliers.api_router import router as supplier_api_router
 from app.modules.suppliers.api_schemas import CANONICAL_ERROR_RESPONSES
 from app.modules.suppliers.article_review_router import router as article_review_router
+from app.modules.suppliers.currency_router import router as currency_router
 
 router = APIRouter()
 router.include_router(supplier_api_router)
@@ -68,6 +69,11 @@ router.include_router(
 )
 router.include_router(
     article_review_router,
+    prefix="/suppliers/platform",
+    responses=CANONICAL_ERROR_RESPONSES,
+)
+router.include_router(
+    currency_router,
     prefix="/suppliers/platform",
     responses=CANONICAL_ERROR_RESPONSES,
 )
