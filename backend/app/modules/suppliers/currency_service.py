@@ -143,7 +143,7 @@ class SupplierCurrencyService:
                 supplier_error(
                     422,
                     "currency_source_connection_invalid",
-                    "Izabrana konekcija ne pripada aktivnom dobavljaču",
+                    "Izabrana konekcija kursa ne pripada aktivnom dobavljaču",
                 )
         setting = await self.active_setting(supplier_id, lock=True)
         if setting and (

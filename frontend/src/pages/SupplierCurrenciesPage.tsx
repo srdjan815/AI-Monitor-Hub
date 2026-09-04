@@ -79,6 +79,8 @@ export function SupplierCurrenciesPage() {
   const [fallbackExpression, setFallbackExpression] = useState("");
   const [decimalSeparator, setDecimalSeparator] = useState<"." | ",">(".");
   const [dailyCheckTime, setDailyCheckTime] = useState("06:00");
+  const [portalUsername, setPortalUsername] = useState("");
+  const [portalPassword, setPortalPassword] = useState("");
   const [testResult, setTestResult] = useState<CurrencySourceTestResult | null>(
     null,
   );
@@ -121,6 +123,12 @@ export function SupplierCurrenciesPage() {
   const selectedSource = (sources.data?.items ?? []).find(
     (item) => item.id === sourceId,
   );
+  const portalCredentialsInvalid = Boolean(
+    selectedSource?.configuration.authentication_type === "PORTAL_FORM" &&
+      (Boolean(portalUsername) !== Boolean(portalPassword) ||
+        (!selectedSource.credentials_available &&
+          (!portalUsername || !portalPassword))),
+  );
   const rates = useQuery({
     queryKey: ["supplier-exchange-rates", selected?.supplier_id],
     queryFn: () => supplierApi.exchangeRates(selected!.supplier_id),
@@ -139,9 +147,18 @@ export function SupplierCurrenciesPage() {
     fallback_extraction_expression: fallbackMethod ? fallbackExpression : null,
     decimal_separator: decimalSeparator,
   };
+  const persistPortalCredentials = async () => {
+    if (!portalUsername && !portalPassword) return;
+    await supplierApi.writeSourceCredentials(supplierId, sourceId, {
+      placement: "PORTAL_FORM",
+      username: portalUsername,
+      password: portalPassword,
+    });
+  };
   const saveSetting = useMutation({
-    mutationFn: () =>
-      supplierApi.saveCurrencySetting(supplierId, {
+    mutationFn: async () => {
+      await persistPortalCredentials();
+      return supplierApi.saveCurrencySetting(supplierId, {
         source_connection_id: currency === "RSD" ? null : sourceId,
         currency_code: currency,
         currency_source: currencySource,
@@ -161,18 +178,31 @@ export function SupplierCurrenciesPage() {
         max_rate_age_hours: 48,
         expected_version:
           selected?.supplier_id === supplierId ? selected.version : null,
-      }),
+      });
+    },
     onSuccess: async () => {
       setSettingOpen(false);
       setSelected(null);
+      setPortalUsername("");
+      setPortalPassword("");
       await queryClient.invalidateQueries({
         queryKey: ["supplier-currencies"],
       });
     },
   });
   const testSource = useMutation({
-    mutationFn: () => supplierApi.testCurrencySource(supplierId, sourcePayload),
-    onSuccess: setTestResult,
+    mutationFn: async () => {
+      await persistPortalCredentials();
+      return supplierApi.testCurrencySource(supplierId, sourcePayload);
+    },
+    onSuccess: async (result) => {
+      setTestResult(result);
+      setPortalUsername("");
+      setPortalPassword("");
+      await queryClient.invalidateQueries({
+        queryKey: ["currency-sources", supplierId],
+      });
+    },
   });
   const saveRate = useMutation({
     mutationFn: () =>
@@ -208,6 +238,8 @@ export function SupplierCurrenciesPage() {
     setFallbackExpression("");
     setDecimalSeparator(".");
     setDailyCheckTime("06:00");
+    setPortalUsername("");
+    setPortalPassword("");
     setTestResult(null);
     setSettingOpen(true);
   };
@@ -225,6 +257,8 @@ export function SupplierCurrenciesPage() {
     setFallbackExpression(row.fallback_extraction_expression ?? "");
     setDecimalSeparator(row.decimal_separator);
     setDailyCheckTime(row.daily_check_time.slice(0, 5));
+    setPortalUsername("");
+    setPortalPassword("");
     setTestResult(null);
     setSettingOpen(true);
   };
@@ -412,12 +446,14 @@ export function SupplierCurrenciesPage() {
             {currency !== "RSD" && (
               <>
                 <FormControl>
-                  <InputLabel>Konekcija cenovnika</InputLabel>
+                  <InputLabel>Konekcija za preuzimanje kursa</InputLabel>
                   <Select
                     value={sourceId}
-                    label="Konekcija cenovnika"
+                    label="Konekcija za preuzimanje kursa"
                     onChange={(e) => {
                       setSourceId(e.target.value);
+                      setPortalUsername("");
+                      setPortalPassword("");
                       setTestResult(null);
                     }}
                   >
@@ -437,6 +473,41 @@ export function SupplierCurrenciesPage() {
                   {selectedSource?.portal_supplier_code ??
                     "nije podešena na izabranoj konekciji"}
                 </Alert>
+                {selectedSource?.configuration.authentication_type ===
+                  "PORTAL_FORM" && (
+                  <>
+                    <Alert
+                      severity={
+                        selectedSource.credentials_available
+                          ? "success"
+                          : "warning"
+                      }
+                    >
+                      {selectedSource.credentials_available
+                        ? "Pristup portalu je već bezbedno podešen. Polja ispod ostavite prazna ako ga ne menjate."
+                        : "Ova konekcija zahteva pristupne podatke portala."}
+                    </Alert>
+                    <TextField
+                      label="Korisničko ime za portal kursa"
+                      value={portalUsername}
+                      autoComplete="off"
+                      onChange={(e) => {
+                        setPortalUsername(e.target.value);
+                        setTestResult(null);
+                      }}
+                    />
+                    <TextField
+                      label="Lozinka za portal kursa"
+                      type="password"
+                      value={portalPassword}
+                      autoComplete="new-password"
+                      onChange={(e) => {
+                        setPortalPassword(e.target.value);
+                        setTestResult(null);
+                      }}
+                    />
+                  </>
+                )}
               </>
             )}
             <TextField
@@ -615,6 +686,7 @@ export function SupplierCurrenciesPage() {
                     !automaticUrl ||
                     !extractionExpression ||
                     (Boolean(fallbackMethod) && !fallbackExpression) ||
+                    portalCredentialsInvalid ||
                     testSource.isPending
                   }
                   onClick={() => testSource.mutate()}
@@ -648,7 +720,8 @@ export function SupplierCurrenciesPage() {
                 (!automaticUrl ||
                   !extractionExpression ||
                   !testResult ||
-                  (Boolean(fallbackMethod) && !fallbackExpression)))
+                  (Boolean(fallbackMethod) && !fallbackExpression) ||
+                  portalCredentialsInvalid))
             }
             onClick={() => saveSetting.mutate()}
           >

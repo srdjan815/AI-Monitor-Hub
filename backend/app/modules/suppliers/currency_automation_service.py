@@ -167,9 +167,7 @@ class SupplierCurrencyAutomationService:
             .replace(encoded_placeholder.lower(), encoded)
         )
 
-    async def refresh(
-        self, supplier_id: uuid.UUID, source_id: uuid.UUID | None = None
-    ) -> SupplierExchangeRate:
+    async def refresh(self, supplier_id: uuid.UUID) -> SupplierExchangeRate:
         setting = await self._setting(supplier_id, lock=True)
         if not setting or setting.rate_mode != "AUTOMATIC":
             raise ValueError("Automatsko podešavanje valute nije aktivno")
@@ -179,11 +177,6 @@ class SupplierCurrencyAutomationService:
             raise CurrencyPreflightError(
                 "KONFIGURACIJA_KURSA_NEISPRAVNA",
                 "Automatski kurs nema povezanu konekciju cenovnika",
-            )
-        if source_id is not None and setting.source_connection_id != source_id:
-            raise CurrencyPreflightError(
-                "KONFIGURACIJA_KURSA_NEISPRAVNA",
-                "Kurs je povezan sa drugom konekcijom cenovnika",
             )
         source = await self._source(supplier_id, setting.source_connection_id)
         checked_at = datetime.now(UTC)
@@ -261,14 +254,9 @@ class SupplierCurrencyAutomationService:
         if setting is None or setting.currency_code == "RSD":
             rate = await self._latest(setting.id) if setting else None
             return CurrencyPreflightResult("KURS_NIJE_POTREBAN", rate)
-        if setting.source_connection_id != source.id:
-            raise CurrencyPreflightError(
-                "KONFIGURACIJA_KURSA_NEISPRAVNA",
-                "Podešavanje kursa nije vezano za ovu konekciju cenovnika",
-            )
         if setting.rate_mode == "AUTOMATIC":
             try:
-                rate = await self.refresh(source.supplier_id, source.id)
+                rate = await self.refresh(source.supplier_id)
             except CurrencyPreflightError:
                 raise
             except (CurrencyRateFetchError, CurrencyRateParseError) as exc:

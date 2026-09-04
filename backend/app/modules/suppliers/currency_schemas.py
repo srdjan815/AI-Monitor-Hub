@@ -74,7 +74,7 @@ class CurrencySettingWrite(BaseModel):
         if self.rate_mode == "AUTOMATIC" and self.automatic_source_url is None:
             raise ValueError("Automatski kurs zahteva HTTPS adresu izvora")
         if self.rate_mode == "AUTOMATIC" and self.source_connection_id is None:
-            raise ValueError("Automatski kurs zahteva konekciju dobavljača")
+            raise ValueError("Automatski kurs zahteva konekciju za preuzimanje kursa")
         if self.rate_mode == "AUTOMATIC" and not self.extraction_expression:
             raise ValueError("Automatski kurs zahteva izraz za pronalaženje vrednosti")
         if bool(self.fallback_extraction_method) != bool(

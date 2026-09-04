@@ -146,19 +146,22 @@ def test_portal_supplier_code_is_safely_inserted() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pipeline_preflight_rejects_wrong_source() -> None:
+async def test_pipeline_preflight_allows_separate_rate_source() -> None:
     service = SupplierCurrencyAutomationService(AsyncMock())
     service._setting = AsyncMock(
         return_value=SimpleNamespace(
+            id=uuid.uuid4(),
             currency_code="EUR",
             source_connection_id=uuid.uuid4(),
             rate_mode="MANUAL",
+            max_rate_age_hours=24,
         )
     )
+    expected_rate = SimpleNamespace(effective_at=datetime.now(UTC))
+    service._latest = AsyncMock(return_value=expected_rate)
     source = SimpleNamespace(id=uuid.uuid4(), supplier_id=uuid.uuid4())
-    with pytest.raises(CurrencyPreflightError) as captured:
-        await service.preflight(source)
-    assert captured.value.code == "KONFIGURACIJA_KURSA_NEISPRAVNA"
+    result = await service.preflight(source)
+    assert result.rate is expected_rate
 
 
 @pytest.mark.asyncio
