@@ -13,6 +13,7 @@ from app.modules.suppliers.source_adapters.adapters import (
     ManualUploadAdapter,
 )
 
+
 class RejectingSecretResolver:
     def resolve(self, reference: str) -> dict[str, str]:
         raise AcquisitionFailure(
@@ -29,7 +30,7 @@ class UnsupportedSourceAdapter:
     ) -> AcquiredPayload:
         raise AcquisitionFailure(
             "acquisition_source_type_unsupported",
-            f"IzvrÅ¡enje za vrstu {source.source_type} nije podrÅ¾ano u Chapter 3.5",
+            f"Izvršenje za vrstu {source.source_type} nije podržano u Chapter 3.5",
         )
 
 
@@ -61,7 +62,7 @@ class SourceAdapterRegistry:
         if adapter is None:
             raise AcquisitionFailure(
                 "acquisition_source_type_unsupported",
-                "Vrsta izvora nije podrÅ¾ana",
+                "Vrsta izvora nije podržana",
             )
         return adapter
 
@@ -71,4 +72,3 @@ __all__ = [
     "SourceAdapterRegistry",
     "UnsupportedSourceAdapter",
 ]
-

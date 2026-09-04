@@ -107,16 +107,16 @@ table{border-collapse:collapse;width:100%}td,th{padding:.4rem;border-bottom:1px 
 <button onclick="loadDefinitions()">Definitions</button><button onclick="newDefinition()">New definition</button>
 <button onclick="loadCategory()">Category layout</button>
 <button onclick="loadProduct()">Product editor</button><button onclick="loadReview()">Review queue</button></nav>
-<nav><a href="/api/v1/catalog/attribute-admin/families">Families</a> Â·
-<a href="/api/v1/catalog/attribute-admin/templates">Templates</a> Â·
-<a href="/api/v1/catalog/attribute-admin/formulas">Formulas</a> Â·
-<a href="/api/v1/catalog/attribute-admin/derived">Derived</a> Â·
-<a href="/api/v1/catalog/attribute-admin/dependencies">Dependencies</a> Â·
-<a href="/api/v1/catalog/attribute-admin/prompts">Prompts</a> Â·
-<a href="/api/v1/catalog/attribute-admin/usage">Usage</a> Â·
-<a href="/api/v1/catalog/attribute-admin/bulk">Bulk editor</a> Â·
+<nav><a href="/api/v1/catalog/attribute-admin/families">Families</a> ·
+<a href="/api/v1/catalog/attribute-admin/templates">Templates</a> ·
+<a href="/api/v1/catalog/attribute-admin/formulas">Formulas</a> ·
+<a href="/api/v1/catalog/attribute-admin/derived">Derived</a> ·
+<a href="/api/v1/catalog/attribute-admin/dependencies">Dependencies</a> ·
+<a href="/api/v1/catalog/attribute-admin/prompts">Prompts</a> ·
+<a href="/api/v1/catalog/attribute-admin/usage">Usage</a> ·
+<a href="/api/v1/catalog/attribute-admin/bulk">Bulk editor</a> ·
 <a href="/api/v1/catalog/attribute-admin/locked">Locked values</a></nav>
-<section id="view">Loadingâ€¦</section>
+<section id="view">Loading…</section>
 <script>
 const api='/api/v1/catalog', view=document.querySelector('#view');
 async function json(path, options){const r=await fetch(api+path,options);if(!r.ok)throw Error(await r.text());return r.json()}
@@ -136,7 +136,7 @@ body:JSON.stringify({name,slug,scope:'GLOBAL',storage_kind:'ATTRIBUTE_VALUE',dat
 async function loadCategory(){const id=prompt('Category UUID');if(!id)return;const d=await json(`/categories/${id}/attributes/resolved`);
 view.innerHTML='<h2>Resolved category layout</h2>'+d.map(x=>`<p>${x.sort_order}. ${x.definition.name} ${x.inherited_from_category_id?'(assigned/inherited)':'(global)'}</p>`).join('')}
 async function loadProduct(){const id=prompt('Product UUID');if(!id)return;const d=await json(`/products/${id}/attributes`);
-view.innerHTML='<h2>Product attribute editor</h2>'+d.map(x=>`<p><b>${x.definition.name}</b>: ${x.display_value??'â€”'} ${x.read_only?'ðŸ”’':''}</p>`).join('')}
+view.innerHTML='<h2>Product attribute editor</h2>'+d.map(x=>`<p><b>${x.definition.name}</b>: ${x.display_value??'—'} ${x.read_only?'🔒':''}</p>`).join('')}
 async function loadReview(){const d=await json('/attribute-dashboard');view.innerHTML=`<h2>Review queue</h2>
 <p>Pending ${d.pending_review_values}; invalid ${d.invalid_values}; warnings ${d.warning_values};
 low confidence ${d.low_confidence_values}</p><p>Use Product editor and approval APIs for decisions.</p>`}

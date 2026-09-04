@@ -145,9 +145,7 @@ class UrllibHttpClient:
         if not query:
             return url
         parsed = urllib.parse.urlsplit(url)
-        parameters = dict(
-            urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-        )
+        parameters = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
         parameters.update(query)
         return urllib.parse.urlunsplit(
             (

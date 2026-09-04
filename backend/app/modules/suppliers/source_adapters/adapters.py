@@ -16,6 +16,7 @@ from app.modules.suppliers.kimtec_acquisition import acquire_kimtec_payload
 from app.modules.suppliers.models import SupplierSource
 from app.modules.suppliers.pin_soap_acquisition import acquire_pin_payload
 
+
 class ManualUploadAdapter:
     async def acquire(
         self,
@@ -25,7 +26,7 @@ class ManualUploadAdapter:
         if supplied is None:
             raise AcquisitionFailure(
                 "acquisition_upload_required",
-                "RuÄni izvor zahteva upload sadrÅ¾aja",
+                "Ručni izvor zahteva upload sadržaja",
             )
         return supplied
 
@@ -96,7 +97,7 @@ class HttpSourceAdapter:
             if not callable(portal_request) or not username or not password:
                 raise AcquisitionFailure(
                     "acquisition_portal_credentials_missing",
-                    "Pristupni podaci za prijavu na portal nisu podeÅ¡eni",
+                    "Pristupni podaci za prijavu na portal nisu podešeni",
                 )
             response = await portal_request(
                 login_url=str(config["login_url"]),
@@ -137,7 +138,7 @@ class HttpSourceAdapter:
         if len(response.content) > self.maximum_bytes:
             raise AcquisitionFailure(
                 "acquisition_artifact_too_large",
-                "Odgovor izvora prelazi dozvoljenu veliÄinu",
+                "Odgovor izvora prelazi dozvoljenu veličinu",
             )
         return AcquiredPayload(
             content=response.content,
@@ -167,7 +168,7 @@ class HttpSourceAdapter:
         if not callable(request) or not certificate or password is None:
             raise AcquisitionFailure(
                 "acquisition_client_certificate_missing",
-                "Klijentski sertifikat nije podeÅ¡en za ovu konekciju",
+                "Klijentski sertifikat nije podešen za ovu konekciju",
             )
         request_headers = dict(headers)
         request_headers.update(extra_headers or {})
@@ -229,7 +230,7 @@ class HttpSourceAdapter:
         if not callable(request) or not username or not password:
             raise AcquisitionFailure(
                 "acquisition_ct_credentials_missing",
-                "CT korisniÄko ime i lozinka nisu trajno podeÅ¡eni",
+                "CT korisničko ime i lozinka nisu trajno podešeni",
             )
 
         async def fetch(
@@ -270,7 +271,7 @@ class HttpSourceAdapter:
         if not callable(request) or not guid:
             raise AcquisitionFailure(
                 "acquisition_pin_guid_missing",
-                "PIN/ALSO klijentski GUID nije trajno podeÅ¡en",
+                "PIN/ALSO klijentski GUID nije trajno podešen",
             )
 
         async def fetch(
@@ -323,4 +324,3 @@ class HttpSourceAdapter:
 
 
 __all__ = ["HttpSourceAdapter", "ManualUploadAdapter"]
-
