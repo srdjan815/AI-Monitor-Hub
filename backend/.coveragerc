@@ -1,0 +1,23 @@
+[run]
+branch = True
+source = app
+parallel = True
+sigterm = True
+
+[report]
+show_missing = True
+skip_covered = False
+precision = 2
+exclude_also =
+    if TYPE_CHECKING:
+    raise NotImplementedError
+
+[html]
+directory = coverage-reports/html
+
+[xml]
+output = coverage-reports/coverage.xml
+
+[json]
+output = coverage-reports/coverage.json
+show_contexts = True

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "global": {
+    "minimum_statement_percent": 79.0,
+    "minimum_branch_percent": 52.0
+  },
+  "groups": {
+    "critical_supplier_decisions": {
+      "description": "Identitet artikla, Delta odluke, zabrana objave i snapshot otisak",
+      "minimum_statement_percent": 97.0,
+      "minimum_branch_percent": 90.0,
+      "files": [
+        "app/modules/suppliers/acquisition_processing.py",
+        "app/modules/suppliers/delta_calculator.py",
+        "app/modules/suppliers/downstream_publication_policy.py",
+        "app/modules/suppliers/gtin_normalization.py",
+        "app/modules/suppliers/snapshot_fingerprints.py"
+      ]
+    }
+  }
+}
