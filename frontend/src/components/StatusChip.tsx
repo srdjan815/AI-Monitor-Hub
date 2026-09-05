@@ -11,7 +11,7 @@ import {
 import { Chip, Tooltip } from "@mui/material";
 
 const success = new Set(["ACTIVE", "READY", "SUCCEEDED", "VALID", "RESOLVED", "MANUALLY_APPROVED", "AUTO_RELEASED"]);
-const error = new Set(["FAILED", "ERROR", "CRITICAL", "INVALID"]);
+const error = new Set(["FAILED", "ERROR", "CRITICAL", "KRITIČNO", "INVALID"]);
 const warning = new Set([
   "PARTIALLY_SUCCEEDED",
   "OPEN",
@@ -19,6 +19,7 @@ const warning = new Set([
   "P1",
   "P2",
   "RESTORING"
+  ,"UPOZORENJE"
   ,"PENDING_REVIEW"
 ]);
 const muted = new Set([

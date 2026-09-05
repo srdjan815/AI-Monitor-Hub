@@ -31,6 +31,7 @@ from app.modules.suppliers import incident_models  # noqa: F401
 from app.modules.suppliers import pipeline_models  # noqa: F401
 from app.modules.suppliers import currency_models  # noqa: F401
 from app.modules.suppliers import eol_models  # noqa: F401
+from app.modules.system import models as system_models  # noqa: F401
 
 # --------------------------------------------------------------------
 # Alembic configuration

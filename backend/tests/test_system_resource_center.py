@@ -1,0 +1,186 @@
+from __future__ import annotations
+
+import os
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+import httpx
+
+from app.core.config import settings
+from app.core.security import create_access_token
+from app.main import app
+from app.modules.system.resource_service import (
+    candidate_digest,
+    cleanup_candidates,
+    create_confirmation_token,
+    verify_confirmation_token,
+)
+
+
+def _old(path: Path, days: int = 40) -> None:
+    moment = (datetime.now(UTC) - timedelta(days=days)).timestamp()
+    os.utime(path, (moment, moment))
+
+
+def test_cleanup_is_restricted_to_explicit_allowlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log_root = tmp_path / "application" / "logs"
+    log_root.mkdir(parents=True)
+    old_log = log_root / "application.log.1"
+    current_log = log_root / "application.log"
+    old_log.write_text("old", encoding="utf-8")
+    current_log.write_text("current", encoding="utf-8")
+    _old(old_log)
+    monkeypatch.setattr(settings, "system_log_root", str(log_root))
+
+    candidates = cleanup_candidates("LOGOVI", 30)
+
+    assert [candidate.path for candidate in candidates] == [old_log]
+    with pytest.raises(ValueError, match="nije dozvoljena"):
+        cleanup_candidates("CENOVNICI", 30)
+
+
+def test_cleanup_ignores_symlinks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log_root = tmp_path / "application" / "logs"
+    protected_root = tmp_path / "protected"
+    log_root.mkdir(parents=True)
+    protected_root.mkdir()
+    protected = protected_root / "business.txt"
+    protected.write_text("never delete", encoding="utf-8")
+    link = log_root / "linked.log"
+    try:
+        link.symlink_to(protected)
+    except OSError:
+        pytest.skip("Platforma ne dozvoljava kreiranje simboličkog linka")
+    _old(protected)
+    monkeypatch.setattr(settings, "system_log_root", str(log_root))
+
+    assert cleanup_candidates("LOGOVI", 30) == []
+    assert protected.read_text(encoding="utf-8") == "never delete"
+
+
+def test_confirmation_token_binds_category_age_and_exact_file_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log_root = tmp_path / "application" / "logs"
+    log_root.mkdir(parents=True)
+    log = log_root / "old.log"
+    log.write_text("first", encoding="utf-8")
+    _old(log)
+    monkeypatch.setattr(settings, "system_log_root", str(log_root))
+    original = cleanup_candidates("LOGOVI", 30)
+    digest = candidate_digest(original)
+    token, _ = create_confirmation_token("LOGOVI", 30, digest)
+
+    assert verify_confirmation_token(token, "LOGOVI", 30, digest)
+    assert not verify_confirmation_token(token, "LOGOVI", 31, digest)
+    assert not verify_confirmation_token(token + "x", "LOGOVI", 30, digest)
+
+    log.write_text("changed", encoding="utf-8")
+    _old(log)
+    changed_digest = candidate_digest(cleanup_candidates("LOGOVI", 30))
+    assert changed_digest != digest
+    assert not verify_confirmation_token(token, "LOGOVI", 30, changed_digest)
+
+
+def test_unsafe_broad_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "system_log_root", str(Path("/").resolve()))
+
+    with pytest.raises(RuntimeError, match="nije dovoljno uska"):
+        cleanup_candidates("LOGOVI", 30)
+
+
+def _bearer(subject: str, role: str) -> dict[str, str]:
+    token = create_access_token(subject, (role,))
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.mark.asyncio
+async def test_system_endpoints_are_admin_only_and_inventory_is_operational() -> None:
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        denied = await client.get(
+            "/api/v1/system/resources", headers=_bearer("reader", "read_only")
+        )
+        inventory = await client.get(
+            "/api/v1/system/resources", headers=_bearer("admin", "system_admin")
+        )
+        preview = await client.post(
+            "/api/v1/system/resources/cleanup/preview",
+            headers=_bearer("admin", "system_admin"),
+            json={"category": "LOGOVI", "older_than_days": 30},
+        )
+
+    assert denied.status_code == 403
+    assert inventory.status_code == 200, inventory.text
+    body = inventory.json()
+    assert body["database_size_bytes"] > 0
+    assert {item["code"] for item in body["categories"]} == {
+        "LOGOVI",
+        "PRIVREMENI_FAJLOVI",
+        "CENOVNICI",
+        "SNAPSHOT_ARHIVE",
+    }
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["confirmation_token"]
+
+
+@pytest.mark.asyncio
+async def test_confirmed_cleanup_deletes_only_previewed_files_and_writes_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log_root = tmp_path / "application" / "logs"
+    log_root.mkdir(parents=True)
+    old_log = log_root / "application.log.1"
+    current_log = log_root / "application.log"
+    old_log.write_text("old", encoding="utf-8")
+    current_log.write_text("current", encoding="utf-8")
+    _old(old_log)
+    monkeypatch.setattr(settings, "system_log_root", str(log_root))
+    headers = _bearer("cleanup-admin", "system_admin")
+    request = {"category": "LOGOVI", "older_than_days": 30}
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        preview = await client.post(
+            "/api/v1/system/resources/cleanup/preview",
+            headers=headers,
+            json=request,
+        )
+        assert preview.status_code == 200, preview.text
+        result = await client.post(
+            "/api/v1/system/resources/cleanup/execute",
+            headers=headers,
+            json={
+                **request,
+                "confirmation_token": preview.json()["confirmation_token"],
+            },
+        )
+        replay = await client.post(
+            "/api/v1/system/resources/cleanup/execute",
+            headers=headers,
+            json={
+                **request,
+                "confirmation_token": preview.json()["confirmation_token"],
+            },
+        )
+        audit = await client.get(
+            "/api/v1/system/resources/cleanup/audit", headers=headers
+        )
+
+    assert result.status_code == 200, result.text
+    assert result.json()["status"] == "SUCCEEDED"
+    assert result.json()["deleted_files"] == 1
+    assert replay.status_code == 409
+    assert not old_log.exists()
+    assert current_log.read_text(encoding="utf-8") == "current"
+    assert audit.status_code == 200, audit.text
+    record = next(
+        item for item in audit.json() if item["id"] == result.json()["audit_id"]
+    )
+    assert record["actor_id"] == "cleanup-admin"
+    assert record["deleted_files"] == 1

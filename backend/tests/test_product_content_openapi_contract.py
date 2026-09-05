@@ -21,7 +21,8 @@ def test_product_content_openapi_contract_snapshot() -> None:
         "schemas": {
             name: value
             for name, value in schema["components"]["schemas"].items()
-            if any(
+            if not name.startswith("Cleanup")
+            and any(
                 marker in name
                 for marker in (
                     "Content",
