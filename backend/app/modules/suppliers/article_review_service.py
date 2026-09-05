@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.security import current_actor_id
+from app.modules.suppliers.article_review_lifecycle import (
+    release_resolved_shared_ean_groups,
+)
 from app.modules.suppliers.article_review_models import (
     SupplierArticleReview,
     SupplierArticleReviewEvent,
@@ -35,6 +38,7 @@ ISSUE_CODES = {
     "REMOVAL_REQUIRES_REVIEW": "ARTICLE_REMOVED",
     "EAN_CHANGE_REQUIRES_REVIEW": "EAN_CHANGED",
     "SHARED_EAN_LOW_NAME_SIMILARITY": "EAN_SHARED_BY_MULTIPLE_ARTICLES",
+    "SHARED_EAN_GROUP_LIMIT_EXCEEDED": "EAN_GROUP_TOO_LARGE",
     "CRITICAL_PRICE_CHANGE": "CRITICAL_PRICE_CHANGE",
     "NAME_CHANGE_REQUIRES_REVIEW": "NAME_CHANGED",
 }
@@ -139,6 +143,16 @@ class SupplierArticleReviewService:
                         },
                     )
                 )
+
+        additions.extend(
+            await release_resolved_shared_ean_groups(
+                self.repository,
+                source_id=run.source_connection_id,
+                delta_run_id=run.id,
+                delta_items=delta_items,
+                decided_at=now,
+            )
+        )
 
         if additions:
             await self.repository.add_all(additions)
@@ -265,6 +279,7 @@ class SupplierArticleReviewService:
             status=review.status,
             severity=review.severity,
             issue_codes=review.issue_codes,
+            control_details=delta.change_summary,
             previous_data=previous.mapped_data if previous else None,
             current_data=current.mapped_data if current else None,
             field_changes=[self._field_read(field) for field in fields],

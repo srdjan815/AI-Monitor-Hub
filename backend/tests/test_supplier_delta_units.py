@@ -123,6 +123,64 @@ def test_shared_ean_is_allowed_but_unrelated_names_are_marked_for_review() -> No
     )
 
 
+def test_shared_ean_group_limit_allows_eight_distinct_codes() -> None:
+    items = [
+        _snapshot_item(f"VAR-{index}", "8606019540128", str(index))
+        for index in range(8)
+    ]
+    for item in items:
+        item.mapped_data["name"] = "Isti proizvod različita varijanta"
+
+    assert shared_ean_findings(items, max_group_size=8) == []
+
+
+def test_shared_ean_group_limit_blocks_nine_without_pair_expansion() -> None:
+    items = [
+        _snapshot_item(f"VAR-{index:05d}", "8606019540128", str(index))
+        for index in range(10_000)
+    ]
+
+    findings = shared_ean_findings(items, max_group_size=8)
+
+    assert len(findings) == 1
+    assert findings[0].finding_type == "GROUP_LIMIT_EXCEEDED"
+    assert findings[0].review_level == "MANUAL_REVIEW"
+    assert findings[0].group_size == 10_000
+    assert len(findings[0].product_codes) == 8
+
+
+def test_shared_ean_group_limit_creates_one_blocking_delta_control() -> None:
+    current = [
+        _snapshot_item(f"VAR-{index}", "8606019540128", str(index))
+        for index in range(9)
+    ]
+
+    items, _, stats = SupplierDeltaService(None)._compare(  # type: ignore[arg-type]
+        uuid.uuid4(), [], current
+    )
+    controls = [item for item in items if item.change_type == "REVIEW"]
+
+    assert stats["added_items"] == 9
+    assert len(controls) == 1
+    assert controls[0].change_summary["classification"] == (
+        "SHARED_EAN_GROUP_LIMIT_BLOCKED"
+    )
+    assert controls[0].change_summary["shared_ean_group_size"] == 9
+    assert controls[0].change_summary["shared_ean_group_limit"] == 8
+    assert controls[0].change_summary["downstream_blocked"] is True
+    assert "SHARED_EAN_GROUP_LIMIT_EXCEEDED" in controls[0].anomaly_flags
+    assert "DOWNSTREAM_ITEM_BLOCKED" in controls[0].anomaly_flags
+
+
+def test_duplicate_rows_for_same_code_do_not_inflate_shared_ean_group() -> None:
+    items = [
+        _snapshot_item("SAME-CODE", "8606019540128", str(index))
+        for index in range(100)
+    ]
+
+    assert shared_ean_findings(items, max_group_size=8) == []
+
+
 @pytest.mark.parametrize(
     ("previous_price", "current_price", "classification", "critical_flag"),
     [

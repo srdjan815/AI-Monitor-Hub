@@ -181,22 +181,35 @@ def add_shared_ean_reviews(
 ) -> None:
     for finding in shared_ean_findings(list(current)):
         requires_review = finding.review_level == "MANUAL_REVIEW"
-        key = (
-            "SHARED_EAN",
-            f"{finding.ean}:{finding.first_code.casefold()}:{finding.second_code.casefold()}",
+        group_limit_exceeded = finding.finding_type == "GROUP_LIMIT_EXCEEDED"
+        key_value = (
+            f"{finding.ean}:group-limit"
+            if group_limit_exceeded
+            else f"{finding.ean}:{finding.first_code.casefold()}:{finding.second_code.casefold()}"
         )
         items.append(
             delta_item(
                 run_id,
                 "REVIEW",
-                key,
+                ("SHARED_EAN", key_value),
                 None,
                 None,
-                classification="SHARED_EAN_NAME_REVIEW",
+                classification=(
+                    "SHARED_EAN_GROUP_LIMIT_BLOCKED"
+                    if group_limit_exceeded
+                    else "SHARED_EAN_NAME_REVIEW"
+                ),
                 anomaly_flags=[
-                    "SHARED_EAN_LOW_NAME_SIMILARITY"
-                    if finding.review_level == "MANUAL_REVIEW"
-                    else "SHARED_EAN_INFORMATIONAL"
+                    *(["DOWNSTREAM_ITEM_BLOCKED"] if requires_review else []),
+                    (
+                        "SHARED_EAN_GROUP_LIMIT_EXCEEDED"
+                        if group_limit_exceeded
+                        else (
+                            "SHARED_EAN_LOW_NAME_SIMILARITY"
+                            if finding.review_level == "MANUAL_REVIEW"
+                            else "SHARED_EAN_INFORMATIONAL"
+                        )
+                    ),
                 ],
                 summary={
                     "ean": finding.ean,
@@ -204,6 +217,12 @@ def add_shared_ean_reviews(
                     "second_product_code": finding.second_code,
                     "name_similarity": finding.name_similarity,
                     "review_level": finding.review_level,
+                    "shared_ean_group_size": finding.group_size,
+                    "shared_ean_group_limit": settings.supplier_shared_ean_max_group_size,
+                    "product_codes_sample": list(finding.product_codes),
+                    "omitted_product_codes": max(
+                        finding.group_size - len(finding.product_codes), 0
+                    ),
                     "downstream_blocked": requires_review,
                     "requires_manual_approval": requires_review,
                 },

@@ -162,6 +162,20 @@ class SupplierArticleReviewRepository:
         )
         return list(rows.scalars())
 
+    async def pending_shared_ean_group_reviews(
+        self, source_id: uuid.UUID
+    ) -> list[SupplierArticleReview]:
+        rows = await self.session.execute(
+            select(SupplierArticleReview)
+            .where(
+                SupplierArticleReview.source_connection_id == source_id,
+                SupplierArticleReview.status == "PENDING_REVIEW",
+                SupplierArticleReview.issue_codes.contains(["EAN_GROUP_TOO_LARGE"]),
+            )
+            .with_for_update()
+        )
+        return list(rows.scalars())
+
     async def add_all(self, values: Sequence[object]) -> None:
         self.session.add_all(values)
         await self.session.flush()

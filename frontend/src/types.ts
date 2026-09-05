@@ -22,6 +22,7 @@ export interface ArticleReview {
   status: string;
   severity: string;
   issue_codes: string[];
+  control_details: Record<string, unknown>;
   previous_data?: Record<string, unknown> | null;
   current_data?: Record<string, unknown> | null;
   field_changes: Array<Record<string, unknown>>;
