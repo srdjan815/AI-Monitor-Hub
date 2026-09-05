@@ -4,25 +4,14 @@ import {
   CancelRounded,
   PlayArrowRounded,
   RefreshRounded,
-  SearchRounded,
   UploadFileRounded
 } from "@mui/icons-material";
 import {
   Alert,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   MenuItem,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography
@@ -39,29 +28,11 @@ import { RelatedData } from "../components/RelatedData";
 import { useAuth } from "../state/AuthContext";
 import { useWorkspace } from "../state/WorkspaceContext";
 import type { ApiError, Operation } from "../types";
+import { isSchemaAnalysis, type PriceListRecord, type PriceListRecordPage, type ResourceConfiguration, type SchemaAnalysis } from "./scopedResource/resourceModel";
+import { PriceListRecordDialog, SchemaAnalysisDialog } from "./scopedResource/ResourceDialogs";
+import { SchemaCatalogPanel } from "./scopedResource/SchemaCatalogPanel";
 
-export interface ResourceConfiguration {
-  resource: string;
-  title: string;
-  description: string;
-  codeField: string;
-  permissionRead: string;
-  permissionWrite?: string;
-  statusField?: string;
-  extraColumns?: Array<{
-    key: string;
-    label: string;
-    tooltip: string;
-  }>;
-  actions?: Array<{
-    name: string;
-    label: string;
-    tooltip: string;
-    permission: string;
-    icon: "play" | "upload" | "cancel" | "retry";
-    body?: Record<string, unknown>;
-  }>;
-}
+export type { ResourceConfiguration } from "./scopedResource/resourceModel";
 
 const icons = {
   play: <PlayArrowRounded />,
@@ -69,70 +40,6 @@ const icons = {
   cancel: <CancelRounded />,
   retry: <RefreshRounded />
 };
-
-interface SchemaAnalysis {
-  profile: Operation;
-  original_filename?: string | null;
-  detected_format: string;
-  encoding?: string | null;
-  delimiter?: string | null;
-  header_row?: number | null;
-  record_count: number;
-  sampled_record_count: number;
-  fields: Array<{
-    field: {
-      id: string;
-      position: number;
-      name: string;
-      data_type: string;
-      nullable: boolean;
-    };
-    sample_values: string[];
-    confidence: number;
-  }>;
-}
-
-interface PriceListRecord {
-  manufacturer_code?: string | null;
-  ean?: string | null;
-  name?: string | null;
-  price?: string | null;
-  duplicate_count: number;
-  values: Record<string, string | null>;
-}
-
-interface PriceListRecordPage {
-  items: PriceListRecord[];
-  total: number;
-  source_record_count: number;
-}
-
-function isSchemaAnalysis(value: unknown): value is SchemaAnalysis {
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      "profile" in value &&
-      "fields" in value &&
-      Array.isArray((value as SchemaAnalysis).fields)
-  );
-}
-
-function readableSupplierValue(value: string | null): string {
-  if (!value) return "—";
-  if (!/<[a-z][\s\S]*>/i.test(value)) return value;
-  const document = new DOMParser().parseFromString(value, "text/html");
-  const rows = [...document.querySelectorAll("tr")]
-    .map((row) => {
-      const label = row.querySelector("th")?.textContent?.trim();
-      const content = row.querySelector("td")?.textContent?.trim();
-      return label && content ? `${label}: ${content}` : null;
-    })
-    .filter((row): row is string => Boolean(row));
-  if (rows.length) return rows.join("\n");
-  return (document.body.textContent ?? "")
-    .replace(/\s+/g, " ")
-    .trim() || "—";
-}
 
 export function ScopedResourcePage({ config }: { config: ResourceConfiguration }) {
   const workspace = useWorkspace();
@@ -683,220 +590,27 @@ export function ScopedResourcePage({ config }: { config: ResourceConfiguration }
         </Stack>
       )}
       {config.resource === "schema-profiles" && !schemaDebug && !analysis ? (
-        <Stack gap={2}>
-          <Typography color="text.secondary">
-            Kliknite „Importuj cenovnik“ da sačuvate originalni fajl i
-            analizirate njegova polja. Ranije preuzeti cenovnik možete izabrati
-            ispod.
-          </Typography>
-          <TextField
-            select
-            size="small"
-            label="Izaberite preuzeti cenovnik"
-            value={selectedSchemaId}
-            onChange={(event) => setSelectedSchemaId(event.target.value)}
-            sx={{ maxWidth: 520 }}
-          >
-            {result.isLoading && (
-              <MenuItem disabled value="">
-                Učitavanje preuzetih cenovnika…
-              </MenuItem>
-            )}
-            {!result.isLoading && !(result.data?.items.length ?? 0) && (
-              <MenuItem disabled value="">
-                Nema uspešno preuzetih cenovnika za ovaj izvor
-              </MenuItem>
-            )}
-            {(result.data?.items ?? []).map((profile) => (
-              <MenuItem key={profile.id} value={profile.id}>
-                {String(profile.name)} · {String(profile.status)} ·{" "}
-                {String(profile.baseline_record_count ?? 0)} proizvoda
-              </MenuItem>
-            ))}
-          </TextField>
-          {selectedSchema && (
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Stack gap={2}>
-                <Stack direction={{ xs: "column", sm: "row" }} gap={3}>
-                  <Typography fontWeight={700}>{String(selectedSchema.name)}</Typography>
-                  <Typography>
-                    Format: {String(selectedSchema.detected_format ?? "—")}
-                  </Typography>
-                  <Typography>
-                    Proizvoda: {String(selectedSchema.baseline_record_count ?? 0)}
-                  </Typography>
-                  <Typography>
-                    Polja: {String(selectedSchema.field_count ?? 0)}
-                  </Typography>
-                  <StatusChip value={String(selectedSchema.status)} />
-                </Stack>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Polje u cenovniku</TableCell>
-                        <TableCell>Primer sadržaja</TableCell>
-                        <TableCell>Prepoznati tip</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(schemaFields.data?.items ?? []).map((field) => (
-                        <TableRow key={field.id}>
-                          <TableCell>{String(field.name)}</TableCell>
-                          <TableCell>{String(field.example_value ?? "—")}</TableCell>
-                          <TableCell>{String(field.data_type)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <Typography variant="h6">Sadržaj cenovnika</Typography>
-                <Typography color="text.secondary">
-                  Pretražite sve artikle po šifri proizvođača, EAN kodu, nazivu,
-                  ceni ili bilo kojoj drugoj vrednosti iz izvornog cenovnika.
-                </Typography>
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  gap={1}
-                  component="form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    setRecordPage(0);
-                    setAppliedRecordSearch(recordSearch.trim());
-                  }}
-                >
-                  <TextField
-                    size="small"
-                    label="Pretraži artikle"
-                    placeholder="Šifra, naziv, EAN ili cena"
-                    value={recordSearch}
-                    onChange={(event) => setRecordSearch(event.target.value)}
-                    sx={{ width: { xs: "100%", sm: 440 } }}
-                  />
-                  <Button
-                    type="submit"
-                    variant="outlined"
-                    startIcon={<SearchRounded />}
-                  >
-                    Pretraži
-                  </Button>
-                  {appliedRecordSearch && (
-                    <Button
-                      onClick={() => {
-                        setRecordSearch("");
-                        setAppliedRecordSearch("");
-                        setRecordPage(0);
-                      }}
-                    >
-                      Obriši pretragu
-                    </Button>
-                  )}
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {priceListRecords.data
-                    ? `${priceListRecords.data.total} prikazanih jedinstvenih artikala od ${priceListRecords.data.source_record_count} izvornih redova`
-                    : "Učitavanje sadržaja cenovnika…"}
-                </Typography>
-                <TableContainer sx={{ maxHeight: 520 }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Šifra proizvođača</TableCell>
-                        <TableCell>EAN</TableCell>
-                        <TableCell>Naziv</TableCell>
-                        <TableCell align="right">Cena</TableCell>
-                        <TableCell align="right">Ponavljanja</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(priceListRecords.data?.items ?? []).map((record, index) => (
-                        <TableRow
-                          hover
-                          key={`${record.manufacturer_code ?? ""}-${record.ean ?? ""}-${record.name ?? ""}-${record.price ?? ""}-${index}`}
-                          onClick={() => setOpenedRecord(record)}
-                          sx={{ cursor: "pointer" }}
-                        >
-                          <TableCell>{record.manufacturer_code || "—"}</TableCell>
-                          <TableCell>{record.ean || "—"}</TableCell>
-                          <TableCell>{record.name || "—"}</TableCell>
-                          <TableCell align="right">{record.price || "—"}</TableCell>
-                          <TableCell align="right">
-                            {record.duplicate_count}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {!priceListRecords.isLoading &&
-                        !(priceListRecords.data?.items.length ?? 0) && (
-                          <TableRow>
-                            <TableCell colSpan={5} align="center">
-                              Nema artikala koji odgovaraju pretrazi.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <Stack direction="row" justifyContent="flex-end" gap={1}>
-                  <Button
-                    disabled={recordPage === 0 || priceListRecords.isFetching}
-                    onClick={() => setRecordPage((value) => value - 1)}
-                  >
-                    Prethodna
-                  </Button>
-                  <Typography sx={{ alignSelf: "center" }}>
-                    Strana {recordPage + 1}
-                  </Typography>
-                  <Button
-                    disabled={
-                      priceListRecords.isFetching ||
-                      (recordPage + 1) * 25 >=
-                        (priceListRecords.data?.total ?? 0)
-                    }
-                    onClick={() => setRecordPage((value) => value + 1)}
-                  >
-                    Sledeća
-                  </Button>
-                </Stack>
-                <Button
-                  variant="contained"
-                  disabled={
-                    !auth.can("mapping_profiles.write") ||
-                    startMapping.isPending ||
-                    !schemaFields.data?.total
-                  }
-                  onClick={() =>
-                    startMapping.mutate({
-                      profile: selectedSchema,
-                      original_filename: String(selectedSchema.name),
-                      detected_format: String(
-                        selectedSchema.detected_format ?? "UNKNOWN"
-                      ),
-                      record_count: Number(
-                        selectedSchema.baseline_record_count ?? 0
-                      ),
-                      sampled_record_count: 0,
-                      fields: (schemaFields.data?.items ?? []).map((field) => ({
-                        field: {
-                          id: field.id,
-                          position: Number(field.position),
-                          name: String(field.name),
-                          data_type: String(field.data_type),
-                          nullable: Boolean(field.nullable)
-                        },
-                        sample_values: field.example_value
-                          ? [String(field.example_value)]
-                          : [],
-                        confidence: 0
-                      }))
-                    })
-                  }
-                >
-                  Mapiraj polja ovog cenovnika
-                </Button>
-              </Stack>
-            </Paper>
-          )}
-        </Stack>
+        <SchemaCatalogPanel
+          profiles={result.data?.items ?? []}
+          profilesLoading={result.isLoading}
+          selectedSchemaId={selectedSchemaId}
+          selectedSchema={selectedSchema ?? undefined}
+          fields={schemaFields.data?.items ?? []}
+          records={priceListRecords.data}
+          recordsLoading={priceListRecords.isLoading}
+          recordsFetching={priceListRecords.isFetching}
+          recordSearch={recordSearch}
+          appliedRecordSearch={appliedRecordSearch}
+          recordPage={recordPage}
+          mappingAllowed={auth.can("mapping_profiles.write")}
+          mappingStarting={startMapping.isPending}
+          onSchemaId={setSelectedSchemaId}
+          onRecordSearch={setRecordSearch}
+          onAppliedRecordSearch={setAppliedRecordSearch}
+          setRecordPage={setRecordPage}
+          onOpenRecord={setOpenedRecord}
+          onStartMapping={(value) => startMapping.mutate(value)}
+        />
       ) : (
         <>
           <TextField
@@ -962,152 +676,18 @@ export function ScopedResourcePage({ config }: { config: ResourceConfiguration }
           </>
         )}
       </DetailDrawer>
-      <Dialog
-        open={Boolean(analysis)}
+      <SchemaAnalysisDialog
+        analysis={analysis}
+        startingMapping={startMapping.isPending}
         onClose={() => setAnalysis(null)}
-        fullWidth
-        maxWidth="lg"
-      >
-        <DialogTitle>Analiza cenovnika</DialogTitle>
-        <DialogContent>
-          {analysis && (
-            <Stack gap={2}>
-              <Typography variant="h6">
-                {analysis.original_filename ?? "Preuzeti cenovnik"}
-              </Typography>
-              <Stack direction={{ xs: "column", sm: "row" }} gap={3}>
-                <Typography>Format: {analysis.detected_format}</Typography>
-                <Typography>Pronađeno proizvoda: {analysis.record_count}</Typography>
-                <Typography>Pronađeno polja: {analysis.fields.length}</Typography>
-                <Typography>Status: {String(analysis.profile.status)}</Typography>
-              </Stack>
-              <Typography color="text.secondary">
-                Tehnički detalji strukture čuvaju se u pozadini. Sledeći korak
-                je povezivanje pronađenih polja sa sistemskim poljima.
-              </Typography>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {analysis && (
-            <Button
-              variant="contained"
-              disabled={startMapping.isPending}
-              onClick={() => startMapping.mutate(analysis)}
-            >
-              Mapiraj polja
-            </Button>
-          )}
-          <Button onClick={() => setAnalysis(null)}>Zatvori</Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={Boolean(openedRecord)}
+        onStartMapping={(value) => startMapping.mutate(value)}
+      />
+      <PriceListRecordDialog
+        record={openedRecord}
         onClose={() => setOpenedRecord(null)}
-        fullWidth
-        maxWidth="md"
-      >
-        <DialogTitle>Podaci artikla iz cenovnika</DialogTitle>
-        <DialogContent>
-          <TableContainer>
-            <Table size="small">
-              <TableBody>
-                {Object.entries(openedRecord?.values ?? {}).map(
-                  ([field, value]) => (
-                    <TableRow key={field}>
-                      <TableCell sx={{ fontWeight: 700, width: "38%" }}>
-                        {field}
-                      </TableCell>
-                      <TableCell sx={{ overflowWrap: "anywhere" }}>
-                        <Typography
-                          component="span"
-                          variant="body2"
-                          sx={{ whiteSpace: "pre-wrap" }}
-                        >
-                          {readableSupplierValue(value)}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenedRecord(null)}>Zatvori</Button>
-        </DialogActions>
-      </Dialog>
+      />
     </>
   );
 }
 
-export const resourceConfigurations: Record<string, ResourceConfiguration> = {
-  schemas: {
-    resource: "schema-profiles",
-    title: "Schema Profiles",
-    description: "Verzije očekivane strukture, aktivacija, polja i validacija.",
-    codeField: "schema_code",
-    permissionRead: "schema_profiles.read",
-    permissionWrite: "schema_profiles.write",
-    extraColumns: [
-      { key: "version_number", label: "Verzija", tooltip: "Nepromjenljiva poslovna verzija schema profila." },
-      { key: "field_count", label: "Polja", tooltip: "Broj detektovanih aktivnih Schema Fields." }
-    ],
-    actions: [
-      { name: "reanalyze", label: "Ponovo analiziraj izvor", tooltip: "Ponovo preuzima izvor i zamenjuje polja ove DRAFT verzije.", permission: "schema_profiles.write", icon: "retry" },
-      { name: "activate", label: "Aktiviraj", tooltip: "Aktivira ovu verziju kroz backend lifecycle.", permission: "schema_profiles.activate", icon: "play" },
-      { name: "archive", label: "Arhiviraj", tooltip: "Arhivira profil bez brisanja istorije.", permission: "schema_profiles.activate", icon: "cancel" }
-    ]
-  },
-  acquisitions: {
-    resource: "acquisitions",
-    title: "Acquisition Runs",
-    description: "Ručno izvršavanje, upload, retry/cancel, greške, statistika i timeline.",
-    codeField: "acquisition_code",
-    permissionRead: "acquisitions.read",
-    extraColumns: [
-      { key: "trigger_type", label: "Trigger", tooltip: "Način pokretanja Acquisition Run-a." },
-      { key: "total_record_count", label: "Zapisi", tooltip: "Ukupan broj pročitanih source redova." },
-      { key: "failure_message", label: "Razlog neuspeha", tooltip: "Bezbedna poslovna poruka koju je sačuvao backend." }
-    ],
-    actions: [
-      { name: "retry", label: "Ponovi", tooltip: "Kreira novi pokušaj preko postojećeg backend servisa.", permission: "acquisitions.execute", icon: "retry" },
-      { name: "cancel", label: "Otkaži", tooltip: "Otkazuje dozvoljeni aktivni Run.", permission: "acquisitions.cancel", icon: "cancel" }
-    ]
-  },
-  snapshots: {
-    resource: "snapshots",
-    title: "Snapshots",
-    description: "Validno stanje dobavljača, integritet, items, arhiva i restore.",
-    codeField: "snapshot_code",
-    permissionRead: "snapshots.read",
-    permissionWrite: "snapshots.create",
-    statusField: "storage_state",
-    extraColumns: [
-      { key: "status", label: "Build status", tooltip: "Rezultat izgradnje Snapshot-a." },
-      { key: "total_items", label: "Stavke", tooltip: "Broj Snapshot Item zapisa." }
-    ],
-    actions: [
-      { name: "verify", label: "Proveri integritet", tooltip: "Backend ponovo proverava checksum i integritet.", permission: "snapshots.verify", icon: "play" },
-      { name: "restore", label: "Vrati online", tooltip: "Pokreće postojeći restore ugovor za arhivirani Snapshot.", permission: "snapshots.restore", icon: "retry" }
-    ]
-  },
-  deltas: {
-    resource: "deltas",
-    title: "Delta Runs",
-    description: "Poređenja Snapshot parova, sažetak i promene po poljima.",
-    codeField: "delta_code",
-    permissionRead: "deltas.read",
-    permissionWrite: "deltas.calculate",
-    extraColumns: [
-      { key: "added_items", label: "Dodato", tooltip: "Broj dodatih stavki." },
-      { key: "modified_items", label: "Izmenjeno", tooltip: "Broj izmenjenih stavki." },
-      { key: "removed_items", label: "Uklonjeno", tooltip: "Broj uklonjenih stavki." }
-    ],
-    actions: [
-      { name: "retry", label: "Ponovi", tooltip: "Ponavlja neuspešno poređenje bez promene snapshot-a.", permission: "deltas.calculate", icon: "retry" },
-      { name: "cancel", label: "Otkaži", tooltip: "Otkazuje aktivni Delta Run.", permission: "deltas.cancel", icon: "cancel" }
-    ]
-  }
-};
+export { resourceConfigurations } from "./scopedResource/resourceConfigurations";
