@@ -25,6 +25,7 @@ class ArticleReviewRead(BaseModel):
     status: str
     severity: str
     issue_codes: list[str]
+    control_details: dict[str, object]
     previous_data: dict[str, object] | None
     current_data: dict[str, object] | None
     field_changes: list[dict[str, object]]

@@ -35,6 +35,7 @@ const statuses = ["PENDING_REVIEW", "MANUALLY_APPROVED", "REJECTED", "AUTO_RELEA
 const issueCodes = [
   "EAN_CHANGED",
   "EAN_SHARED_BY_MULTIPLE_ARTICLES",
+  "EAN_GROUP_TOO_LARGE",
   "RECORD_INVALID",
   "CRITICAL_PRICE_CHANGE",
   "NAME_CHANGED"
@@ -50,6 +51,7 @@ const statusLabels: Record<string, string> = {
 const issueLabels: Record<string, string> = {
   EAN_CHANGED: "Promenjen EAN za šifru",
   EAN_SHARED_BY_MULTIPLE_ARTICLES: "Više artikala sa istim EAN-om",
+  EAN_GROUP_TOO_LARGE: "Previše artikala sa istim EAN-om",
   RECORD_INVALID: "Neispravan zapis artikla",
   ARTICLE_REMOVED: "Artikal uklonjen iz cenovnika",
   CRITICAL_PRICE_CHANGE: "Kritična promena cene",
@@ -178,6 +180,9 @@ export function ArticleReviewsPage() {
       >
         {selected && <Stack gap={2}>
           {selected.status === "AUTO_RELEASED" && <Alert severity="success">Dobavljač je dostavio ispravljenu verziju i blokada je automatski uklonjena.</Alert>}
+          {selected.issue_codes.includes("EAN_GROUP_TOO_LARGE") && <Alert severity="warning">
+            EAN {selected.ean} koristi {String(selected.control_details.shared_ean_group_size)} različitih šifara, a dozvoljeni automatski maksimum je {String(selected.control_details.shared_ean_group_limit)}. Uzorak šifara: {Array.isArray(selected.control_details.product_codes_sample) ? selected.control_details.product_codes_sample.join(", ") : "—"}.
+          </Alert>}
           <Stack direction="row" gap={1}><StatusChip value={selected.status} label={statusLabels[selected.status]} /><StatusChip value={selected.severity} label={severityLabels[selected.severity]} /></Stack>
           {changedFields.map((field, index) => <Paper variant="outlined" sx={{ p: 1.5 }} key={`${String(field.field_path)}-${index}`}>
             <Typography fontWeight={700}>{String(field.field_path)}</Typography>

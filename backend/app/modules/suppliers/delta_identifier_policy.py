@@ -21,6 +21,9 @@ class SharedEanFinding:
     second_code: str
     name_similarity: float
     review_level: str
+    finding_type: str = "PAIR_SIMILARITY"
+    group_size: int = 2
+    product_codes: tuple[str, ...] = ()
 
 
 def normalized_name_similarity(first: object, second: object) -> float:
@@ -36,6 +39,7 @@ def shared_ean_findings(
     *,
     auto_accept_similarity: float | None = None,
     manual_review_similarity: float | None = None,
+    max_group_size: int | None = None,
 ) -> list[SharedEanFinding]:
     auto_accept = (
         settings.supplier_shared_ean_auto_accept_similarity
@@ -47,14 +51,42 @@ def shared_ean_findings(
         if manual_review_similarity is None
         else manual_review_similarity
     )
-    groups: dict[str, list[IdentifierItem]] = {}
+    group_limit = (
+        settings.supplier_shared_ean_max_group_size
+        if max_group_size is None
+        else max_group_size
+    )
+    if group_limit < 2:
+        raise ValueError("SHARED_EAN_GROUP_LIMIT_INVALID")
+    groups: dict[str, dict[str, IdentifierItem]] = {}
     for item in items:
         ean = str(item.mapped_data.get("ean") or "").strip()
         code = str(item.mapped_data.get("product_code") or "").strip()
         if ean and code:
-            groups.setdefault(ean, []).append(item)
+            groups.setdefault(ean, {}).setdefault(code.casefold(), item)
     findings: list[SharedEanFinding] = []
-    for ean, group in sorted(groups.items()):
+    for ean, unique_items in sorted(groups.items()):
+        group = sorted(
+            unique_items.values(),
+            key=lambda item: str(item.mapped_data.get("product_code") or "").casefold(),
+        )
+        product_codes = tuple(
+            str(item.mapped_data.get("product_code") or "").strip() for item in group
+        )
+        if len(group) > group_limit:
+            findings.append(
+                SharedEanFinding(
+                    ean=ean,
+                    first_code=product_codes[0],
+                    second_code=product_codes[1],
+                    name_similarity=0.0,
+                    review_level="MANUAL_REVIEW",
+                    finding_type="GROUP_LIMIT_EXCEEDED",
+                    group_size=len(group),
+                    product_codes=product_codes[:group_limit],
+                )
+            )
+            continue
         for first, second in combinations(group, 2):
             first_code = str(first.mapped_data.get("product_code") or "").strip()
             second_code = str(second.mapped_data.get("product_code") or "").strip()
@@ -76,6 +108,8 @@ def shared_ean_findings(
                         if similarity < manual_review
                         else "INFORMATIONAL"
                     ),
+                    group_size=len(group),
+                    product_codes=product_codes,
                 )
             )
     return findings

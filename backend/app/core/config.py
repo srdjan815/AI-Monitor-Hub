@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     )
     supplier_shared_ean_auto_accept_similarity: float = Field(default=0.8, ge=0, le=1)
     supplier_shared_ean_manual_review_similarity: float = Field(default=0.6, ge=0, le=1)
+    supplier_shared_ean_max_group_size: int = Field(default=8, ge=2, le=100)
     incident_max_synchronized_per_source: int = Field(default=100, ge=1, le=1000)
     incident_due_hours_p1: int = Field(default=4, ge=1, le=720)
     incident_due_hours_p2: int = Field(default=24, ge=1, le=720)
