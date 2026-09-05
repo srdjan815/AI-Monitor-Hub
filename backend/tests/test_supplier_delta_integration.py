@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 from sqlalchemy import select
@@ -166,23 +165,7 @@ def test_supplier_delta_real_snapshot_cycle() -> None:
                 params={"supplier_id": supplier_id, "status": "PENDING_REVIEW"},
             )
             assert reviews.status_code == 200, reviews.text
-            review = reviews.json()["items"][0]
-
-            def approve_once() -> int:
-                with httpx.Client(
-                    base_url=API_ROOT, headers=_headers(), timeout=60
-                ) as concurrent_client:
-                    return concurrent_client.post(
-                        f"/suppliers/platform/article-reviews/{review['id']}/approve",
-                        json={
-                            "expected_version": review["version"],
-                            "comment": "Provereno u konkurentnom testu",
-                        },
-                    ).status_code
-
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                results = sorted(pool.map(lambda _: approve_once(), range(2)))
-            assert results == [200, 409]
+            assert reviews.json()["items"] == []
             exported = client.post(
                 f"{snapshots_root}/{snapshot_ids[0]}/archive",
                 json={"include_source_artifact": False},

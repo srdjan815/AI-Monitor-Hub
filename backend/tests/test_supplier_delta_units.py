@@ -79,13 +79,13 @@ def test_removed_rejected_recovered_and_ean_change_are_safely_classified() -> No
     )
     by_code = {item.matching_key_value: item for item in items}
 
-    assert by_code["removed"].change_summary["classification"] == "REMOVED_BLOCKED"
-    assert by_code["removed"].change_summary["downstream_blocked"] is True
-    assert by_code["removed"].change_summary["requires_manual_approval"] is True
-    assert by_code["removed"].anomaly_flags == [
-        "DOWNSTREAM_ITEM_BLOCKED",
-        "REMOVAL_REQUIRES_REVIEW",
-    ]
+    assert (
+        by_code["removed"].change_summary["classification"]
+        == "REMOVED_FROM_SUPPLIER_OFFER"
+    )
+    assert by_code["removed"].change_summary["downstream_blocked"] is False
+    assert by_code["removed"].change_summary["requires_manual_approval"] is False
+    assert by_code["removed"].anomaly_flags == []
     assert by_code["rejected"].change_type == "BLOCKED"
     assert (
         by_code["rejected"].change_summary["classification"] == "PRESENT_BUT_REJECTED"

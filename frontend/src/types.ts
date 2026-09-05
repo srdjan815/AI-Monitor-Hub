@@ -32,6 +32,44 @@ export interface ArticleReview {
   version: number;
 }
 
+export interface EolSupplierPresence {
+  supplier_id: string;
+  supplier_name: string;
+  product_code: string;
+  last_seen_at: string;
+  is_currently_offered: boolean;
+}
+
+export interface EolCandidate {
+  identity_key: string;
+  ean?: string | null;
+  product_name?: string | null;
+  last_seen_at: string;
+  inactive_days: number;
+  status: "EOL_CANDIDATE" | "MARKED_FOR_DEACTIVATION" | "DEACTIVATED";
+  export_batch_code?: string | null;
+  export_eligible: boolean;
+  suppliers: EolSupplierPresence[];
+}
+
+export interface EolCandidatePage {
+  items: EolCandidate[];
+  total: number;
+  inactivity_months: number;
+  cutoff_at: string;
+}
+
+export interface EolDeactivationBatch {
+  id: string;
+  batch_code: string;
+  status: string;
+  inactivity_months: number;
+  target_systems: string[];
+  item_count: number;
+  created_by: string;
+  created_at: string;
+}
+
 export interface Supplier {
   id: string;
   supplier_code: string;

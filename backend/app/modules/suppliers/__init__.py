@@ -56,11 +56,15 @@ from app.modules.suppliers.article_review_models import (
     SupplierArticleReview,
     SupplierArticleReviewEvent,
 )
+from app.modules.suppliers.eol_models import EolExportBatch, EolExportItem, SupplierProductPresence
 
 __all__ = [
     "Supplier",
     "SupplierArticleReview",
     "SupplierArticleReviewEvent",
+    "SupplierProductPresence",
+    "EolExportBatch",
+    "EolExportItem",
     "SupplierAcquisitionIssue",
     "SupplierAcquisitionRun",
     "SupplierAcquisitionService",
