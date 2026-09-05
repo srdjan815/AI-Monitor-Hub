@@ -1,6 +1,6 @@
 {
-  "captured": "2026-09-04",
-  "checked_source_files": 332,
+  "captured": "2026-09-05",
+  "checked_source_files": 337,
   "maximum_errors": 0,
   "maximum_files_with_errors": 0,
   "policy": "clean; every MyPy error fails the build"

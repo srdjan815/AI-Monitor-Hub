@@ -101,8 +101,7 @@ def calculate_delta(
                     key,
                     previous_item,
                     None,
-                    classification="REMOVED_BLOCKED",
-                    anomaly_flags=["REMOVAL_REQUIRES_REVIEW"],
+                    classification="REMOVED_FROM_SUPPLIER_OFFER",
                 )
             )
         stats["removed_items"] += 1

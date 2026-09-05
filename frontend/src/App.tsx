@@ -29,6 +29,9 @@ const ArticleReviewsPage = lazy(() =>
 const SupplierCurrenciesPage = lazy(() =>
   import("./pages/SupplierCurrenciesPage").then((module) => ({ default: module.SupplierCurrenciesPage }))
 );
+const EolProductsPage = lazy(() =>
+  import("./pages/EolProductsPage").then((module) => ({ default: module.EolProductsPage }))
+);
 const ArchivePage = lazy(() =>
   import("./pages/ArchivePage").then((module) => ({ default: module.ArchivePage }))
 );
@@ -77,6 +80,7 @@ function ProtectedRoutes() {
         />
         <Route path="/incidents" element={protectedPage("/incidents", <IncidentsPage />)} />
         <Route path="/article-reviews" element={protectedPage("/article-reviews", <ArticleReviewsPage />)} />
+        <Route path="/eol-products" element={protectedPage("/eol-products", <EolProductsPage />)} />
         <Route path="/supplier-currencies" element={protectedPage("/supplier-currencies", <SupplierCurrenciesPage />)} />
         <Route path="/archive" element={protectedPage("/archive", <ArchivePage />)} />
         <Route path="/administration" element={protectedPage("/administration", <AdministrationPage />)} />

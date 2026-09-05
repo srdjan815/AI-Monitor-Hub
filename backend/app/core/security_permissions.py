@@ -61,6 +61,8 @@ ARTICLE_REVIEWS_READ = "article_reviews.read"
 ARTICLE_REVIEWS_DECIDE = "article_reviews.decide"
 CURRENCY_RATES_READ = "currency_rates.read"
 CURRENCY_RATES_WRITE = "currency_rates.write"
+EOL_PRODUCTS_READ = "eol_products.read"
+EOL_PRODUCTS_MANAGE = "eol_products.manage"
 ADMIN_ACCESS = "admin.access"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
@@ -124,6 +126,8 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         ARTICLE_REVIEWS_DECIDE,
         CURRENCY_RATES_READ,
         CURRENCY_RATES_WRITE,
+        EOL_PRODUCTS_READ,
+        EOL_PRODUCTS_MANAGE,
         ADMIN_ACCESS,
     }
 )
@@ -200,6 +204,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             ARTICLE_REVIEWS_DECIDE,
             CURRENCY_RATES_READ,
             CURRENCY_RATES_WRITE,
+            EOL_PRODUCTS_READ,
+            EOL_PRODUCTS_MANAGE,
         }
     ),
     "supplier_source_validator": frozenset(
@@ -268,6 +274,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             ARTICLE_REVIEWS_DECIDE,
             CURRENCY_RATES_READ,
             CURRENCY_RATES_WRITE,
+            EOL_PRODUCTS_READ,
+            EOL_PRODUCTS_MANAGE,
         }
     ),
     "read_only": frozenset(
@@ -290,6 +298,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             SUPPLIER_PLATFORM_SEARCH,
             ARTICLE_REVIEWS_READ,
             CURRENCY_RATES_READ,
+            EOL_PRODUCTS_READ,
         }
     ),
     "internal_service": ALL_PERMISSIONS,

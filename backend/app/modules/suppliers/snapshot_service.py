@@ -26,6 +26,7 @@ from app.modules.suppliers.snapshot_models import (
     SupplierSnapshotItem,
 )
 from app.modules.suppliers.snapshot_repository import SupplierSnapshotRepository
+from app.modules.suppliers.eol_repository import SupplierEolRepository
 
 
 class SupplierSnapshotService:
@@ -127,6 +128,7 @@ class SupplierSnapshotService:
         await self.session.refresh(snapshot)
         try:
             pending_items: list[SupplierSnapshotItem] = []
+            lifecycle_items: list[SupplierSnapshotItem] = []
             payloads: list[dict[str, object]] = []
             fingerprints: list[str] = []
             for record in records:
@@ -147,18 +149,18 @@ class SupplierSnapshotService:
                         "source_image_links": links,
                     }
                 )
-                pending_items.append(
-                    SupplierSnapshotItem(
-                        snapshot_id=snapshot.id,
-                        source_staged_record_id=record.id,
-                        record_number=record.record_number,
-                        source_key=record.source_key,
-                        source_identifier=record.source_identifier,
-                        item_fingerprint=fingerprint,
-                        mapped_data=mapped_data,
-                        source_image_links=links,
-                    )
+                snapshot_item = SupplierSnapshotItem(
+                    snapshot_id=snapshot.id,
+                    source_staged_record_id=record.id,
+                    record_number=record.record_number,
+                    source_key=record.source_key,
+                    source_identifier=record.source_identifier,
+                    item_fingerprint=fingerprint,
+                    mapped_data=mapped_data,
+                    source_image_links=links,
                 )
+                pending_items.append(snapshot_item)
+                lifecycle_items.append(snapshot_item)
                 if len(pending_items) >= settings.snapshot_batch_size:
                     await self.repository.add_items(pending_items)
                     pending_items = []
@@ -182,6 +184,10 @@ class SupplierSnapshotService:
                     "finalized_at": now,
                     "version": snapshot.version + 1,
                 },
+            )
+            # Lifecycle projection is committed atomically with the READY snapshot.
+            await SupplierEolRepository(self.session).sync_snapshot(
+                snapshot, lifecycle_items
             )
             await self.session.commit()
         except Exception:

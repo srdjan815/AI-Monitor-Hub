@@ -14,6 +14,8 @@ import type {
   SupplierExchangeRate,
   PipelineRunQueued,
   Supplier
+  , EolCandidatePage
+  , EolDeactivationBatch
 } from "../types";
 
 export const supplierApi = {
@@ -221,6 +223,15 @@ export const supplierApi = {
       method: "POST",
       body: { expected_version: expectedVersion, comment }
     }),
+  eolProducts: (params: Record<string, unknown>) =>
+    api<EolCandidatePage>(
+      `/suppliers/platform/eol-products${queryString(params as any)}`
+    ),
+  prepareEolDeactivation: (body: Record<string, unknown>) =>
+    api<EolDeactivationBatch>(
+      "/suppliers/platform/eol-products/deactivation-batches",
+      { method: "POST", body }
+    ),
   monitorCurrency: () =>
     api<{ currency_code: "RSD"; rate_to_rsd: string; version: number }>(
       "/suppliers/platform/supplier-currencies/monitor"

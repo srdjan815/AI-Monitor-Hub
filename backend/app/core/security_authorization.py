@@ -66,6 +66,8 @@ from app.core.security_permissions import (
     SUPPLIER_PLATFORM_SEARCH,
     ARTICLE_REVIEWS_READ,
     ARTICLE_REVIEWS_DECIDE,
+    EOL_PRODUCTS_READ,
+    EOL_PRODUCTS_MANAGE,
 )
 from app.core.security_runtime import authenticate_token
 
@@ -106,6 +108,8 @@ def required_permission(request: Request) -> str | None:
         return SUPPLIER_PLATFORM_SEARCH
     if "/suppliers/platform/article-reviews" in path:
         return ARTICLE_REVIEWS_DECIDE if write else ARTICLE_REVIEWS_READ
+    if "/suppliers/platform/eol-products" in path:
+        return EOL_PRODUCTS_MANAGE if write else EOL_PRODUCTS_READ
     if "/suppliers/platform/source-schedules" in path:
         return SUPPLIER_SOURCES_WRITE if write else SUPPLIER_SOURCES_READ
     if "/suppliers/platform/bulk/incidents/assign" in path:
