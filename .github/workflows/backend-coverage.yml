@@ -1,0 +1,38 @@
+name: Backend coverage
+
+on:
+  pull_request:
+    branches:
+      - feature/database-foundation
+  push:
+    branches:
+      - feature/database-foundation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mandatory-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run isolated backend suite and coverage gates
+        shell: pwsh
+        run: ./scripts/Invoke-IsolatedTestSuite.ps1 -Suite full -Coverage
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-coverage-${{ github.run_id }}
+          path: backend/coverage-reports/
+          if-no-files-found: error
+          retention-days: 14

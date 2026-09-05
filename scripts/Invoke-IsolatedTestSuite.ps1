@@ -7,7 +7,9 @@ param(
     [int]$RandomRuns = 5,
 
     [ValidateRange(0, 2147483646)]
-    [int]$RandomSeed = 0
+    [int]$RandomSeed = 0,
+
+    [switch]$Coverage
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,10 +65,21 @@ function Assert-TestOnlyConfiguration {
 function Invoke-PytestRun {
     param([string[]]$PytestArguments)
     Write-Host "`n[TEST ONLY] pytest $($PytestArguments -join ' ')" -ForegroundColor Yellow
-    & docker compose --project-name $projectName --file $composeFile run --rm test-runner python -m pytest @PytestArguments
+    $pythonArguments = if ($Coverage) {
+        @("-m", "coverage", "run", "--parallel-mode", "-m", "pytest") + $PytestArguments
+    } else {
+        @("-m", "pytest") + $PytestArguments
+    }
+    & docker compose --project-name $projectName --file $composeFile run --rm test-runner python @pythonArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Test run failed with exit code $LASTEXITCODE."
     }
+}
+
+function Write-CoverageReports {
+    Write-Host "[TEST ONLY] Stopping covered API process and combining coverage..." -ForegroundColor Yellow
+    Invoke-TestCompose stop --timeout 20 test-api
+    Invoke-TestCompose run --rm --no-deps coverage-reporter /bin/sh -c "coverage combine /coverage && coverage report && coverage json -o /coverage/coverage.json && python /app/scripts/check_coverage_thresholds.py --coverage /coverage/coverage.json --policy /app/coverage-policy.json && coverage xml -o /coverage/coverage.xml && coverage html -d /coverage/html"
 }
 
 function Remove-TestEnvironment {
@@ -76,7 +89,7 @@ function Remove-TestEnvironment {
     if ($RemoveImages) {
         $downArguments += @("--rmi", "local")
     }
-    & docker compose --project-name $projectName --file $composeFile @downArguments
+    & docker compose --project-name $projectName --file $composeFile --profile coverage @downArguments
     $downExitCode = $LASTEXITCODE
     $leftovers = @(& docker ps --all --quiet --filter "label=com.docker.compose.project=$projectName")
     $networks = @(& docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
@@ -96,6 +109,9 @@ function Invoke-OneIsolatedRun {
     try {
         Invoke-TestCompose up --detach --wait test-api
         Invoke-PytestRun $PytestArguments
+        if ($Coverage) {
+            Write-CoverageReports
+        }
     }
     finally {
         Remove-TestEnvironment
@@ -110,7 +126,28 @@ Write-Host "============================================================" -Foreg
 
 try {
     Assert-TestOnlyConfiguration
-    Invoke-TestCompose build test-api test-runner
+    if ($Coverage -and $Suite -ne "full") {
+        throw "Coverage is supported only for the full isolated suite."
+    }
+    if ($Coverage) {
+        $coverageRoot = Join-Path (Join-Path $repositoryRoot "backend") "coverage-reports"
+        if (Test-Path -LiteralPath $coverageRoot) {
+            Remove-Item -LiteralPath $coverageRoot -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $coverageRoot | Out-Null
+        if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
+            & chmod 0777 -- $coverageRoot
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not grant isolated containers access to coverage output."
+            }
+        }
+        $env:TEST_API_COMMAND = "coverage run --parallel-mode -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers"
+    }
+    $buildServices = @("test-api", "test-runner")
+    if ($Coverage) {
+        $buildServices += "coverage-reporter"
+    }
+    Invoke-TestCompose build @buildServices
 
     switch ($Suite) {
         "supplier" {

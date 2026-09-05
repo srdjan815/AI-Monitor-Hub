@@ -51,12 +51,15 @@ services:
       HOME: /home/appuser
       USER: appuser
       LOGNAME: appuser
+      COVERAGE_FILE: /coverage/.coverage.api
     command:
       - /bin/sh
       - -c
-      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers
+      - alembic upgrade head && exec ${TEST_API_COMMAND:-uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers}
     tmpfs:
       - /tmp/amh-test-artifacts
+    volumes:
+      - ./backend/coverage-reports:/coverage
     depends_on:
       test-db:
         condition: service_healthy
@@ -74,12 +77,31 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    environment: *test-environment
+    environment:
+      <<: *test-environment
+      COVERAGE_FILE: /coverage/.coverage.tests
     network_mode: "service:test-api"
     depends_on:
       test-api:
         condition: service_healthy
     entrypoint: ["/usr/bin/setpriv", "--reuid=1000", "--regid=1000", "--init-groups"]
     command: ["python", "-m", "pytest", "-q"]
+    volumes:
+      - ./backend/coverage-reports:/coverage
+    labels:
+      ai.monitor.environment: "TEST_ONLY_EPHEMERAL"
+
+  coverage-reporter:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      <<: *test-environment
+      COVERAGE_FILE: /coverage/.coverage
+    entrypoint: ["/usr/bin/setpriv", "--reuid=1000", "--regid=1000", "--init-groups"]
+    command: ["coverage", "report"]
+    volumes:
+      - ./backend/coverage-reports:/coverage
+    profiles: ["coverage"]
     labels:
       ai.monitor.environment: "TEST_ONLY_EPHEMERAL"

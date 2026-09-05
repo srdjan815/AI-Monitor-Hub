@@ -32,3 +32,23 @@ Status-code-only assertions are insufficient for new tests: assert database
 state, invariants, actor identity, error code, history/event effects, and
 rollback. Mandatory regressions may not be hidden by skips, xfails, or an
 unreviewed baseline.
+
+## Mandatory branch coverage
+
+Run the complete coverage gate only in the disposable test environment:
+
+```powershell
+.\scripts\Invoke-IsolatedTestSuite.ps1 -Suite full -Coverage
+```
+
+The gate instruments both the pytest process and the separate Uvicorn API
+process, combines their data, and checks statement and branch coverage as two
+independent metrics. The tracked policy is `backend/coverage-policy.json`.
+Current repository-wide floors are 79% statements and 52% branches. The
+critical supplier-decision group has a 97% statement floor and a 90% branch
+floor. A missing critical file or malformed report fails closed.
+
+JSON, XML, and browsable HTML reports are written under the ignored
+`backend/coverage-reports/` directory. CI uploads these reports as artifacts.
+Any reduction of the tracked floors requires an explicit policy and test change
+in review; ordinary code changes must maintain or improve them.
