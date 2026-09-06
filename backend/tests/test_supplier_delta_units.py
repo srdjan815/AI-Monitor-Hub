@@ -174,8 +174,7 @@ def test_shared_ean_group_limit_creates_one_blocking_delta_control() -> None:
 
 def test_duplicate_rows_for_same_code_do_not_inflate_shared_ean_group() -> None:
     items = [
-        _snapshot_item("SAME-CODE", "8606019540128", str(index))
-        for index in range(100)
+        _snapshot_item("SAME-CODE", "8606019540128", str(index)) for index in range(100)
     ]
 
     assert shared_ean_findings(items, max_group_size=8) == []

@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.config import settings
-from app.modules.suppliers.acquisition_adapters import SourceAdapterRegistry, UrllibHttpClient
+from app.modules.suppliers.acquisition_adapters import (
+    SourceAdapterRegistry,
+    UrllibHttpClient,
+)
 from app.modules.suppliers.acquisition_context import (
     AcquisitionContext,
     AcquisitionContextResolver,

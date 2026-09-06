@@ -37,7 +37,14 @@ FIELD_ALIASES = {
         "description",
         "opis",
     ),
-    "price": ("veleprodajnacena", "nabavnacena", "prodajnacena", "unitprice", "price", "cena"),
+    "price": (
+        "veleprodajnacena",
+        "nabavnacena",
+        "prodajnacena",
+        "unitprice",
+        "price",
+        "cena",
+    ),
 }
 
 
@@ -65,9 +72,7 @@ class SupplierSchemaRecordService(SupplierSchemaServiceSupport):
                 "schema_profile_artifact_missing",
                 "Izabrani cenovnik nema sačuvan originalni Artifact",
             )
-        artifact = await self.pipeline.artifact(
-            source_id, profile.baseline_artifact_id
-        )
+        artifact = await self.pipeline.artifact(source_id, profile.baseline_artifact_id)
         if artifact is None:
             supplier_error(
                 404,
@@ -81,10 +86,7 @@ class SupplierSchemaRecordService(SupplierSchemaServiceSupport):
         needle = self._text(search).casefold()
         grouped: dict[tuple[str, ...], SchemaRecordRead] = {}
         for record_number, raw in enumerate(structure.rows, 1):
-            values = {
-                str(key): self._value(value)
-                for key, value in raw.items()
-            }
+            values = {str(key): self._value(value) for key, value in raw.items()}
             if needle and not any(
                 needle in (value or "").casefold() for value in values.values()
             ):
@@ -106,8 +108,7 @@ class SupplierSchemaRecordService(SupplierSchemaServiceSupport):
                 key = ("name-price", name, price)
             else:
                 key = tuple(
-                    f"{name.casefold()}={value or ''}"
-                    for name, value in values.items()
+                    f"{name.casefold()}={value or ''}" for name, value in values.items()
                 )
             existing = grouped.get(key)
             if existing is not None:
@@ -123,9 +124,7 @@ class SupplierSchemaRecordService(SupplierSchemaServiceSupport):
         return records[offset : offset + limit], len(records), structure.record_count
 
     @classmethod
-    def _columns(
-        cls, rows: list[dict[str, object]]
-    ) -> dict[str, str | None]:
+    def _columns(cls, rows: list[dict[str, object]]) -> dict[str, str | None]:
         columns = list(dict.fromkeys(str(key) for row in rows for key in row))
         normalized = {column: cls._normalize(column) for column in columns}
         result: dict[str, str | None] = {}
@@ -135,8 +134,7 @@ class SupplierSchemaRecordService(SupplierSchemaServiceSupport):
                     column
                     for alias in aliases
                     for column, value in normalized.items()
-                    if value == cls._normalize(alias)
-                    or cls._normalize(alias) in value
+                    if value == cls._normalize(alias) or cls._normalize(alias) in value
                 ),
                 None,
             )

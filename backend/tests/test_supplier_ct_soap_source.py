@@ -14,7 +14,6 @@ from app.modules.suppliers.models import SupplierSource
 from app.modules.suppliers.source_configuration import ApiSourceConfiguration
 from app.modules.suppliers.source_secrets import FileSourceSecretProvider
 
-
 CT_RESPONSE = b"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -45,9 +44,7 @@ class SoapClient:
             '"http://www.ct4partners.com/B2B/GetCTProducts_WithAttributes"'
         )
         root = ElementTree.fromstring(kwargs["body"])
-        values = {
-            node.tag.rsplit("}", 1)[-1]: node.text for node in root.iter()
-        }
+        values = {node.tag.rsplit("}", 1)[-1]: node.text for node in root.iter()}
         assert values["username"] == "partner"
         assert values["password"] == "hidden"
         assert values["productGroupCode"] is None

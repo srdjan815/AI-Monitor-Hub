@@ -197,7 +197,9 @@ class RequestObservabilityMiddleware:
         started_at = time.perf_counter()
         status_code = 500
         response_started = False
-        correlation_id = current_correlation_id() or current_request_id() or "unavailable"
+        correlation_id = (
+            current_correlation_id() or current_request_id() or "unavailable"
+        )
 
         async def observed_send(message: dict[str, Any]) -> None:
             nonlocal response_started, status_code

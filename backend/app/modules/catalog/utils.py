@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import unicodedata
 
-
 _TRANSLITERATION = str.maketrans(
     {
         "đ": "dj",

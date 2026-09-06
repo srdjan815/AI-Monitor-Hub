@@ -74,9 +74,11 @@ class SupplierValidationService:
         if not normalized:
             supplier_error(
                 422,
-                "supplier_contact_invalid"
-                if label == "Ime kontakta"
-                else "supplier_invalid",
+                (
+                    "supplier_contact_invalid"
+                    if label == "Ime kontakta"
+                    else "supplier_invalid"
+                ),
                 f"{label} ne sme biti prazan",
             )
         return normalized

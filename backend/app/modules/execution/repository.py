@@ -12,7 +12,6 @@ from app.modules.execution.enums import JobStatus
 from app.modules.execution.models import Job, JobAttempt
 from app.modules.execution.schemas import JobCreate
 
-
 RETRY_BASE_SECONDS = 5
 RETRY_MAX_SECONDS = 300
 RETRY_JITTER_RATIO = 0.20

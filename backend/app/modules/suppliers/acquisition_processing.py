@@ -58,7 +58,11 @@ class AcquisitionProcessor:
         validates_price = "price" in target_attributes
         validates_name = "name" in target_attributes
         ean_rule = next(
-            (rule for rule in rules if rule.is_active and rule.target_attribute == "ean"),
+            (
+                rule
+                for rule in rules
+                if rule.is_active and rule.target_attribute == "ean"
+            ),
             None,
         )
         for number, raw in enumerate(rows, start=1):

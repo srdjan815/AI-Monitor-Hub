@@ -129,7 +129,9 @@ def validated_document(content: bytes, content_type: str) -> FetchedDocument:
         raise CurrencyRateFetchError("Tip sadržaja izvora nije dozvoljen")
     if len(content) > MAX_BYTES:
         raise CurrencyRateFetchError("Odgovor izvora je veći od dozvoljene veličine")
-    return FetchedDocument(content, normalized_type, hashlib.sha256(content).hexdigest())
+    return FetchedDocument(
+        content, normalized_type, hashlib.sha256(content).hexdigest()
+    )
 
 
 __all__ = [

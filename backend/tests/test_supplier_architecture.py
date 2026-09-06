@@ -102,9 +102,9 @@ def test_supplier_has_no_forbidden_module_dependency_or_product_model() -> None:
         "app.modules.product_content",
     )
     for path in SUPPLIER_ROOT.glob("*.py"):
-        assert not any(module.startswith(forbidden) for module in _imports(path)), (
-            path.name
-        )
+        assert not any(
+            module.startswith(forbidden) for module in _imports(path)
+        ), path.name
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         assert not any(
             isinstance(node, ast.ClassDef) and node.name == "Product"
@@ -157,9 +157,9 @@ def test_supplier_service_responsibilities_are_decomposed() -> None:
         "get_source",
         "list_sources",
         "update_source",
-            "validate_source",
-            "write_credentials",
-        }
+        "validate_source",
+        "write_credentials",
+    }
 
 
 def test_supplier_sources_have_no_network_or_future_chapter_surface() -> None:

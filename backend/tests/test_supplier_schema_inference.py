@@ -28,9 +28,7 @@ def _xlsx(rows: list[list[str]]) -> bytes:
     for row_number, row in enumerate(rows, 1):
         cells = []
         for column, _value in zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", row):
-            cells.append(
-                f'<c r="{column}{row_number}" t="s"><v>{index}</v></c>'
-            )
+            cells.append(f'<c r="{column}{row_number}" t="s"><v>{index}</v></c>')
             index += 1
         sheet_rows.append(f'<row r="{row_number}">{"".join(cells)}</row>')
     strings = "".join(f"<si><t>{escape(value)}</t></si>" for value in shared)
@@ -270,6 +268,8 @@ def test_ds_business_limits_override_sample_lengths() -> None:
     assert fields["barkod"].data_type == "STRING"
     assert fields["barkod"].example_value == "0012345678905"
     assert fields["sifra"].required is True
+
+
 def test_epi_business_string_limits_are_not_derived_from_short_sample() -> None:
     inferred = SchemaFieldInferer.fields(
         uuid.uuid4(),

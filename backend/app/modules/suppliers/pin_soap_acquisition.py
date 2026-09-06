@@ -44,9 +44,7 @@ async def acquire_pin_payload(
             "integration_profile": "PIN_SOAP",
             "stock_scope": "ON_STOCK_ONLY",
         },
-        "raw_source": base64.b64encode(gzip.compress(response.content)).decode(
-            "ascii"
-        ),
+        "raw_source": base64.b64encode(gzip.compress(response.content)).decode("ascii"),
     }
     content = json.dumps(envelope, ensure_ascii=False).encode("utf-8")
     if len(content) > maximum_bytes:
@@ -130,8 +128,7 @@ def _response_rows(response: HttpResponse) -> list[dict[str, object]]:
     in_stock = [
         row
         for row in rows
-        if str(row.get("ON_STOCK", "")).strip().casefold()
-        in {"1", "true", "yes", "da"}
+        if str(row.get("ON_STOCK", "")).strip().casefold() in {"1", "true", "yes", "da"}
     ]
     if not in_stock:
         raise AcquisitionFailure(

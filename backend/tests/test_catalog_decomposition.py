@@ -16,7 +16,6 @@ from app.modules.catalog.product_service import ProductService
 from app.modules.catalog.repository import CatalogRepository
 from app.modules.catalog.service import CatalogService
 
-
 CATALOG_ROOT = Path(__file__).resolve().parents[1] / "app" / "modules" / "catalog"
 PUBLIC_METHODS = {
     "create_attribute",

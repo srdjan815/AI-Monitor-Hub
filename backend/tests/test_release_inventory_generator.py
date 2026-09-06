@@ -7,7 +7,6 @@ import pytest
 
 from scripts import generate_release_inventory as inventory
 
-
 _TRACKED_PATHS: dict[Path, set[str]] = {}
 
 

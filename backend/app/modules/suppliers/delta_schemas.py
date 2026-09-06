@@ -113,4 +113,14 @@ class DeltaCompatibility(BaseModel):
     current_snapshot_id: uuid.UUID
 
 
-__all__ = ["DeltaCalculate", "DeltaCompatibility", "DeltaCurrentCalculate", "DeltaFieldList", "DeltaFieldRead", "DeltaItemList", "DeltaItemRead", "DeltaRunList", "DeltaRunRead"]
+__all__ = [
+    "DeltaCalculate",
+    "DeltaCompatibility",
+    "DeltaCurrentCalculate",
+    "DeltaFieldList",
+    "DeltaFieldRead",
+    "DeltaItemList",
+    "DeltaItemRead",
+    "DeltaRunList",
+    "DeltaRunRead",
+]

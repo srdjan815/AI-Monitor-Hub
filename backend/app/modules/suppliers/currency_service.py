@@ -193,7 +193,9 @@ class SupplierCurrencyService:
             setting.extraction_method = payload.extraction_method
             setting.extraction_expression = payload.extraction_expression
             setting.fallback_extraction_method = payload.fallback_extraction_method
-            setting.fallback_extraction_expression = payload.fallback_extraction_expression
+            setting.fallback_extraction_expression = (
+                payload.fallback_extraction_expression
+            )
             setting.decimal_separator = payload.decimal_separator
             setting.daily_check_time = payload.daily_check_time
             setting.version += 1

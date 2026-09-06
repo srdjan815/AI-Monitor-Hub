@@ -10,7 +10,9 @@ from app.modules.execution.enums import JobStatus
 from app.modules.execution.models import Job
 from app.modules.suppliers.pipeline_contracts import PipelineContext
 from app.modules.suppliers.pipeline_failure_support import failed_phase_results
-from app.modules.suppliers.pipeline_incident_service import SupplierPipelineIncidentService
+from app.modules.suppliers.pipeline_incident_service import (
+    SupplierPipelineIncidentService,
+)
 from app.modules.suppliers.pipeline_models import SupplierSourcePipelineRun
 from app.modules.suppliers.pipeline_repository import SupplierPipelineRepository
 from app.modules.suppliers.repository import SupplierRepository

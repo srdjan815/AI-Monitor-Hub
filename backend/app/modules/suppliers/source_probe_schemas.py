@@ -28,7 +28,15 @@ class SourceCredentialWrite(BaseModel):
 
     @model_validator(mode="after")
     def at_least_one_secret(self) -> SourceCredentialWrite:
-        if not any((self.password, self.token, self.api_key, self.certificate_base64, self.imap_password)):
+        if not any(
+            (
+                self.password,
+                self.token,
+                self.api_key,
+                self.certificate_base64,
+                self.imap_password,
+            )
+        ):
             raise ValueError("Unesite lozinku, token, API ključ ili sertifikat")
         if bool(self.imap_username) != bool(self.imap_password):
             raise ValueError("IMAP korisničko ime i lozinka moraju biti uneti zajedno")

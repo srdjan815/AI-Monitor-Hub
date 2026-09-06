@@ -548,8 +548,7 @@ def test_supplier_source_openapi_and_scope() -> None:
         for token in ("/download", "/import", "/preview", "/refresh", "/upload")
     )
     source_schema = schema["components"]["schemas"]["SupplierSourceRead"]
-    assert (
-        "automatski generiše"
-        in (source_schema["properties"]["source_code"]["description"])
+    assert "automatski generiše" in (
+        source_schema["properties"]["source_code"]["description"]
     )
     assert "secret_reference" not in source_schema["properties"]

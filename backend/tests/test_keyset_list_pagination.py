@@ -11,7 +11,6 @@ import pytest
 from app.core.pagination import encode_cursor
 from app.core.security import create_access_token
 
-
 API_ROOT = "http://localhost:8000/api/v1"
 
 

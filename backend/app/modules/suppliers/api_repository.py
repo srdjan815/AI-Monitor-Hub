@@ -44,14 +44,10 @@ class SupplierApiRepository:
             "active_source_connections": select(func.count(SupplierSource.id)).where(
                 SupplierSource.is_active.is_(True)
             ),
-            "recent_acquisitions": select(
-                func.count(SupplierAcquisitionRun.id)
-            ).where(
+            "recent_acquisitions": select(func.count(SupplierAcquisitionRun.id)).where(
                 SupplierAcquisitionRun.created_at.between(range_from, range_to)
             ),
-            "failed_acquisitions": select(
-                func.count(SupplierAcquisitionRun.id)
-            ).where(
+            "failed_acquisitions": select(func.count(SupplierAcquisitionRun.id)).where(
                 SupplierAcquisitionRun.status == "FAILED",
                 SupplierAcquisitionRun.created_at.between(range_from, range_to),
             ),
@@ -76,10 +72,7 @@ class SupplierApiRepository:
                 SupplierIncident.assigned_user_id.is_(None),
             ),
         }
-        return {
-            name: await self.scalar_count(query)
-            for name, query in queries.items()
-        }
+        return {name: await self.scalar_count(query) for name, query in queries.items()}
 
     async def supplier_process_rows(self) -> SupplierProcessRows:
         suppliers = list(
@@ -158,30 +151,32 @@ class SupplierApiRepository:
         failed_only: bool,
         error_count_column: Any | None = None,
     ) -> Select[Any]:
-        query = select(
-            literal(resource_type).label("resource_type"),
-            model.id.label("id"),
-            code_column.label("code"),
-            status_column.label("status"),
-            model.created_at.label("occurred_at"),
-            (literal(path_prefix) + cast(model.id, String)).label(
-                "resource_path"
-            ),
-            Supplier.company_name.label("supplier_name"),
-            SupplierSource.name.label("source_name"),
-            model.failure_code.label("failure_code"),
-            model.failure_message.label("failure_message"),
-            (
-                error_count_column
-                if error_count_column is not None
-                else literal(None)
-            ).label("error_count"),
-        ).join(
-            Supplier,
-            Supplier.id == model.supplier_id,
-        ).join(
-            SupplierSource,
-            SupplierSource.id == model.source_connection_id,
+        query = (
+            select(
+                literal(resource_type).label("resource_type"),
+                model.id.label("id"),
+                code_column.label("code"),
+                status_column.label("status"),
+                model.created_at.label("occurred_at"),
+                (literal(path_prefix) + cast(model.id, String)).label("resource_path"),
+                Supplier.company_name.label("supplier_name"),
+                SupplierSource.name.label("source_name"),
+                model.failure_code.label("failure_code"),
+                model.failure_message.label("failure_message"),
+                (
+                    error_count_column
+                    if error_count_column is not None
+                    else literal(None)
+                ).label("error_count"),
+            )
+            .join(
+                Supplier,
+                Supplier.id == model.supplier_id,
+            )
+            .join(
+                SupplierSource,
+                SupplierSource.id == model.source_connection_id,
+            )
         )
         if failed_only:
             query = query.where(status_column == "FAILED")
@@ -257,9 +252,7 @@ class SupplierApiRepository:
             name_column.label("display_name"),
             literal(None).label("short_context"),
             status_column.label("status"),
-            (literal(path_prefix) + cast(model.id, String)).label(
-                "resource_path"
-            ),
+            (literal(path_prefix) + cast(model.id, String)).label("resource_path"),
             case((func.lower(code_column) == exact, 2), else_=1).label("rank"),
         ).where(or_(code_column.ilike(pattern), name_column.ilike(pattern)))
 

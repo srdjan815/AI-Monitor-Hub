@@ -100,9 +100,7 @@ class SupplierSchemaProfile(UUIDMixin, TimestampMixin, Base):
     analysis_metadata: Mapped[dict[str, object]] = mapped_column(
         JSONB, nullable=False, default=dict
     )
-    last_analyzed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    last_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     __mapper_args__ = {
         "version_id_col": version,

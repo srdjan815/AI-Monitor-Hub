@@ -6,7 +6,6 @@ from typing import Any, TypeVar
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 ModelT = TypeVar("ModelT")
 
 

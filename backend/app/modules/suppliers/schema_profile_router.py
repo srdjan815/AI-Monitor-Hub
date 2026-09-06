@@ -160,9 +160,7 @@ async def list_profile_records(
     offset: int = Query(default=0, ge=0, le=MAX_LEGACY_OFFSET),
     session: AsyncSession = Depends(get_db),
 ) -> SchemaRecordListResponse:
-    rows, total, source_count = await SupplierSchemaRecordService(
-        session
-    ).list_records(
+    rows, total, source_count = await SupplierSchemaRecordService(session).list_records(
         supplier_id,
         source_id,
         profile_id,

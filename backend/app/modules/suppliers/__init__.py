@@ -56,7 +56,11 @@ from app.modules.suppliers.article_review_models import (
     SupplierArticleReview,
     SupplierArticleReviewEvent,
 )
-from app.modules.suppliers.eol_models import EolExportBatch, EolExportItem, SupplierProductPresence
+from app.modules.suppliers.eol_models import (
+    EolExportBatch,
+    EolExportItem,
+    SupplierProductPresence,
+)
 from app.modules.suppliers.retention_models import (
     SupplierDataRetentionPolicy,
     SupplierPriceObservation,

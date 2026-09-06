@@ -24,12 +24,8 @@ class SupplierProcessOverviewService:
         sources: dict[uuid.UUID, SupplierSource] = {}
         for source_record in data["sources"]:
             sources.setdefault(source_record.supplier_id, source_record)
-        schemas = {
-            profile.source_connection_id: profile for profile in data["schemas"]
-        }
-        mappings = {
-            profile.schema_profile_id: profile for profile in data["mappings"]
-        }
+        schemas = {profile.source_connection_id: profile for profile in data["schemas"]}
+        mappings = {profile.schema_profile_id: profile for profile in data["mappings"]}
         runs: dict[uuid.UUID, list[SupplierAcquisitionRun]] = {}
         for run in data["runs"]:
             runs.setdefault(run.source_connection_id, []).append(run)
@@ -68,7 +64,9 @@ class SupplierProcessOverviewService:
                     acquisition_status=self._acquisition(
                         bool(schema), bool(mapping), latest, latest_success
                     ),
-                    last_success_at=latest_success.completed_at if latest_success else None,
+                    last_success_at=(
+                        latest_success.completed_at if latest_success else None
+                    ),
                     article_count=(
                         latest_success.accepted_record_count if latest_success else None
                     ),

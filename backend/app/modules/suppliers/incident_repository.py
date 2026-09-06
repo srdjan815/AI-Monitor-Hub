@@ -244,7 +244,14 @@ class SupplierIncidentRepository:
         rows = await self.session.execute(
             select(SupplierIncident)
             .where(*filters)
-            .order_by(ordering, SupplierIncident.id.asc() if sort_order == "asc" else SupplierIncident.id.desc())
+            .order_by(
+                ordering,
+                (
+                    SupplierIncident.id.asc()
+                    if sort_order == "asc"
+                    else SupplierIncident.id.desc()
+                ),
+            )
             .limit(limit)
             .offset(offset)
         )

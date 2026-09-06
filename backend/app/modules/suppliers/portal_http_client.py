@@ -147,7 +147,13 @@ def _target(url: str, query: dict[str, str]) -> str:
     parameters = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
     parameters.update(query)
     return urllib.parse.urlunsplit(
-        (parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(parameters), parsed.fragment)
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            urllib.parse.urlencode(parameters),
+            parsed.fragment,
+        )
     )
 
 
@@ -183,7 +189,9 @@ class LoginFormParser(HTMLParser):
         if tag.lower() != "form" or self._action is None:
             return
         has_password = "password" in self._inputs.values()
-        if self.username_field in self._inputs or (self.action is None and has_password):
+        if self.username_field in self._inputs or (
+            self.action is None and has_password
+        ):
             self.action = self._action
             self.hidden_fields = dict(self._hidden)
             self.input_names = set(self._inputs)
@@ -192,7 +200,11 @@ class LoginFormParser(HTMLParser):
                 None,
             )
             self.detected_username_field = next(
-                (name for name, kind in self._inputs.items() if kind in {"text", "email"}),
+                (
+                    name
+                    for name, kind in self._inputs.items()
+                    if kind in {"text", "email"}
+                ),
                 None,
             )
         self._action = None

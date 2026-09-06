@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.core.limits import MAX_DB_INTEGER, MAX_DESCRIPTION_CHARS
 from app.modules.suppliers.enums import SupplierContactType, SupplierStatus
 
-
 _EMAIL_PATTERN = re.compile(
     r"^[^@\s]{1,64}@[^@\s.]{1,190}(?:\.[^@\s.]{1,63})+$",
     re.IGNORECASE,

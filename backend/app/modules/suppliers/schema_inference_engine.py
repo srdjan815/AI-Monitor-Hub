@@ -55,9 +55,7 @@ class SchemaStructureDetector:
         return cls._csv(content, row_limit=row_limit)
 
     @classmethod
-    def _csv(
-        cls, content: bytes, *, row_limit: int | None
-    ) -> DetectedStructure:
+    def _csv(cls, content: bytes, *, row_limit: int | None) -> DetectedStructure:
         encoding, text = cls._decode(content)
         lines = text.splitlines()
         try:
@@ -117,9 +115,7 @@ class SchemaStructureDetector:
         )
 
     @classmethod
-    def _xlsx(
-        cls, content: bytes, *, row_limit: int | None
-    ) -> DetectedStructure:
+    def _xlsx(cls, content: bytes, *, row_limit: int | None) -> DetectedStructure:
         try:
             with zipfile.ZipFile(io.BytesIO(content)) as archive:
                 XlsxParser._safe_archive(archive)
@@ -165,9 +161,7 @@ class SchemaStructureDetector:
         return structure
 
     @classmethod
-    def _xml(
-        cls, content: bytes, *, row_limit: int | None
-    ) -> DetectedStructure:
+    def _xml(cls, content: bytes, *, row_limit: int | None) -> DetectedStructure:
         probe = content[:4096].upper()
         if b"<!DOCTYPE" in probe or b"<!ENTITY" in probe:
             raise AcquisitionFailure(

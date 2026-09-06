@@ -21,7 +21,6 @@ from app.modules.suppliers.delta_models import (
 from app.modules.suppliers.models import Supplier, SupplierSource
 from app.modules.suppliers.snapshot_models import SupplierSnapshotItem
 
-
 ReviewRow = tuple[
     SupplierArticleReview,
     SupplierDeltaItem,

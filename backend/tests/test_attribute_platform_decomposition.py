@@ -23,7 +23,6 @@ from app.modules.catalog.attribute_value_mutation_service import (
 from app.modules.catalog.platform_service import AttributePlatformService
 from app.modules.catalog.platform_service_support import _PlatformServiceSupport
 
-
 RESPONSIBILITIES = {
     AttributeFamilyService: {
         "create_family",

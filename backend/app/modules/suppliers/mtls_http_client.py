@@ -90,8 +90,7 @@ def _certificate_request(
         certificate_path.write_bytes(
             certificate.public_bytes(serialization.Encoding.PEM)
             + b"".join(
-                item.public_bytes(serialization.Encoding.PEM)
-                for item in chain or []
+                item.public_bytes(serialization.Encoding.PEM) for item in chain or []
             )
         )
         key_path.write_bytes(

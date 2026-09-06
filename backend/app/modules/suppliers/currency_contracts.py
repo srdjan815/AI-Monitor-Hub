@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.suppliers.currency_models import SupplierCurrencySetting, SupplierExchangeRate
+from app.modules.suppliers.currency_models import (
+    SupplierCurrencySetting,
+    SupplierExchangeRate,
+)
 
 
 @dataclass(frozen=True, slots=True)

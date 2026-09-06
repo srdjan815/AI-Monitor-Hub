@@ -82,9 +82,7 @@ def _search(client: imaplib.IMAP4_SSL, config: dict[str, object]) -> list[str]:
     return [value.decode("ascii") for value in data[0].split()]
 
 
-def _newest_message_ids(
-    client: imaplib.IMAP4_SSL, message_ids: list[str]
-) -> list[str]:
+def _newest_message_ids(client: imaplib.IMAP4_SSL, message_ids: list[str]) -> list[str]:
     """Order candidates by server receipt time, never by mailbox listing order."""
     ranked: list[tuple[bool, datetime, int, str]] = []
     for message_id in message_ids:
@@ -105,9 +103,7 @@ def _newest_message_ids(
     return [item[3] for item in ranked]
 
 
-def _internal_date(
-    client: imaplib.IMAP4_SSL, message_id: str
-) -> datetime | None:
+def _internal_date(client: imaplib.IMAP4_SSL, message_id: str) -> datetime | None:
     status, parts = client.fetch(message_id, "(INTERNALDATE)")
     if status != "OK" or not parts:
         return None

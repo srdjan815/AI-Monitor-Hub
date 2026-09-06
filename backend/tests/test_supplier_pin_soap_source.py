@@ -12,7 +12,6 @@ from app.modules.suppliers.acquisition_contracts import HttpResponse
 from app.modules.suppliers.models import SupplierSource
 from app.modules.suppliers.source_configuration import ApiSourceConfiguration
 
-
 PIN_RESPONSE = """<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>

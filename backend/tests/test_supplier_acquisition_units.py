@@ -308,7 +308,7 @@ def test_xlsx_zero_number_format_preserves_leading_ean_zeroes() -> None:
     sheet = (
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
         '<sheetData><row r="1"><c r="A1" s="1"><v>12345678905</v></c>'
-        '</row></sheetData></worksheet>'
+        "</row></sheetData></worksheet>"
     ).encode()
 
     rows = XlsxParser._rows_with_formats(sheet, [], {1: 13})
@@ -359,7 +359,13 @@ def test_product_price_must_be_positive(
 
 @pytest.mark.parametrize(
     ("name", "has_problem"),
-    [("Monitor Lenovo", False), ("  Monitor Lenovo  ", False), ("", True), ("   ", True), (None, True)],
+    [
+        ("Monitor Lenovo", False),
+        ("  Monitor Lenovo  ", False),
+        ("", True),
+        ("   ", True),
+        (None, True),
+    ],
 )
 def test_product_name_must_not_be_blank(name: object, has_problem: bool) -> None:
     problem = AcquisitionProcessor._name_problem({"name": name})

@@ -44,9 +44,7 @@ _RESOURCE_PERMISSIONS = {
 BulkCallable = Callable[[SupplierIncidentService], Awaitable[SupplierIncident]]
 
 
-def _assign_operation(
-    incident_id: uuid.UUID, assigned_user_id: str
-) -> BulkCallable:
+def _assign_operation(incident_id: uuid.UUID, assigned_user_id: str) -> BulkCallable:
     async def execute(service: SupplierIncidentService) -> SupplierIncident:
         return await service.assign(incident_id, assigned_user_id)
 
@@ -77,9 +75,7 @@ class SupplierApiService:
             if permission in self.permissions
         }
 
-    async def search(
-        self, query: str, *, limit: int
-    ) -> SupplierPlatformSearchResponse:
+    async def search(self, query: str, *, limit: int) -> SupplierPlatformSearchResponse:
         rows = await self.repository.search(
             query.strip(), allowed=self.allowed_resources(), limit=limit
         )
@@ -115,9 +111,7 @@ class SupplierApiService:
                     "message": "Pregled je ograničen na 366 dana",
                 },
             )
-        counts = await self.repository.overview_counts(
-            range_from=start, range_to=end
-        )
+        counts = await self.repository.overview_counts(range_from=start, range_to=end)
         allowed = self.allowed_resources()
         operation_types = allowed & {"acquisition", "snapshot", "delta"}
         latest = await self.repository.operations(
@@ -239,9 +233,7 @@ class SupplierApiService:
                         status="FAILED",
                         resource_id=resource_id,
                         error_code=str(detail.get("code", "OPERATION_FAILED")),
-                        message=str(
-                            detail.get("message", "Operacija nije uspela")
-                        ),
+                        message=str(detail.get("message", "Operacija nije uspela")),
                     )
                 )
             else:

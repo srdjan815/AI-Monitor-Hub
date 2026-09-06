@@ -10,7 +10,6 @@ import pytest_asyncio
 
 from app.core.security import create_access_token
 
-
 API_ROOT = "http://localhost:8000/api/v1"
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 

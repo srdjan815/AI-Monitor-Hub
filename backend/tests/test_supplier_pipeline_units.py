@@ -164,13 +164,13 @@ async def test_pipeline_failure_creates_a_source_scoped_deduplicated_incident(
 
 
 @pytest.mark.asyncio
-async def test_success_resolves_only_active_pipeline_incidents_for_same_source() -> None:
+async def test_success_resolves_only_active_pipeline_incidents_for_same_source() -> (
+    None
+):
     source_id = uuid.uuid4()
     run = SimpleNamespace(id=uuid.uuid4())
     context = SimpleNamespace(source=SimpleNamespace(id=source_id), run=run)
-    incident = SimpleNamespace(
-        id=uuid.uuid4(), status="OPEN", version=4
-    )
+    incident = SimpleNamespace(id=uuid.uuid4(), status="OPEN", version=4)
     repository = SimpleNamespace(
         active_pipeline_incidents=AsyncMock(return_value=[incident]),
         mutate=AsyncMock(),
@@ -192,7 +192,9 @@ async def test_success_resolves_only_active_pipeline_incidents_for_same_source()
 
 
 @pytest.mark.asyncio
-async def test_compatibility_retry_updates_existing_report_instead_of_inserting() -> None:
+async def test_compatibility_retry_updates_existing_report_instead_of_inserting() -> (
+    None
+):
     report = SimpleNamespace(version=2)
     repository = SimpleNamespace(
         compatibility_report=AsyncMock(return_value=report),
@@ -221,16 +223,10 @@ async def test_compatibility_retry_updates_existing_report_instead_of_inserting(
 async def test_terminal_worker_job_releases_active_pipeline() -> None:
     source_id, job_id = uuid.uuid4(), uuid.uuid4()
     run = SimpleNamespace(job_id=job_id)
-    service = SupplierPipelineRecoveryService.__new__(
-        SupplierPipelineRecoveryService
-    )
-    service.repository = SimpleNamespace(
-        active_pipeline=AsyncMock(return_value=run)
-    )
+    service = SupplierPipelineRecoveryService.__new__(SupplierPipelineRecoveryService)
+    service.repository = SimpleNamespace(active_pipeline=AsyncMock(return_value=run))
     service.session = SimpleNamespace(
-        get=AsyncMock(
-            return_value=SimpleNamespace(status=JobStatus.DEAD_LETTER.value)
-        )
+        get=AsyncMock(return_value=SimpleNamespace(status=JobStatus.DEAD_LETTER.value))
     )
     service._fail = AsyncMock()  # type: ignore[method-assign]
 
@@ -243,12 +239,8 @@ async def test_terminal_worker_job_releases_active_pipeline() -> None:
 async def test_running_worker_job_is_never_recovered_as_stale() -> None:
     source_id, job_id = uuid.uuid4(), uuid.uuid4()
     run = SimpleNamespace(job_id=job_id)
-    service = SupplierPipelineRecoveryService.__new__(
-        SupplierPipelineRecoveryService
-    )
-    service.repository = SimpleNamespace(
-        active_pipeline=AsyncMock(return_value=run)
-    )
+    service = SupplierPipelineRecoveryService.__new__(SupplierPipelineRecoveryService)
+    service.repository = SimpleNamespace(active_pipeline=AsyncMock(return_value=run))
     service.session = SimpleNamespace(
         get=AsyncMock(return_value=SimpleNamespace(status=JobStatus.RUNNING.value))
     )
