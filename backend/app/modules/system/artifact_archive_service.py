@@ -44,7 +44,7 @@ def _target_root(relative_path: str) -> Path:
         raise ArchiveConfigurationError(
             "Putanja arhive izlazi iz dozvoljenog korena"
         ) from exc
-    if base == base.parent or len(base.parts) < 3:
+    if base == base.parent:
         raise ArchiveConfigurationError("Koren arhive nije dovoljno usko podešen")
     return target
 

@@ -154,6 +154,12 @@ def test_archive_target_is_confined_to_configured_mount(
     with pytest.raises(ArchiveConfigurationError, match="relativna"):
         _target_root("/apsolutna")
 
+    # Produkcioni Docker mount je namerno direktorijum prvog nivoa. Bezbednost
+    # obezbeđuje confinement iznad, a ne proizvoljan broj segmenata putanje.
+    docker_mount = Path("/archive-targets")
+    monkeypatch.setattr(settings, "system_archive_mount_root", str(docker_mount))
+    assert _target_root("cenovnici") == docker_mount / "cenovnici"
+
     monkeypatch.setattr(settings, "system_archive_mount_root", str(Path("/").resolve()))
     with pytest.raises(ArchiveConfigurationError, match="dovoljno usko"):
         _target_root("cenovnici")
