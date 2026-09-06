@@ -57,6 +57,11 @@ from app.modules.suppliers.article_review_models import (
     SupplierArticleReviewEvent,
 )
 from app.modules.suppliers.eol_models import EolExportBatch, EolExportItem, SupplierProductPresence
+from app.modules.suppliers.retention_models import (
+    SupplierDataRetentionPolicy,
+    SupplierPriceObservation,
+    SupplierRetentionRun,
+)
 
 __all__ = [
     "Supplier",
@@ -104,4 +109,7 @@ __all__ = [
     "SupplierSourcePipelineRun",
     "SupplierSourceSchedule",
     "SupplierStagedRecord",
+    "SupplierDataRetentionPolicy",
+    "SupplierPriceObservation",
+    "SupplierRetentionRun",
 ]

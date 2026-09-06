@@ -27,6 +27,9 @@ from app.modules.suppliers.snapshot_models import (
 )
 from app.modules.suppliers.snapshot_repository import SupplierSnapshotRepository
 from app.modules.suppliers.eol_repository import SupplierEolRepository
+from app.modules.suppliers.price_observation_repository import (
+    SupplierPriceObservationRepository,
+)
 
 
 class SupplierSnapshotService:
@@ -187,6 +190,11 @@ class SupplierSnapshotService:
             )
             # Lifecycle projection is committed atomically with the READY snapshot.
             await SupplierEolRepository(self.session).sync_snapshot(
+                snapshot, lifecycle_items
+            )
+            # The narrow price history is committed with the READY snapshot so
+            # retention can never remove payloads before statistics are durable.
+            await SupplierPriceObservationRepository(self.session).preserve_snapshot(
                 snapshot, lifecycle_items
             )
             await self.session.commit()
