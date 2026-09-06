@@ -13,6 +13,16 @@ from app.modules.suppliers.currency_conversion import (
 )
 from app.modules.suppliers.currency_contracts import SnapshotCurrencyPlan
 from app.modules.suppliers.currency_schemas import CurrencySettingWrite
+from app.modules.suppliers.currency_source_fetch import _strings
+
+
+def test_portal_parameter_normalization_accepts_only_mappings() -> None:
+    assert _strings(None) == {}
+    assert _strings([("header", "value")]) == {}
+    assert _strings({"X-Account": 815, 7: True}) == {
+        "X-Account": "815",
+        "7": "True",
+    }
 
 
 def test_monitor_rsd_setting_requires_fixed_rate() -> None:
