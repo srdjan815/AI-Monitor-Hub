@@ -70,7 +70,32 @@ class LocalArtifactStorage:
         if target.parent == self.root:
             target.unlink(missing_ok=True)
 
+    def link(self, reference: str, payload: AcquiredPayload) -> StoredArtifact:
+        source = self._resolve_file(reference)
+        filename = self._safe_display_name(payload.original_filename)
+        suffix = Path(filename).suffix.lower() if filename else ""
+        self.root.mkdir(parents=True, exist_ok=True)
+        destination = (self.root / f"{uuid.uuid4().hex}{suffix}").resolve()
+        if destination.parent != self.root:
+            raise AcquisitionFailure(
+                "acquisition_unsafe_filename", "Naziv fajla nije bezbedan"
+            )
+        try:
+            os.link(source, destination)
+        except OSError:
+            return self.store(payload)
+        return StoredArtifact(
+            reference=destination.name,
+            checksum=hashlib.sha256(payload.content).hexdigest(),
+            size_bytes=len(payload.content),
+            content_type=payload.content_type,
+            original_filename=filename,
+        )
+
     def load(self, reference: str) -> bytes:
+        return self._resolve_file(reference).read_bytes()
+
+    def _resolve_file(self, reference: str) -> Path:
         if not reference or Path(reference).name != reference:
             raise AcquisitionFailure(
                 "acquisition_artifact_missing",
@@ -82,7 +107,7 @@ class LocalArtifactStorage:
                 "acquisition_artifact_missing",
                 "Sačuvani artefakt nije dostupan",
             )
-        return target.read_bytes()
+        return target
 
     @staticmethod
     def _safe_display_name(filename: str | None) -> str | None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import cast
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,29 @@ class SupplierPipelineRepository:
 
     async def lock_global_pipeline_dispatch(self) -> None:
         await self.session.execute(select(func.pg_advisory_xact_lock(7_241_901_001)))
+
+    async def lock_artifact_checksum(self, checksum: str) -> None:
+        key = int(checksum[:16], 16)
+        if key >= 1 << 63:
+            key -= 1 << 64
+        await self.session.execute(select(func.pg_advisory_xact_lock(key)))
+
+    async def artifact_by_checksum(
+        self, checksum: str, size: int
+    ) -> SupplierSourceArtifact | None:
+        return cast(
+            SupplierSourceArtifact | None,
+            await self.session.scalar(
+                select(SupplierSourceArtifact)
+                .where(
+                    SupplierSourceArtifact.checksum_sha256 == checksum,
+                    SupplierSourceArtifact.size_bytes == size,
+                    SupplierSourceArtifact.retention_status == "ONLINE",
+                )
+                .order_by(SupplierSourceArtifact.created_at)
+                .limit(1)
+            ),
+        )
 
     async def add(
         self,

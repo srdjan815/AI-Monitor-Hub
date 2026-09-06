@@ -6,7 +6,6 @@ from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
 
@@ -44,6 +43,7 @@ class Settings(BaseSettings):
     system_memory_critical_percent: int = Field(default=90, ge=60, le=99)
     system_inventory_max_files: int = Field(default=200_000, ge=1000, le=2_000_000)
     system_cleanup_max_files: int = Field(default=1000, ge=1, le=10_000)
+    system_archive_mount_root: str = "/app/data/archive-targets"
     delta_batch_size: int = Field(default=1000, ge=10, le=10_000)
     delta_max_comparison_items: int = Field(default=250_000, ge=100, le=2_000_000)
     delta_max_changed_fields_per_item: int = Field(default=2000, ge=10, le=10_000)

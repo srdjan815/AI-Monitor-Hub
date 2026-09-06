@@ -23,9 +23,13 @@ from app.modules.suppliers.schema_profile_models import SupplierSchemaProfile
 from app.modules.suppliers.pipeline_orchestrator_support import (
     SupplierPipelineOrchestratorSupport,
 )
-from app.modules.suppliers.pipeline_run_service import SupplierPipelineRunService
-from app.modules.suppliers.schema_profile_schemas import SchemaProfileCreate
-from app.modules.suppliers.schema_profile_schemas import SchemaProfileAction
+from app.modules.suppliers.pipeline_run_service import (
+    SupplierPipelineRunService as SupplierPipelineRunService,
+)
+from app.modules.suppliers.schema_profile_schemas import (
+    SchemaProfileAction,
+    SchemaProfileCreate,
+)
 from app.modules.suppliers.snapshot_service import SupplierSnapshotService
 
 
@@ -344,6 +348,3 @@ class SupplierPipelineOrchestrator(SupplierPipelineOrchestratorSupport):
             started,
             warnings=warnings,
         )
-
-
-__all__ = ["SupplierPipelineOrchestrator", "SupplierPipelineRunService"]

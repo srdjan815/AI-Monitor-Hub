@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import uuid
+import hashlib
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.modules.suppliers.acquisition_contracts import AcquiredPayload
+from app.modules.suppliers.acquisition_contracts import (
+    AcquiredPayload,
+    AcquisitionFailure,
+)
 from app.modules.suppliers.acquisition_storage import LocalArtifactStorage
 from app.modules.suppliers.pipeline_models import SupplierSourceArtifact
 from app.modules.suppliers.pipeline_repository import SupplierPipelineRepository
@@ -41,16 +45,30 @@ class SupplierSourceArtifactService:
         payload: AcquiredPayload,
     ) -> SupplierSourceArtifact:
         structure = SchemaStructureDetector.detect(payload)
-        stored = self.storage.store(payload)
+        checksum = hashlib.sha256(payload.content).hexdigest()
+        await self.repository.lock_artifact_checksum(checksum)
+        existing = await self.repository.artifact_by_checksum(
+            checksum, len(payload.content)
+        )
+        stored = None
+        if existing is not None:
+            try:
+                self.storage.load(existing.storage_reference)
+                stored = self.storage.link(existing.storage_reference, payload)
+            except AcquisitionFailure:
+                existing = None
+        if existing is None:
+            stored = self.storage.store(payload)
+        assert stored is not None
         artifact = SupplierSourceArtifact(
             source_connection_id=source_id,
             storage_reference=stored.reference,
-            original_filename=stored.original_filename,
-            content_type=stored.content_type,
+            original_filename=payload.original_filename,
+            content_type=payload.content_type,
             detected_format=self._format(structure.detected_format),
             encoding=structure.encoding,
-            size_bytes=stored.size_bytes,
-            checksum_sha256=stored.checksum,
+            size_bytes=len(payload.content),
+            checksum_sha256=checksum,
             record_count=structure.record_count,
             source_metadata=self._sanitize(payload.source_metadata),
             retention_status="ONLINE",
@@ -60,7 +78,8 @@ class SupplierSourceArtifactService:
             await self.session.commit()
         except Exception:
             await self.session.rollback()
-            self.storage.delete(stored.reference)
+            if stored is not None:
+                self.storage.delete(stored.reference)
             raise
         await self.session.refresh(artifact)
         return artifact

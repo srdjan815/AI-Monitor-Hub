@@ -29,6 +29,8 @@ class CleanupCandidate:
     path: Path
     size: int
     modified_ns: int
+    device: int
+    inode: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +161,11 @@ def _walk_files(root: Path, limit: int) -> tuple[list[CleanupCandidate], bool]:
                 path.resolve().relative_to(resolved)
             except (OSError, ValueError):
                 continue
-            files.append(CleanupCandidate(path, stat.st_size, stat.st_mtime_ns))
+            files.append(
+                CleanupCandidate(
+                    path, stat.st_size, stat.st_mtime_ns, stat.st_dev, stat.st_ino
+                )
+            )
             if len(files) >= limit:
                 truncated = True
                 return files, truncated
@@ -185,6 +191,17 @@ def candidate_digest(candidates: list[CleanupCandidate]) -> str:
             f"{item.path.resolve()}\0{item.size}\0{item.modified_ns}\n".encode()
         )
     return digest.hexdigest()
+
+
+def _physical_size(files: list[CleanupCandidate]) -> int:
+    seen: set[tuple[int, int]] = set()
+    total = 0
+    for item in files:
+        identity = (item.device, item.inode)
+        if identity not in seen:
+            seen.add(identity)
+            total += item.size
+    return total
 
 
 def create_confirmation_token(
@@ -249,7 +266,7 @@ class SystemResourceService:
                 StorageCategoryRead(
                     code=policy.code,
                     label=policy.label,
-                    size_bytes=sum(item.size for item in files),
+                    size_bytes=_physical_size(files),
                     file_count=len(files),
                     status="UPOZORENJE" if truncated else "OK",
                     cleanup_allowed=policy.cleanup_allowed,
