@@ -1,5 +1,58 @@
 export type JsonObject = Record<string, unknown>;
 
+export interface PriceListArchiveFilter {
+  id: string;
+  name: string;
+  supplier_id?: string | null;
+}
+
+export interface PriceListArchiveFilters {
+  suppliers: PriceListArchiveFilter[];
+  sources: PriceListArchiveFilter[];
+}
+
+export interface PriceListArchiveEntry {
+  acquisition_run_id: string;
+  acquisition_code: string;
+  supplier_id: string;
+  supplier_name: string;
+  source_connection_id: string;
+  source_name: string;
+  original_filename?: string | null;
+  imported_at: string;
+  completed_at?: string | null;
+  status: string;
+  total_records: number;
+  accepted_records: number;
+  rejected_records: number;
+  size_bytes?: number | null;
+  checksum_sha256?: string | null;
+  artifact_code?: string | null;
+  storage_status: string;
+  archive_reference?: string | null;
+}
+
+export interface ArchivedPriceListItem {
+  id: string;
+  record_number: number;
+  product_code?: string | null;
+  ean?: string | null;
+  name?: string | null;
+  price?: string | null;
+  currency?: string | null;
+  stock?: string | null;
+  category?: string | null;
+  validation_status: string;
+  warning_count: number;
+  error_count: number;
+  raw_data: JsonObject;
+  mapped_data: JsonObject;
+}
+
+export interface ArchivedPriceListItemPage extends Page<ArchivedPriceListItem> {
+  acquisition_run_id: string;
+}
+
 export interface Page<T> {
   items: T[];
   total: number;

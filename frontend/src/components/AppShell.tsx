@@ -68,7 +68,8 @@ const items = [
   { path: "/article-reviews", label: "Kontrola artikala", icon: FactCheckRounded },
   { path: "/eol-products", label: "EOL artikli", icon: Inventory2Rounded },
   { path: "/supplier-currencies", label: "Valute dobavljača", icon: CurrencyExchangeRounded },
-  { path: "/archive", label: "Arhiva", icon: ArchiveRounded },
+  { path: "/price-list-archive", label: "Arhiva cenovnika", icon: ArchiveRounded },
+  { path: "/archive", label: "Snapshot arhiva", icon: ArchiveRounded },
   { path: "/system", label: "Sistem", icon: MemoryRounded },
   { path: "/administration", label: "Administracija", icon: AdminPanelSettingsRounded }
 ];

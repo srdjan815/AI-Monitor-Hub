@@ -36,6 +36,9 @@ from app.modules.suppliers.article_review_router import router as article_review
 from app.modules.suppliers.currency_router import router as currency_router
 from app.modules.suppliers.eol_router import router as eol_router
 from app.modules.suppliers.retention_router import router as retention_router
+from app.modules.suppliers.price_list_archive_router import (
+    router as price_list_archive_router,
+)
 
 router = APIRouter()
 router.include_router(supplier_api_router)
@@ -53,6 +56,7 @@ router.include_router(snapshot_execution_router)
 router.include_router(snapshot_archive_router)
 router.include_router(snapshot_query_router)
 router.include_router(retention_router)
+router.include_router(price_list_archive_router)
 router.include_router(delta_router)
 router.include_router(
     incident_router,

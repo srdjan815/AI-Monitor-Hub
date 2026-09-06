@@ -35,6 +35,9 @@ const EolProductsPage = lazy(() =>
 const ArchivePage = lazy(() =>
   import("./pages/ArchivePage").then((module) => ({ default: module.ArchivePage }))
 );
+const PriceListArchivePage = lazy(() =>
+  import("./pages/PriceListArchivePage").then((module) => ({ default: module.PriceListArchivePage }))
+);
 const AdministrationPage = lazy(() =>
   import("./pages/AdministrationPage").then((module) => ({ default: module.AdministrationPage }))
 );
@@ -85,6 +88,7 @@ function ProtectedRoutes() {
         <Route path="/article-reviews" element={protectedPage("/article-reviews", <ArticleReviewsPage />)} />
         <Route path="/eol-products" element={protectedPage("/eol-products", <EolProductsPage />)} />
         <Route path="/supplier-currencies" element={protectedPage("/supplier-currencies", <SupplierCurrenciesPage />)} />
+        <Route path="/price-list-archive" element={protectedPage("/price-list-archive", <PriceListArchivePage />)} />
         <Route path="/archive" element={protectedPage("/archive", <ArchivePage />)} />
         <Route path="/system" element={protectedPage("/system", <SystemPage />)} />
         <Route path="/administration" element={protectedPage("/administration", <AdministrationPage />)} />
