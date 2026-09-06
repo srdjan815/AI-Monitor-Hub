@@ -17,6 +17,7 @@ export const PAGE_ACCESS = [
   { path: "/article-reviews", permission: "article_reviews.read" },
   { path: "/eol-products", permission: "eol_products.read" },
   { path: "/supplier-currencies", permission: "currency_rates.read" },
+  { path: "/price-list-archive", permission: "acquisitions.read" },
   { path: "/archive", permission: "snapshots.read" },
   { path: "/system", permission: "system_resources.read" },
   { path: "/administration", permission: "incident_rules.read" }

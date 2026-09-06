@@ -150,6 +150,8 @@ def required_permission(request: Request) -> str | None:
         if method == "POST" and path.endswith(("/cancel", "/retry")):
             return EXECUTION_MANAGE
         return EXECUTION_SUBMIT if method == "POST" else EXECUTION_READ
+    if "/price-list-archive" in path:
+        return ACQUISITIONS_READ
     if "/acquisitions" in path:
         if method == "POST" and path.endswith("/upload"):
             return ACQUISITIONS_UPLOAD
