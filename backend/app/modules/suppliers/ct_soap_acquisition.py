@@ -49,9 +49,7 @@ async def acquire_ct_payload(
             "products_with_barcode": sum(bool(row.get("BARCODE")) for row in rows),
             "integration_profile": "CT_SOAP",
         },
-        "raw_source": base64.b64encode(gzip.compress(response.content)).decode(
-            "ascii"
-        ),
+        "raw_source": base64.b64encode(gzip.compress(response.content)).decode("ascii"),
     }
     content = json.dumps(envelope, ensure_ascii=False).encode("utf-8")
     if len(content) > maximum_bytes:
@@ -145,9 +143,7 @@ def _product(element: ElementTree.Element) -> dict[str, object]:
         name = _local(child.tag)
         if name == "IMAGE_URLS":
             result[name] = [
-                (item.text or "").strip()
-                for item in child
-                if (item.text or "").strip()
+                (item.text or "").strip() for item in child if (item.text or "").strip()
             ]
         elif name == "ATTRIBUTES":
             result[name] = _attributes(child)
@@ -159,9 +155,7 @@ def _product(element: ElementTree.Element) -> dict[str, object]:
 def _attributes(element: ElementTree.Element) -> dict[str, str]:
     result: dict[str, str] = {}
     for attribute in element:
-        values = {
-            _local(child.tag): (child.text or "").strip() for child in attribute
-        }
+        values = {_local(child.tag): (child.text or "").strip() for child in attribute}
         code = values.get("AttributeCode")
         if code:
             result[code] = values.get("AttributeValue", "")

@@ -83,7 +83,9 @@ async def test_currency_source(
     session: AsyncSession = Depends(get_db),
 ) -> CurrencySourceTestRead:
     require_current_permission(CURRENCY_RATES_WRITE)
-    return await SupplierCurrencyAutomationService(session).test_source(supplier_id, payload)
+    return await SupplierCurrencyAutomationService(session).test_source(
+        supplier_id, payload
+    )
 
 
 @router.post("/{supplier_id}/refresh", response_model=ExchangeRateRead)

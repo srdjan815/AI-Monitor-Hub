@@ -170,9 +170,7 @@ class SupplierIncidentSupport:
                         "OPEN",
                     )
                 )
-            events.append(
-                self.event(incident.id, "REOPENED", incident.status, "OPEN")
-            )
+            events.append(self.event(incident.id, "REOPENED", incident.status, "OPEN"))
             changes.update(
                 {
                     "status": "OPEN",

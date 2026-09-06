@@ -32,9 +32,7 @@ class SupplierSourceCertificateService:
         supplier = await self.suppliers.get_supplier(supplier_id)
         if supplier is None or not supplier.is_active:
             supplier_error(404, "supplier_not_found", "Dobavljač nije pronađen")
-        source = await self.sources.get_source(
-            supplier_id, source_id, for_update=True
-        )
+        source = await self.sources.get_source(supplier_id, source_id, for_update=True)
         if source is None:
             supplier_error(404, "supplier_source_not_found", "Konekcija nije pronađena")
         if not source.is_active:
@@ -43,9 +41,10 @@ class SupplierSourceCertificateService:
                 "supplier_source_inactive",
                 "Arhivirana konekcija se ne može menjati",
             )
-        if source.source_type != "API" or source.configuration.get(
-            "authentication_type"
-        ) != "CLIENT_CERTIFICATE":
+        if (
+            source.source_type != "API"
+            or source.configuration.get("authentication_type") != "CLIENT_CERTIFICATE"
+        ):
             supplier_error(
                 409,
                 "supplier_source_certificate_not_allowed",

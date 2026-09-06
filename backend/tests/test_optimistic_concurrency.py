@@ -13,7 +13,6 @@ from app.core.security import create_access_token
 from app.db.session import AsyncSessionLocal
 from app.modules.catalog.models import Category, Product
 
-
 API_ROOT = "http://localhost:8000/api/v1"
 
 

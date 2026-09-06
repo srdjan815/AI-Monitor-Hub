@@ -18,7 +18,6 @@ from app.modules.suppliers.gtin_normalization import (
     normalize_to_ean13,
 )
 
-
 CATALOG = b"""<NewDataSet><Table><ProductCode>100</ProductCode><ProductName>Test</ProductName></Table></NewDataSet>"""
 PRICES = b"""<NewDataSet><Table><ProductCode>100</ProductCode><ProductPartnerPrice>12.34</ProductPartnerPrice></Table></NewDataSet>"""
 BARCODES = b"""<NewDataSet><Table><ProductCode>100</ProductCode><BarcodeType>EAN</BarcodeType><BarcodeValue>8606019540128</BarcodeValue></Table></NewDataSet>"""
@@ -106,7 +105,11 @@ async def test_kimtec_feeds_are_joined_by_product_code() -> None:
 @pytest.mark.parametrize(
     ("source", "expected", "status"),
     [
-        ("198156628701", "0198156628701", GtinNormalizationStatus.UPC_A_CONVERTED_TO_EAN13),
+        (
+            "198156628701",
+            "0198156628701",
+            GtinNormalizationStatus.UPC_A_CONVERTED_TO_EAN13,
+        ),
         ("8606019540128", "8606019540128", GtinNormalizationStatus.EAN13_VALID),
         ("198156628702", "", GtinNormalizationStatus.INVALID_CHECKSUM),
         ("1111111111111", "", GtinNormalizationStatus.PLACEHOLDER),
@@ -138,9 +141,9 @@ def test_file_provider_persists_certificate_outside_database(tmp_path: Path) -> 
 
 
 def test_mtls_client_uses_pkcs12_chain_as_scoped_trust_anchor() -> None:
-    source = Path(
-        "app/modules/suppliers/mtls_http_client.py"
-    ).read_text(encoding="utf-8")
+    source = Path("app/modules/suppliers/mtls_http_client.py").read_text(
+        encoding="utf-8"
+    )
     assert "context.load_verify_locations" in source
     assert "check_hostname = False" in source
     assert source.index("elif chain:") < source.index("context.load_verify_locations")

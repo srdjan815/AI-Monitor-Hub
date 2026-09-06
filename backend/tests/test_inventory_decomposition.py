@@ -18,7 +18,6 @@ from app.modules.inventory.reservation_repository import (
 from app.modules.inventory.reservation_service import ReservationService
 from app.modules.inventory.service import InventoryService
 
-
 INVENTORY_ROOT = Path(__file__).resolve().parents[1] / "app" / "modules" / "inventory"
 PUBLIC_METHODS = {
     "cancel_reservation",

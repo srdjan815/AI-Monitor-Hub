@@ -45,8 +45,8 @@ async def acquire_kimtec_payload(
         'xmlns:xsd="http://www.w3.org/2001/XMLSchema" '
         'xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'
         '<soap:Body><GetProductsBarcodes xmlns="http://www.msan.hr/B2B/">'
-        '<ProductCode></ProductCode>'
-        '</GetProductsBarcodes></soap:Body></soap:Envelope>'
+        "<ProductCode></ProductCode>"
+        "</GetProductsBarcodes></soap:Body></soap:Envelope>"
     ).encode("utf-8")
     soap_action = str(
         config.get(
@@ -143,10 +143,7 @@ def _xml_records(content: bytes, feed: str) -> list[dict[str, object]]:
             f"KimTec {feed} odgovor nije ispravan XML",
         ) from exc
     records: list[dict[str, object]] = [
-        {
-            child.tag.rsplit("}", 1)[-1]: (child.text or "").strip()
-            for child in item
-        }
+        {child.tag.rsplit("}", 1)[-1]: (child.text or "").strip() for child in item}
         for item in root.iter()
         if item.tag.rsplit("}", 1)[-1] == "Table"
     ]

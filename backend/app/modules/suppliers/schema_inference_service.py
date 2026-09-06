@@ -40,6 +40,7 @@ class SupplierSchemaInferenceService(SupplierSchemaServiceSupport):
 
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session)
+
     async def create_from_artifact(
         self,
         source_id: uuid.UUID,

@@ -10,7 +10,6 @@ from fastapi.routing import APIRoute
 
 from app.main import app
 
-
 PUBLIC_PATHS = {
     "/",
     "/health",
@@ -95,14 +94,14 @@ def test_openapi_operation_ids_security_and_error_contracts() -> None:
             assert operation_id, f"{method.upper()} {path} lacks operationId"
             operation_ids.append(operation_id)
             if path not in PUBLIC_PATHS:
-                assert operation.get("security"), (
-                    f"{method.upper()} {path} lacks security"
-                )
+                assert operation.get(
+                    "security"
+                ), f"{method.upper()} {path} lacks security"
                 responses = operation.get("responses", {})
                 for code in ("401", "403", "422", "500"):
-                    assert code in responses, (
-                        f"{method.upper()} {path} lacks documented {code}"
-                    )
+                    assert (
+                        code in responses
+                    ), f"{method.upper()} {path} lacks documented {code}"
     visible_operation_count = sum(
         len(route.methods - {"HEAD", "OPTIONS"})
         for route in _effective_api_routes()

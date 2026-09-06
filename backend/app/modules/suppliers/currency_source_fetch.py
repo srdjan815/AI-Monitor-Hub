@@ -35,7 +35,11 @@ async def fetch_currency_document(source: SupplierSource, url: str) -> FetchedDo
     try:
         response = await portal_request(
             login_url=login_url,
-            login_submit_url=str(config["login_submit_url"]) if config.get("login_submit_url") else None,
+            login_submit_url=(
+                str(config["login_submit_url"])
+                if config.get("login_submit_url")
+                else None
+            ),
             download_url=url,
             username_field=str(config.get("username_field") or "username"),
             password_field=str(config.get("password_field") or "password"),
@@ -51,7 +55,9 @@ async def fetch_currency_document(source: SupplierSource, url: str) -> FetchedDo
     except AcquisitionFailure as exc:
         raise CurrencyRateFetchError(exc.safe_message) from exc
     if not 200 <= response.status_code < 300:
-        raise CurrencyRateFetchError(f"Portal dobavljača je vratio status {response.status_code}")
+        raise CurrencyRateFetchError(
+            f"Portal dobavljača je vratio status {response.status_code}"
+        )
     return validated_document(response.content, response.content_type or "")
 
 

@@ -41,9 +41,7 @@ class SupplierSchemaAnalysisService:
         source_id: uuid.UUID,
         data: SchemaProfileCreate,
     ) -> SchemaInferenceRead:
-        return await self._execute(
-            supplier_id, source_id, schema_create=data
-        )
+        return await self._execute(supplier_id, source_id, schema_create=data)
 
     async def reanalyze(
         self,
@@ -153,9 +151,7 @@ class SupplierSchemaAnalysisService:
             item_path=profile.record_path,
             record_count=profile.baseline_record_count or 0,
             sampled_record_count=(
-                sampled_value
-                if isinstance(sampled_value, int)
-                else 0
+                sampled_value if isinstance(sampled_value, int) else 0
             ),
             fields=inferred,
         )

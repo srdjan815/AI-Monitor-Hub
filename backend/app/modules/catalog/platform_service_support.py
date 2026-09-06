@@ -11,7 +11,6 @@ from app.modules.catalog.attribute_repository import ProductAttributeRepository
 from app.modules.catalog.attribute_service import ProductAttributeService
 from app.modules.catalog.formula_engine import FormulaEngine
 
-
 ModelT = TypeVar("ModelT")
 
 

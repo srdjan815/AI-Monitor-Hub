@@ -13,7 +13,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm.exc import StaleDataError
 
-
 _request_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "request_id", default=None
 )
@@ -102,11 +101,7 @@ def _payload(
     correlation_id = current_correlation_id() or request_id
     embedded_code = detail.get("code") if isinstance(detail, dict) else None
     code = embedded_code or STATUS_CODES.get(status_code, "HTTP_ERROR")
-    message = (
-        detail.get("message", code)
-        if isinstance(detail, dict)
-        else str(detail)
-    )
+    message = detail.get("message", code) if isinstance(detail, dict) else str(detail)
     field_errors = detail if status_code == 422 and isinstance(detail, list) else []
     payload = {
         "detail": detail,
@@ -147,9 +142,7 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
             _payload(
                 422,
                 exc.errors(),
-                canonical=request.url.path.startswith(
-                    "/api/v1/suppliers/platform"
-                ),
+                canonical=request.url.path.startswith("/api/v1/suppliers/platform"),
             )
         ),
     )

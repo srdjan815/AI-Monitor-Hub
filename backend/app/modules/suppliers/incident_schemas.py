@@ -5,7 +5,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.suppliers.enums import IncidentPriority, IncidentSourceDomain, IncidentType
+from app.modules.suppliers.enums import (
+    IncidentPriority,
+    IncidentSourceDomain,
+    IncidentType,
+)
 
 
 class ManualIncidentCreate(BaseModel):

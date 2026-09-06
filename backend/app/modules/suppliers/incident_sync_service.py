@@ -4,7 +4,10 @@ import uuid
 from typing import cast
 
 from app.core.config import settings
-from app.modules.suppliers.incident_contracts import DEFAULT_PRIORITY, SIGNAL_TO_INCIDENT
+from app.modules.suppliers.incident_contracts import (
+    DEFAULT_PRIORITY,
+    SIGNAL_TO_INCIDENT,
+)
 from app.modules.suppliers.incident_models import SupplierIncident, SupplierIncidentRule
 from app.modules.suppliers.incident_rules import rule_allows, select_rule
 from app.modules.suppliers.incident_support import SupplierIncidentSupport
@@ -64,8 +67,7 @@ class SupplierIncidentSyncService(SupplierIncidentSupport):
                     {
                         "rejected": run.rejected_record_count,
                         "total": run.total_record_count,
-                        "ratio": run.rejected_record_count
-                        / run.total_record_count,
+                        "ratio": run.rejected_record_count / run.total_record_count,
                     },
                 )
             )
@@ -114,9 +116,7 @@ class SupplierIncidentSyncService(SupplierIncidentSupport):
             if operation_id
             else None
         )
-        if operation_id and (
-            operation is None or operation.snapshot_id != snapshot.id
-        ):
+        if operation_id and (operation is None or operation.snapshot_id != snapshot.id):
             supplier_error(
                 404,
                 "snapshot_archive_operation_not_found",
@@ -260,9 +260,7 @@ class SupplierIncidentSyncService(SupplierIncidentSupport):
                     incident_type=str(candidate["incident_type"]),
                     severity=severity,
                     priority=priority,
-                    title=str(candidate["incident_type"])
-                    .replace("_", " ")
-                    .title(),
+                    title=str(candidate["incident_type"]).replace("_", " ").title(),
                     description=(
                         f"Automatski Incident iz "
                         f"{candidate['source_domain']} činjenice."

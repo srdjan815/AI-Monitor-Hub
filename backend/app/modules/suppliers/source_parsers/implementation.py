@@ -256,9 +256,7 @@ class XlsxParser:
                     (child.text or "" for child in cell if child.tag.endswith("}v")),
                     "",
                 )
-                rendered = (
-                    shared[int(value)] if cell.attrib.get("t") == "s" else value
-                )
+                rendered = shared[int(value)] if cell.attrib.get("t") == "s" else value
                 style = int(cell.attrib.get("s", "0"))
                 width = zero_widths.get(style)
                 if width and cell.attrib.get("t") not in {"s", "str"}:

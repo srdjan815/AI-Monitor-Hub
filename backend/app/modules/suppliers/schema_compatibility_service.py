@@ -68,7 +68,9 @@ class SupplierSchemaCompatibilityService:
                         code="FIELD_MISSING",
                         path=path,
                         classification=classification,
-                        severity="ERROR" if classification == "INCOMPATIBLE" else "WARNING",
+                        severity=(
+                            "ERROR" if classification == "INCOMPATIBLE" else "WARNING"
+                        ),
                         expected=field.data_type,
                         actual=None,
                         message="Očekivano polje više ne postoji.",
@@ -112,9 +114,7 @@ class SupplierSchemaCompatibilityService:
             severity=severity,
             changes=changes,
             warnings=[
-                change.message
-                for change in changes
-                if change.severity == "WARNING"
+                change.message for change in changes if change.severity == "WARNING"
             ],
             summary={
                 "expected_field_count": len(expected),
@@ -133,8 +133,18 @@ class SupplierSchemaCompatibilityService:
     ) -> None:
         for code, path, expected, actual in (
             ("FORMAT_CHANGED", None, active.detected_format, analyzed.detected_format),
-            ("ROOT_PATH_CHANGED", active.root_path, active.root_path, analyzed.root_path),
-            ("RECORD_PATH_CHANGED", active.record_path, active.record_path, analyzed.record_path),
+            (
+                "ROOT_PATH_CHANGED",
+                active.root_path,
+                active.root_path,
+                analyzed.root_path,
+            ),
+            (
+                "RECORD_PATH_CHANGED",
+                active.record_path,
+                active.record_path,
+                analyzed.record_path,
+            ),
             ("DELIMITER_CHANGED", None, active.delimiter, analyzed.delimiter),
         ):
             if expected is not None and expected != actual:
@@ -165,9 +175,15 @@ class SupplierSchemaCompatibilityService:
             collision = field.field_code.lower() in normalized
             changes.append(
                 CompatibilityChange(
-                    code="FIELD_NORMALIZATION_COLLISION" if collision else "OPTIONAL_FIELD_ADDED",
+                    code=(
+                        "FIELD_NORMALIZATION_COLLISION"
+                        if collision
+                        else "OPTIONAL_FIELD_ADDED"
+                    ),
                     path=path,
-                    classification="INCOMPATIBLE" if collision else "COMPATIBLE_WITH_WARNINGS",
+                    classification=(
+                        "INCOMPATIBLE" if collision else "COMPATIBLE_WITH_WARNINGS"
+                    ),
                     severity="ERROR" if collision else "WARNING",
                     expected=None,
                     actual=field.data_type,

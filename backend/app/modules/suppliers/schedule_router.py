@@ -48,9 +48,7 @@ async def save_schedule(
     payload: SupplierScheduleWrite,
     session: AsyncSession = Depends(get_db),
 ) -> SupplierScheduleRead:
-    return await SupplierScheduleService(session).save(
-        supplier_id, source_id, payload
-    )
+    return await SupplierScheduleService(session).save(supplier_id, source_id, payload)
 
 
 @router.post(

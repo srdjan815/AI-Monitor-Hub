@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.config import settings
 from app.modules.catalog.models import Category
 
-
 DATABASE_URL = os.getenv(
     "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
     settings.database_url,

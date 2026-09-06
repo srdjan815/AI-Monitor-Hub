@@ -16,7 +16,6 @@ from app.modules.execution.repository import JobLeaseLostError, JobRepository
 from app.modules.execution.schemas import JobCreate
 from app.modules.execution.service import JobService
 
-
 DATABASE_URL = os.getenv(
     "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
     settings.database_url,

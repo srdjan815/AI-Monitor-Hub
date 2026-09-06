@@ -15,7 +15,6 @@ from app.core.security import authorize_request
 from app.main import app
 from app.modules.inventory.router import router as inventory_router
 
-
 API_ROOT = "http://localhost:8000/api/v1"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 CATALOG_ROOT = BACKEND_ROOT / "app" / "modules" / "catalog"

@@ -55,9 +55,9 @@ def test_supplier_api_openapi_contract() -> None:
         if isinstance(operation, dict) and "summary" in operation
     ]
     assert all(operation["summary"].strip() for operation in supplier_operations)
-    canonical_errors = schema["paths"][
-        "/api/v1/suppliers/platform/search"
-    ]["get"]["responses"]
+    canonical_errors = schema["paths"]["/api/v1/suppliers/platform/search"]["get"][
+        "responses"
+    ]
     assert "SupplierApiErrorResponse" in str(canonical_errors["422"])
 
 
@@ -111,9 +111,7 @@ def test_supplier_api_end_to_end_scenario() -> None:
                 )
                 assert acquisition.status_code == 201, acquisition.text
                 acquisitions.append(acquisition.json())
-                fetched = client.get(
-                    f"{root}/acquisitions/{acquisition.json()['id']}"
-                )
+                fetched = client.get(f"{root}/acquisitions/{acquisition.json()['id']}")
                 assert fetched.status_code == 200
                 snapshot = client.post(
                     f"{root}/snapshots",
@@ -134,9 +132,7 @@ def test_supplier_api_end_to_end_scenario() -> None:
             asyncio.run(
                 _shape(str(snapshots[0]["id"]), current=False, long_text="opis")
             )
-            asyncio.run(
-                _shape(str(snapshots[1]["id"]), current=True, long_text="opis")
-            )
+            asyncio.run(_shape(str(snapshots[1]["id"]), current=True, long_text="opis"))
             delta = client.post(
                 f"{root}/deltas",
                 json={
@@ -147,7 +143,10 @@ def test_supplier_api_end_to_end_scenario() -> None:
             )
             assert delta.status_code == 201, delta.text
             delta_row = delta.json()
-            assert client.get(f"{root}/deltas/{delta_row['id']}/summary").status_code == 200
+            assert (
+                client.get(f"{root}/deltas/{delta_row['id']}/summary").status_code
+                == 200
+            )
             changed = client.get(
                 f"{root}/deltas/{delta_row['id']}/items",
                 params={"limit": 10},
@@ -167,14 +166,12 @@ def test_supplier_api_end_to_end_scenario() -> None:
             )
             assert acknowledged.status_code == 200
             comment = client.post(
-                "/suppliers/platform/supplier-incidents/"
-                f"{incident['id']}/comments",
+                "/suppliers/platform/supplier-incidents/" f"{incident['id']}/comments",
                 json={"body": "Provereno kroz objedinjeni API"},
             )
             assert comment.status_code == 201
             resolved = client.post(
-                "/suppliers/platform/supplier-incidents/"
-                f"{incident['id']}/resolve",
+                "/suppliers/platform/supplier-incidents/" f"{incident['id']}/resolve",
                 json={
                     "resolution_code": "API_VERIFIED",
                     "resolution_summary": "Provera završena",
@@ -208,9 +205,7 @@ def test_supplier_api_end_to_end_scenario() -> None:
                 params={"limit": 1, "sort_by": "incident_code"},
             )
             assert page.status_code == 200
-            assert {"items", "total", "limit", "offset", "has_more"} <= set(
-                page.json()
-            )
+            assert {"items", "total", "limit", "offset", "has_more"} <= set(page.json())
 
             mixed = client.post(
                 "/suppliers/platform/bulk/incidents/assign",

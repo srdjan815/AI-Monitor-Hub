@@ -21,9 +21,9 @@ class SupplierIncidentService(SupplierIncidentSupport):
     async def manual(self, payload: ManualIncidentCreate) -> SupplierIncident:
         await self.validate_scope(payload.supplier_id, payload.source_connection_id)
         principal = current_principal()
-        if (
-            payload.severity == "CRITICAL" or payload.priority.value == "P1"
-        ) and (principal is None or INCIDENTS_MANAGE not in principal.permissions):
+        if (payload.severity == "CRITICAL" or payload.priority.value == "P1") and (
+            principal is None or INCIDENTS_MANAGE not in principal.permissions
+        ):
             supplier_error(
                 403,
                 "incident_elevated_permission_required",

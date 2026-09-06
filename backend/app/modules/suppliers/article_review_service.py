@@ -32,7 +32,6 @@ from app.modules.suppliers.delta_models import (
 from app.modules.suppliers.errors import supplier_error
 from app.modules.suppliers.snapshot_models import SupplierSnapshotItem
 
-
 ISSUE_CODES = {
     "CURRENT_RECORD_INVALID": "RECORD_INVALID",
     "REMOVAL_REQUIRES_REVIEW": "ARTICLE_REMOVED",
@@ -324,12 +323,16 @@ class SupplierArticleReviewService:
             "change_type": field.change_type,
             "previous_value": field.previous_value_preview,
             "current_value": field.current_value_preview,
-            "absolute_change": str(field.absolute_numeric_change)
-            if field.absolute_numeric_change is not None
-            else None,
-            "percentage_change": str(field.percentage_numeric_change)
-            if field.percentage_numeric_change is not None
-            else None,
+            "absolute_change": (
+                str(field.absolute_numeric_change)
+                if field.absolute_numeric_change is not None
+                else None
+            ),
+            "percentage_change": (
+                str(field.percentage_numeric_change)
+                if field.percentage_numeric_change is not None
+                else None
+            ),
         }
 
 

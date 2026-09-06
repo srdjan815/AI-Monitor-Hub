@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -12,6 +13,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.core.config import Settings
+from app.core.base64url import decode_base64url, encode_base64url
 from app.core.security import LocalHMACAuthenticationAdapter
 
 
@@ -75,6 +77,15 @@ def _assert_unauthorized(adapter: LocalHMACAuthenticationAdapter, token: str) ->
         adapter.authenticate(token)
     assert captured.value.status_code == 401
     assert captured.value.detail["code"] == "AUTHENTICATION_REQUIRED"
+
+
+def test_base64url_codec_rejects_noncanonical_and_unsafe_input() -> None:
+    assert encode_base64url(b"a") == "YQ"
+    assert decode_base64url("YQ") == b"a"
+
+    for invalid in ("", "YQ==", "AB", "ć"):
+        with pytest.raises(binascii.Error):
+            decode_base64url(invalid)
 
 
 def test_current_token_has_fixed_header_and_validated_claims() -> None:

@@ -9,9 +9,7 @@ from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_valida
 
 CurrencySource = Literal["CONFIGURED", "PRICE_LIST"]
 RateMode = Literal["FIXED", "MANUAL", "AUTOMATIC"]
-ExtractionMethod = Literal[
-    "JSON_PATH", "CSS_SELECTOR", "XPATH", "REGEX", "TEXT_LABEL"
-]
+ExtractionMethod = Literal["JSON_PATH", "CSS_SELECTOR", "XPATH", "REGEX", "TEXT_LABEL"]
 SUPPORTED_CURRENCIES = frozenset(
     {
         "RSD",
@@ -80,7 +78,9 @@ class CurrencySettingWrite(BaseModel):
         if bool(self.fallback_extraction_method) != bool(
             self.fallback_extraction_expression
         ):
-            raise ValueError("Rezervni način i rezervni izraz moraju biti zadati zajedno")
+            raise ValueError(
+                "Rezervni način i rezervni izraz moraju biti zadati zajedno"
+            )
         if (
             self.fallback_extraction_method == self.extraction_method
             and self.fallback_extraction_expression == self.extraction_expression
@@ -201,7 +201,9 @@ class CurrencySourceTestRequest(BaseModel):
         if bool(self.fallback_extraction_method) != bool(
             self.fallback_extraction_expression
         ):
-            raise ValueError("Rezervni način i rezervni izraz moraju biti zadati zajedno")
+            raise ValueError(
+                "Rezervni način i rezervni izraz moraju biti zadati zajedno"
+            )
         return self
 
 

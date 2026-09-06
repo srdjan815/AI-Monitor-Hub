@@ -482,14 +482,13 @@ def test_supplier_openapi_contract_and_chapter_scope() -> None:
         for path in paths
         for token in (
             "/supplier-sources",
-                "/supplier-products",
-                "/supplier-snapshots",
-            )
+            "/supplier-products",
+            "/supplier-snapshots",
+        )
     )
     supplier_schema = schema["components"]["schemas"]["SupplierRead"]
-    assert (
-        "automatski generiše"
-        in (supplier_schema["properties"]["supplier_code"]["description"])
+    assert "automatski generiše" in (
+        supplier_schema["properties"]["supplier_code"]["description"]
     )
     assert "paralel" in supplier_schema["properties"]["version"]["description"]
     for path in expected:

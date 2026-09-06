@@ -44,7 +44,6 @@ from app.modules.product_content.schemas import (
 )
 from app.modules.product_content.template_service import TemplateService
 
-
 DATABASE_URL = os.getenv(
     "PRODUCT_CONTENT_INTEGRATION_DATABASE_URL",
     settings.database_url,

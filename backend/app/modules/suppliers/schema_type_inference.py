@@ -156,16 +156,12 @@ class SchemaFieldInferer:
             precision = (
                 38
                 if is_price_field
-                else cls._precision(samples)
-                if data_type == "DECIMAL"
-                else None
+                else cls._precision(samples) if data_type == "DECIMAL" else None
             )
             scale = (
                 2
                 if is_price_field
-                else cls._scale(samples)
-                if data_type == "DECIMAL"
-                else None
+                else cls._scale(samples) if data_type == "DECIMAL" else None
             )
             result.append(
                 InferredField(
@@ -294,9 +290,11 @@ class SchemaFieldInferer:
     def _scale(values: list[str]) -> int:
         return max(
             (
-                len(re.split(r"[.,]", value, maxsplit=1)[1])
-                if re.search(r"[.,]", value)
-                else 0
+                (
+                    len(re.split(r"[.,]", value, maxsplit=1)[1])
+                    if re.search(r"[.,]", value)
+                    else 0
+                )
                 for value in values
             ),
             default=0,

@@ -51,9 +51,18 @@ def identity_index(items: list[TIdentity]) -> dict[tuple[str, str], TIdentity]:
     return result
 
 
-def compare_values(previous: object, current: object, path: str = "") -> list[ValueChange]:
+def compare_values(
+    previous: object, current: object, path: str = ""
+) -> list[ValueChange]:
     if previous is MISSING or current is MISSING:
-        return [ValueChange(path, "VALUE_ADDED" if previous is MISSING else "VALUE_REMOVED", previous, current)]
+        return [
+            ValueChange(
+                path,
+                "VALUE_ADDED" if previous is MISSING else "VALUE_REMOVED",
+                previous,
+                current,
+            )
+        ]
     if type(previous) is not type(current):
         return [ValueChange(path, "TYPE_CHANGED", previous, current)]
     if isinstance(previous, dict):
@@ -61,11 +70,23 @@ def compare_values(previous: object, current: object, path: str = "") -> list[Va
         changes: list[ValueChange] = []
         for key in sorted(set(previous) | set(current_dict), key=str):
             child = f"{path}.{key}" if path else str(key)
-            changes.extend(compare_values(previous.get(key, MISSING), current_dict.get(key, MISSING), child))
+            changes.extend(
+                compare_values(
+                    previous.get(key, MISSING), current_dict.get(key, MISSING), child
+                )
+            )
         return changes
     if isinstance(previous, list):
-        return [] if previous == current else [ValueChange(path, "ARRAY_CHANGED", previous, current)]
-    return [] if previous == current else [ValueChange(path, "VALUE_CHANGED", previous, current)]
+        return (
+            []
+            if previous == current
+            else [ValueChange(path, "ARRAY_CHANGED", previous, current)]
+        )
+    return (
+        []
+        if previous == current
+        else [ValueChange(path, "VALUE_CHANGED", previous, current)]
+    )
 
 
 def value_hash(value: object) -> str | None:
@@ -95,7 +116,11 @@ def value_type(value: object) -> str | None:
 def preview(value: object) -> str | None:
     if value is MISSING:
         return None
-    rendered = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    rendered = (
+        value
+        if isinstance(value, str)
+        else json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    )
     return rendered[:PREVIEW_LIMIT]
 
 
@@ -120,6 +145,14 @@ def field_role(path: str) -> str | None:
 
 
 __all__ = [
-    "MISSING", "ValueChange", "compare_values", "decimal_value", "field_role",
-    "identity_index", "matching_identity", "preview", "value_hash", "value_type",
+    "MISSING",
+    "ValueChange",
+    "compare_values",
+    "decimal_value",
+    "field_role",
+    "identity_index",
+    "matching_identity",
+    "preview",
+    "value_hash",
+    "value_type",
 ]

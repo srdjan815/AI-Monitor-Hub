@@ -54,14 +54,12 @@ class RecordingPortalClient(RecordingHttpClient):
 
 def test_portal_login_form_detects_supplier_specific_field_names() -> None:
     parser = _LoginFormParser("username")
-    parser.feed(
-        """
+    parser.feed("""
         <form action="login.php" method="POST">
           <input type="text" name="user">
           <input type="password" name="pass">
         </form>
-        """
-    )
+        """)
 
     assert parser.action == "login.php"
     assert parser.detected_username_field == "user"
@@ -105,9 +103,7 @@ def test_probe_redacts_sensitive_preview_fields_and_rejects_html() -> None:
     )
     assert detected == "CSV"
     assert count == 1
-    assert preview == [
-        {"sku": "1", "password": "[REDACTED]", "username": "[REDACTED]"}
-    ]
+    assert preview == [{"sku": "1", "password": "[REDACTED]", "username": "[REDACTED]"}]
     with pytest.raises(AcquisitionFailure, match="HTML"):
         SupplierSourceProbeService._analyse(
             b"<html><body>Login</body></html>",
@@ -232,9 +228,10 @@ def test_dashboard_business_messages_separate_pipeline_phases() -> None:
     assert warning("Radi", True, True, failed, None, None, datetime.now(UTC)) == (
         "Cenovnik je dostupan, ali obrada nije uspešno završena."
     )
-    assert warning(
-        "Ne radi", True, True, None, None, None, datetime.now(UTC)
-    ) == "Cenovnik nije dostupan zbog problema sa pristupom dobavljaču."
+    assert (
+        warning("Ne radi", True, True, None, None, None, datetime.now(UTC))
+        == "Cenovnik nije dostupan zbog problema sa pristupom dobavljaču."
+    )
 
 
 @pytest.mark.parametrize(

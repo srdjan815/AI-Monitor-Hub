@@ -60,7 +60,11 @@ class SupplierSourceProbeService:
         if source is None:
             supplier_error(404, "supplier_source_not_found", "Konekcija nije pronađena")
         if not source.is_active:
-            supplier_error(409, "supplier_source_inactive", "Arhivirana konekcija se ne može testirati")
+            supplier_error(
+                409,
+                "supplier_source_inactive",
+                "Arhivirana konekcija se ne može testirati",
+            )
         if supplied is not None and source.source_type not in {
             "MANUAL_UPLOAD",
             "CSV",
@@ -158,9 +162,7 @@ class SupplierSourceProbeService:
             "Sadržaj može da se otvori",
             "Pronađeni su zapisi",
         ]
-        return [
-            SourceProbeStep(label=label, successful=successful) for label in labels
-        ]
+        return [SourceProbeStep(label=label, successful=successful) for label in labels]
 
     @staticmethod
     def _safe_message(exc: AcquisitionFailure) -> str:
@@ -202,9 +204,7 @@ class SupplierSourceProbeService:
         return cls._csv(content)
 
     @classmethod
-    def _xml(
-        cls, content: bytes
-    ) -> tuple[str, list[dict[str, object]], int]:
+    def _xml(cls, content: bytes) -> tuple[str, list[dict[str, object]], int]:
         try:
             root = ET.fromstring(content)
         except ET.ParseError as exc:
@@ -223,18 +223,13 @@ class SupplierSourceProbeService:
                 "U preuzetom cenovniku nisu pronađeni zapisi",
             )
         preview: list[dict[str, object]] = [
-            {
-                item.tag.rsplit("}", 1)[-1]: (item.text or "").strip()
-                for item in row
-            }
+            {item.tag.rsplit("}", 1)[-1]: (item.text or "").strip() for item in row}
             for row in rows[:10]
         ]
         return "XML", cls._sanitize_preview(preview), len(rows)
 
     @classmethod
-    def _json(
-        cls, content: bytes
-    ) -> tuple[str, list[dict[str, object]], int]:
+    def _json(cls, content: bytes) -> tuple[str, list[dict[str, object]], int]:
         try:
             value = json.loads(content)
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -265,9 +260,7 @@ class SupplierSourceProbeService:
         return "EXCEL", cls._sanitize_preview(rows[:10]), len(rows)
 
     @classmethod
-    def _csv(
-        cls, content: bytes
-    ) -> tuple[str, list[dict[str, object]], int]:
+    def _csv(cls, content: bytes) -> tuple[str, list[dict[str, object]], int]:
         try:
             text = content.decode("utf-8-sig")
             rows = list(csv.DictReader(io.StringIO(text)))
@@ -309,9 +302,7 @@ class SupplierSourceProbeService:
                 if any(marker in normalized for marker in sensitive):
                     clean[str(key)] = "[REDACTED]"
                 elif isinstance(value, (str, int, float, bool)) or value is None:
-                    clean[str(key)] = (
-                        value[:500] if isinstance(value, str) else value
-                    )
+                    clean[str(key)] = value[:500] if isinstance(value, str) else value
                 else:
                     clean[str(key)] = str(value)[:500]
             sanitized.append(clean)

@@ -10,13 +10,21 @@ def select_rule(
     ranked = sorted(
         enabled,
         key=lambda rule: (
-            0
-            if rule.source_connection_id == source_id
-            else 1
-            if rule.supplier_id == supplier_id and rule.source_connection_id is None
-            else 2
-            if rule.supplier_id is None and rule.source_connection_id is None
-            else 3,
+            (
+                0
+                if rule.source_connection_id == source_id
+                else (
+                    1
+                    if rule.supplier_id == supplier_id
+                    and rule.source_connection_id is None
+                    else (
+                        2
+                        if rule.supplier_id is None
+                        and rule.source_connection_id is None
+                        else 3
+                    )
+                )
+            ),
             rule.rule_code,
         ),
     )

@@ -226,10 +226,10 @@ def test_frozen_supplier_pipeline_partial_success_and_idempotency() -> None:
                 + ("dobavljački proizvod " * 3500)
             )
             rows = [
-                    ["A-1", "8606019540128", "Prvi", "Opis 1", "10.00", "RSD", "4"],
-                    ["A-2", "4711158481004", "Drugi", long_description, "20", "EUR", "2"],
-                    ["A-3", "8808979804832", "Treći", "Opis 3", "30", "RSD", "0"],
-                    ["", "4711377342544", "Nevažeći", "Opis 4", "40", "RSD", "1"],
+                ["A-1", "8606019540128", "Prvi", "Opis 1", "10.00", "RSD", "4"],
+                ["A-2", "4711158481004", "Drugi", long_description, "20", "EUR", "2"],
+                ["A-3", "8808979804832", "Treći", "Opis 3", "30", "RSD", "0"],
+                ["", "4711377342544", "Nevažeći", "Opis 4", "40", "RSD", "1"],
             ]
             header = "supplier_sku,ean,name,description,price,currency,stock\n"
             stream = io.StringIO(newline="")

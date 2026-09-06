@@ -29,9 +29,7 @@ async def _make_one_product_inactive(source_id: str) -> str:
     async with sessions() as session:
         presence = await session.scalar(
             select(SupplierProductPresence)
-            .where(
-                SupplierProductPresence.source_connection_id == uuid.UUID(source_id)
-            )
+            .where(SupplierProductPresence.source_connection_id == uuid.UUID(source_id))
             .order_by(SupplierProductPresence.product_code_normalized)
             .limit(1)
         )

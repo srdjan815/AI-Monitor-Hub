@@ -146,9 +146,9 @@ class SupplierMappingTestService:
                 field = fields_by_id.get(rule.schema_field_id)
                 original = validated.values.get(rule.schema_field_id)
                 configured_field_ids: set[uuid.UUID] = set()
-                configured = (
-                    getattr(rule, "transformation_config", None) or {}
-                ).get("field_ids", [])
+                configured = (getattr(rule, "transformation_config", None) or {}).get(
+                    "field_ids", []
+                )
                 if isinstance(configured, list):
                     for field_id in configured:
                         try:
@@ -184,9 +184,7 @@ class SupplierMappingTestService:
                     status=(
                         "GREŠKA"
                         if row_errors
-                        else "UPOZORENJE"
-                        if row_warnings
-                        else "ISPRAVNO"
+                        else "UPOZORENJE" if row_warnings else "ISPRAVNO"
                     ),
                     cells=cells,
                 )

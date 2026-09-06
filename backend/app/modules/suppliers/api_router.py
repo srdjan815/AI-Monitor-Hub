@@ -119,7 +119,11 @@ async def canonical_incidents(
     offset: int = Query(default=0, ge=0, le=MAX_LEGACY_OFFSET),
     session: AsyncSession = Depends(get_db),
 ) -> SupplierApiPage:
-    if created_from is not None and created_to is not None and created_from > created_to:
+    if (
+        created_from is not None
+        and created_to is not None
+        and created_from > created_to
+    ):
         raise HTTPException(
             422,
             detail={
@@ -127,9 +131,7 @@ async def canonical_incidents(
                 "message": "created_from ne sme biti posle created_to",
             },
         )
-    rows, total = await SupplierIncidentQueryService(
-        session
-    ).repository.list_incidents(
+    rows, total = await SupplierIncidentQueryService(session).repository.list_incidents(
         supplier_id=supplier_id,
         source_id=source_connection_id,
         status=incident_status,
