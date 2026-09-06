@@ -102,3 +102,29 @@ def test_archive_item_uses_supported_fallback_fields() -> None:
     assert item.currency == "EUR"
     assert item.stock == "3"
     assert item.category == "Oprema"
+
+
+def test_archive_item_handles_sparse_legacy_record() -> None:
+    record = cast(
+        Any,
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            record_number=3,
+            source_key="LEGACY-1",
+            validation_status="ACCEPTED",
+            warning_count=0,
+            error_count=0,
+            raw_data={"legacy": True},
+            mapped_data={},
+        ),
+    )
+
+    item = PriceListArchiveService._item(record)
+
+    assert item.product_code == "LEGACY-1"
+    assert item.ean is None
+    assert item.name is None
+    assert item.price is None
+    assert item.currency is None
+    assert item.stock is None
+    assert item.category is None

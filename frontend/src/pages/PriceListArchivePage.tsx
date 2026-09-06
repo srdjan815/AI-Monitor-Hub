@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { srLatn } from "date-fns/locale";
+import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFnsV3";
 import {
   Alert, Button, Dialog, DialogContent, DialogTitle, FormControl, InputLabel,
   MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer,
@@ -32,15 +36,19 @@ const storageLabels: Record<string, string> = {
   TRANSFER_FAILED: "Prenos neuspešan"
 };
 
-function endOfDay(value: string) {
-  return value ? `${value}T23:59:59.999` : undefined;
+function startOfDay(value: Date | null) {
+  return value ? `${format(value, "yyyy-MM-dd")}T00:00:00` : undefined;
+}
+
+function endOfDay(value: Date | null) {
+  return value ? `${format(value, "yyyy-MM-dd")}T23:59:59.999` : undefined;
 }
 
 export function PriceListArchivePage() {
   const [supplierId, setSupplierId] = useState("");
   const [sourceId, setSourceId] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
   const [fileSearch, setFileSearch] = useState("");
   const [archiveOffset, setArchiveOffset] = useState(0);
   const [selected, setSelected] = useState<PriceListArchiveEntry | null>(null);
@@ -48,6 +56,7 @@ export function PriceListArchivePage() {
   const [validationStatus, setValidationStatus] = useState("");
   const [itemOffset, setItemOffset] = useState(0);
   const [details, setDetails] = useState<ArchivedPriceListItem | null>(null);
+  const articleSectionRef = useRef<HTMLDivElement | null>(null);
 
   const filters = useQuery({
     queryKey: ["price-list-archive-filters"],
@@ -62,9 +71,9 @@ export function PriceListArchivePage() {
   }, [sourceId, sources]);
 
   const archives = useQuery({
-    queryKey: ["price-list-archive", supplierId, sourceId, dateFrom, dateTo, fileSearch, archiveOffset],
+    queryKey: ["price-list-archive", supplierId, sourceId, dateFrom?.getTime(), dateTo?.getTime(), fileSearch, archiveOffset],
     queryFn: () => api<Page<PriceListArchiveEntry>>(`/price-list-archive${queryString({
-      supplier_id: supplierId, source_id: sourceId, date_from: dateFrom ? `${dateFrom}T00:00:00` : undefined,
+      supplier_id: supplierId, source_id: sourceId, date_from: startOfDay(dateFrom),
       date_to: endOfDay(dateTo), search: fileSearch.trim(), limit: pageSize, offset: archiveOffset
     })}`)
   });
@@ -80,6 +89,12 @@ export function PriceListArchivePage() {
   const chooseArchive = (entry: PriceListArchiveEntry) => {
     setSelected(entry); setItemOffset(0); setItemSearch(""); setValidationStatus("");
   };
+  useEffect(() => {
+    if (!selected) return;
+    window.requestAnimationFrame(() => {
+      articleSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [selected]);
 
   return <>
     <PageHeader title="Arhiva cenovnika" description="Read-only pregled istorijskih cenovnika i artikala. Originalni fajlovi ostaju neizmenjeni i zaštićeni SHA-256 proverom." />
@@ -87,8 +102,10 @@ export function PriceListArchivePage() {
       <Stack direction={{ xs: "column", md: "row" }} gap={1.5} flexWrap="wrap">
         <FormControl sx={{ minWidth: 240 }}><InputLabel>Dobavljač</InputLabel><Select label="Dobavljač" value={supplierId} onChange={(event) => { setSupplierId(event.target.value); resetArchivePage(); }}>{<MenuItem value="">Svi dobavljači</MenuItem>}{(filters.data?.suppliers ?? []).map((item) => <MenuItem key={item.id} value={item.id}>{item.name}</MenuItem>)}</Select></FormControl>
         <FormControl sx={{ minWidth: 240 }}><InputLabel>Izvor</InputLabel><Select label="Izvor" value={sourceId} onChange={(event) => { setSourceId(event.target.value); resetArchivePage(); }}>{<MenuItem value="">Svi izvori</MenuItem>}{sources.map((item) => <MenuItem key={item.id} value={item.id}>{item.name}</MenuItem>)}</Select></FormControl>
-        <TextField label="Od datuma" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); resetArchivePage(); }} InputLabelProps={{ shrink: true }} />
-        <TextField label="Do datuma" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); resetArchivePage(); }} InputLabelProps={{ shrink: true }} />
+        <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={srLatn}>
+          <DatePicker label="Od datuma" format="dd.MM.yyyy" value={dateFrom} maxDate={dateTo ?? undefined} onChange={(value) => { setDateFrom(value); resetArchivePage(); }} slotProps={{ textField: { placeholder: "dd.mm.gggg", sx: { width: 180 } } }} />
+          <DatePicker label="Do datuma" format="dd.MM.yyyy" value={dateTo} minDate={dateFrom ?? undefined} onChange={(value) => { setDateTo(value); resetArchivePage(); }} slotProps={{ textField: { placeholder: "dd.mm.gggg", sx: { width: 180 } } }} />
+        </LocalizationProvider>
         <TextField label="Naziv fajla ili oznaka importa" value={fileSearch} onChange={(event) => { setFileSearch(event.target.value); resetArchivePage(); }} sx={{ flex: "1 1 280px" }} />
       </Stack>
     </Paper>
@@ -102,13 +119,13 @@ export function PriceListArchivePage() {
           <TableCell><Typography>{entry.original_filename || "Bez originalnog naziva"}</Typography><Typography variant="caption" fontFamily="monospace">{entry.acquisition_code}</Typography></TableCell>
           <TableCell align="right">{entry.total_records.toLocaleString("sr-RS")}</TableCell><TableCell align="right">{bytes(entry.size_bytes)}</TableCell>
           <TableCell><StatusChip value={storageLabels[entry.storage_status] ?? entry.storage_status} /></TableCell>
-          <TableCell><Button onClick={() => chooseArchive(entry)}>Pregledaj artikle</Button></TableCell>
+          <TableCell><Button type="button" onClick={() => chooseArchive(entry)}>Pregledaj artikle</Button></TableCell>
         </TableRow>)}
       </TableBody></Table></TableContainer>
       <TablePagination component="div" count={archives.data.total} page={Math.floor(archiveOffset / pageSize)} rowsPerPage={pageSize} rowsPerPageOptions={[pageSize]} onPageChange={(_, page) => setArchiveOffset(page * pageSize)} />
     </Paper> : <EmptyState title="Nema cenovnika" description="Promenite filtere ili sačekajte prvi uspešan import." />}
 
-    {selected && <Paper sx={{ p: 2, mt: 3 }}>
+    {selected && <Paper ref={articleSectionRef} sx={{ p: 2, mt: 3, scrollMarginTop: 80 }}>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" gap={1} mb={2}>
         <div><Typography variant="h2">Artikli — {selected.original_filename || selected.acquisition_code}</Typography><Typography color="text.secondary">{selected.supplier_name} · {selected.source_name} · checksum {selected.checksum_sha256 ? `${selected.checksum_sha256.slice(0, 16)}…` : "nije dostupan"}</Typography></div>
         <Button onClick={() => setSelected(null)}>Zatvori pregled</Button>
