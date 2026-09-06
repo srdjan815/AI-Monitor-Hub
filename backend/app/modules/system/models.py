@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -23,6 +24,7 @@ from app.db.mixins import TimestampMixin, UUIDMixin
 class SystemCleanupAudit(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "system_cleanup_audit"
     __table_args__ = (
+        Index("ix_system_cleanup_audit_created_at", "created_at"),
         CheckConstraint(
             "status IN ('SUCCEEDED','FAILED','NO_CHANGES')", name="status_valid"
         ),

@@ -15,7 +15,11 @@ from app.core.config import settings
 from app.core.security import create_access_token
 from app.main import app
 from app.db.session import AsyncSessionLocal
-from app.modules.system.models import ArtifactArchiveSetting, ArtifactArchiveTransfer
+from app.modules.system.models import (
+    ArtifactArchiveSetting,
+    ArtifactArchiveTransfer,
+    SystemCleanupAudit,
+)
 from app.modules.system.artifact_archive_service import (
     ArchiveConfigurationError,
     ArtifactArchiveService,
@@ -37,6 +41,17 @@ from app.modules.system.resource_service import (
 def _old(path: Path, days: int = 40) -> None:
     moment = (datetime.now(UTC) - timedelta(days=days)).timestamp()
     os.utime(path, (moment, moment))
+
+
+def test_cleanup_audit_model_declares_migrated_created_at_index() -> None:
+    index = next(
+        item
+        for item in SystemCleanupAudit.__table__.indexes
+        if item.name == "ix_system_cleanup_audit_created_at"
+    )
+
+    assert [column.name for column in index.columns] == ["created_at"]
+    assert not index.unique
 
 
 def test_cleanup_is_restricted_to_explicit_allowlist(
