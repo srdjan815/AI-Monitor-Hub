@@ -7,6 +7,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import current_actor_id
+from app.modules.suppliers.enums import SupplierSourceStatus, SupplierStatus
 from app.modules.suppliers.models import Supplier, SupplierSource
 from app.modules.suppliers.retention_models import (
     SupplierDataRetentionPolicy,
@@ -96,6 +97,12 @@ class SupplierRetentionService:
                     SupplierDataRetentionPolicy.source_connection_id
                     == SupplierSource.id,
                 )
+                .where(
+                    Supplier.is_active.is_(True),
+                    Supplier.status == SupplierStatus.ACTIVE.value,
+                    SupplierSource.is_active.is_(True),
+                    SupplierSource.status == SupplierSourceStatus.ACTIVE.value,
+                )
                 .order_by(Supplier.company_name, SupplierSource.name, SupplierSource.id)
             )
         ).all()
@@ -109,7 +116,13 @@ class SupplierRetentionService:
             await self.session.execute(
                 select(SupplierSource, Supplier.company_name)
                 .join(Supplier, Supplier.id == SupplierSource.supplier_id)
-                .where(SupplierSource.id == source_id)
+                .where(
+                    SupplierSource.id == source_id,
+                    Supplier.is_active.is_(True),
+                    Supplier.status == SupplierStatus.ACTIVE.value,
+                    SupplierSource.is_active.is_(True),
+                    SupplierSource.status == SupplierSourceStatus.ACTIVE.value,
+                )
             )
         ).one_or_none()
         if row is None:
