@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { Alert, Button, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Button, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { api } from "../../api/client";
 import type { ApiError, RetentionPolicy, RetentionPreview, RetentionRun } from "../../types";
+import { FieldInfoLabel } from "./FieldInfoLabel";
 
 const bytes = (value: number) => {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -24,12 +24,7 @@ interface RetentionNumberFieldProps {
 
 function RetentionNumberField({ label, help, value, min, max, onChange }: RetentionNumberFieldProps) {
   return <Stack gap={0.5} sx={{ flex: "0 1 180px", minWidth: 165 }}>
-    <Stack direction="row" alignItems="center" gap={0.5}>
-      <Typography variant="caption" color="text.secondary">{label}</Typography>
-      <Tooltip title={help} arrow>
-        <InfoOutlinedIcon color="info" fontSize="small" tabIndex={0} aria-label={help} />
-      </Tooltip>
-    </Stack>
+    <FieldInfoLabel label={label} help={help} />
     <TextField aria-label={label} type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} inputProps={{ min, max }} />
   </Stack>;
 }
