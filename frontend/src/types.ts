@@ -420,3 +420,54 @@ export interface ArtifactArchiveStatus {
   duplicate_artifacts: number;
   duplicate_bytes: number;
 }
+
+export interface RetentionPolicy {
+  source_connection_id: string;
+  supplier_name: string;
+  source_name: string;
+  enabled: boolean;
+  configured: boolean;
+  staging_retention_days: number;
+  snapshot_online_days: number;
+  minimum_online_snapshots: number;
+  cleanup_batch_size: number;
+  version: number | null;
+}
+
+export interface RetentionPreview {
+  run_id: string;
+  source_connection_id: string;
+  staging_cutoff: string;
+  snapshot_cutoff: string;
+  candidate_staging_rows: number;
+  candidate_staging_bytes: number;
+  referenced_staging_rows: number;
+  candidate_snapshots: number;
+  candidate_snapshot_items: number;
+  candidate_snapshot_bytes: number;
+  observations_preserved: number;
+  snapshots_ready_for_offload: number;
+  snapshots_requiring_archive: number;
+  protected_snapshots: number;
+  execution_allowed: boolean;
+  blockers: string[];
+  created_at: string;
+}
+
+export interface RetentionRun {
+  id: string;
+  source_connection_id: string;
+  source_name: string;
+  status: string;
+  staging_cutoff: string;
+  snapshot_cutoff: string;
+  candidate_staging_rows: number;
+  candidate_snapshots: number;
+  preserved_observations: number;
+  deleted_staging_rows: number;
+  offloaded_snapshot_items: number;
+  created_by: string;
+  created_at: string;
+  completed_at: string | null;
+  failure_message: string | null;
+}

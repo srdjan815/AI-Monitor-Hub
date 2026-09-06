@@ -13,6 +13,7 @@ import { StatusChip } from "../components/StatusChip";
 import { useAuth } from "../state/AuthContext";
 import type { ApiError, CleanupAudit, CleanupPreview, SystemCapacity, SystemInventory } from "../types";
 import { ArtifactArchivePanel } from "./system/ArtifactArchivePanel";
+import { DataRetentionPanel } from "./system/DataRetentionPanel";
 
 const bytes = (value: number | null | undefined) => {
   if (value == null) return "—";
@@ -106,6 +107,7 @@ export function SystemPage() {
       <TableBody>{(audit.data ?? []).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.created_at).toLocaleString("sr-RS")}</TableCell><TableCell>{item.category}</TableCell><TableCell>{item.older_than_days} dana</TableCell><TableCell><StatusChip value={item.status} /></TableCell><TableCell>{item.deleted_files} / {bytes(item.deleted_bytes)}</TableCell><TableCell>{item.actor_id}</TableCell></TableRow>)}</TableBody>
     </Table></TableContainer>
     {auth.can("system_resources.manage") && <ArtifactArchivePanel />}
+    {auth.can("system_resources.manage") && <DataRetentionPanel />}
     <Dialog open={dialogOpen} onClose={() => { setDialogOpen(false); preview.reset(); }} fullWidth maxWidth="sm">
       <DialogTitle>Bezbedno čišćenje</DialogTitle><DialogContent>
         <Alert severity="warning" sx={{ mb: 2 }}>Brisanje je ograničeno samo na dozvoljene direktorijume. Cenovnici, snapshot arhive, slike i podaci baze nisu obuhvaćeni.</Alert>
