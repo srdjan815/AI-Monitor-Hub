@@ -22,11 +22,12 @@ def test_supplier_price_list_archive_lists_import_and_reads_items_without_mutati
     with httpx.Client(base_url=API_ROOT, headers=_headers(), timeout=60) as client:
         try:
             supplier_id, source_id, source_root = _pipeline(client, suffix)
+            payload = _csv_payload("Arhivirani opis")
             acquisition = client.post(
                 f"{source_root}/acquisitions/upload",
                 params={"filename": "archive.csv"},
                 headers={"Content-Type": "text/csv"},
-                content=_csv_payload("Arhivirani opis"),
+                content=payload,
             )
             assert acquisition.status_code == 201, acquisition.text
             assert acquisition.json()["status"] == "SUCCEEDED"
@@ -61,6 +62,14 @@ def test_supplier_price_list_archive_lists_import_and_reads_items_without_mutati
             assert item["mapped_data"]["product_code"] == "A-1"
             assert item["raw_data"]
 
+            original = client.get(
+                f"/price-list-archive/{entry['acquisition_run_id']}/original"
+            )
+            assert original.status_code == 200, original.text
+            assert original.content == payload
+            assert original.headers["x-content-sha256"] == entry["checksum_sha256"]
+            assert "archive.csv" in original.headers["content-disposition"]
+
             repeated = client.get(
                 f"/price-list-archive/{entry['acquisition_run_id']}/items",
                 params={"search": "A-1", "validation_status": "ACCEPTED"},
@@ -69,6 +78,10 @@ def test_supplier_price_list_archive_lists_import_and_reads_items_without_mutati
 
             missing = client.get(f"/price-list-archive/{uuid.uuid4()}/items")
             assert missing.status_code == 404
+            missing_original = client.get(
+                f"/price-list-archive/{uuid.uuid4()}/original"
+            )
+            assert missing_original.status_code == 404
         finally:
             if supplier_id:
                 asyncio.run(_purge(supplier_id))

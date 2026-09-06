@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import uuid
 from types import SimpleNamespace
 from typing import Any, cast
 
+from app.core.config import settings
+from app.modules.suppliers.price_list_archive_download import (
+    _archive_path,
+    _download_name,
+    _local_path,
+    _verified,
+)
 from app.modules.suppliers.price_list_archive_service import (
     PriceListArchiveService,
     _first,
@@ -128,3 +136,41 @@ def test_archive_item_handles_sparse_legacy_record() -> None:
     assert item.currency is None
     assert item.stock is None
     assert item.category is None
+
+
+def test_download_name_preserves_safe_original_and_falls_back() -> None:
+    assert _download_name(" cenovnik.xlsx ", "ACQ-1", "XLSX") == "cenovnik.xlsx"
+    assert _download_name("../tajna.txt", "ACQ-2", "CSV") == "ACQ-2.csv"
+    assert _download_name(None, "ACQ-3", None) == "ACQ-3"
+
+
+def test_download_verification_requires_exact_size_and_checksum(tmp_path: Any) -> None:
+    payload = b"originalni cenovnik"
+    source = tmp_path / "cenovnik.csv"
+    source.write_bytes(payload)
+    checksum = hashlib.sha256(payload).hexdigest()
+
+    assert _verified(source, checksum, len(payload)) is True
+    assert _verified(source, checksum, None) is True
+    assert _verified(source, checksum, len(payload) + 1) is False
+    assert _verified(source, "0" * 64, len(payload)) is False
+    assert _verified(tmp_path / "ne-postoji.csv", checksum, len(payload)) is False
+
+
+def test_local_download_path_is_confined_to_artifact_root(tmp_path: Any) -> None:
+    root = str(tmp_path)
+    assert _local_path("cenovnik.csv", root) == (tmp_path / "cenovnik.csv").resolve()
+    assert _local_path(None, root) is None
+    assert _local_path("../tajna.txt", root) is None
+
+
+def test_archive_download_path_is_confined_to_configured_mount(
+    tmp_path: Any, monkeypatch: Any
+) -> None:
+    monkeypatch.setattr(settings, "system_archive_mount_root", str(tmp_path))
+
+    expected = (tmp_path / "cenovnici" / "blobs" / "cenovnik.csv").resolve()
+    assert _archive_path("cenovnici", "blobs/cenovnik.csv") == expected
+    assert _archive_path("cenovnici", None) is None
+    assert _archive_path("cenovnici", "/tajna.txt") is None
+    assert _archive_path("cenovnici", "../tajna.txt") is None

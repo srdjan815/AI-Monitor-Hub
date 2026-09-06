@@ -94,6 +94,39 @@ export async function deleteSession(): Promise<void> {
   await api<void>("/auth/session", { method: "DELETE" });
 }
 
+export async function downloadApiFile(path: string, fallbackFilename: string): Promise<void> {
+  const response = await fetch(path.startsWith("/api/") ? path : `${API_ROOT}${path}`, {
+    credentials: "same-origin",
+    headers: { Accept: "application/octet-stream", "X-Correlation-ID": correlationId() }
+  });
+  if (!response.ok) {
+    let payload: unknown = {};
+    try {
+      payload = await response.json();
+    } catch {
+      payload = { detail: response.statusText };
+    }
+    throw apiError(response.status, payload);
+  }
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const plain = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+  let filename = fallbackFilename;
+  try {
+    filename = encoded ? decodeURIComponent(encoded) : plain || fallbackFilename;
+  } catch {
+    filename = fallbackFilename;
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function queryString(
   values: Record<string, string | number | boolean | null | undefined>
 ): string {
