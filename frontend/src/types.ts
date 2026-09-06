@@ -401,8 +401,9 @@ export interface CleanupAudit {
 export interface ArtifactArchiveSetting {
   id: string;
   backend_type: "MOUNT";
-  display_name: string;
-  relative_path: string;
+    display_name: string;
+    relative_path: string;
+    snapshot_relative_path: string;
   enabled: boolean;
   local_retention_days: number;
   last_tested_at?: string | null;

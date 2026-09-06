@@ -32,7 +32,7 @@ def _setting_read(item: ArtifactArchiveSetting) -> ArchiveSettingRead:
     return ArchiveSettingRead.model_validate(item, from_attributes=True)
 
 
-def _target_root(relative_path: str) -> Path:
+def archive_target_root(relative_path: str) -> Path:
     relative = PurePosixPath(relative_path)
     if relative.is_absolute() or ".." in relative.parts:
         raise ArchiveConfigurationError("Putanja arhive mora biti relativna i bez '..'")
@@ -47,6 +47,10 @@ def _target_root(relative_path: str) -> Path:
     if base == base.parent:
         raise ArchiveConfigurationError("Koren arhive nije dovoljno usko podešen")
     return target
+
+
+# Backward-compatible internal alias; new integrations use the named public helper.
+_target_root = archive_target_root
 
 
 def _checksum(path: Path) -> str:
@@ -151,7 +155,8 @@ class ArtifactArchiveService:
         )
 
     async def save_setting(self, payload: ArchiveSettingWrite) -> ArchiveSettingRead:
-        _target_root(payload.relative_path)
+        archive_target_root(payload.relative_path)
+        archive_target_root(payload.snapshot_relative_path)
         item = await self.setting()
         if item is None:
             item = ArtifactArchiveSetting(
@@ -165,8 +170,16 @@ class ArtifactArchiveService:
                 raise ArchiveConfigurationError(
                     "Podešavanje je u međuvremenu promenjeno"
                 )
+            location_changed = (
+                item.relative_path != payload.relative_path
+                or item.snapshot_relative_path != payload.snapshot_relative_path
+            )
             for key, value in payload.model_dump(exclude={"expected_version"}).items():
                 setattr(item, key, value)
+            if location_changed:
+                item.last_tested_at = None
+                item.last_test_status = None
+                item.last_test_message = None
             item.version += 1
         await self.session.commit()
         await self.session.refresh(item)
@@ -176,18 +189,22 @@ class ArtifactArchiveService:
         item = await self.setting()
         if item is None:
             raise ArchiveConfigurationError("Odredište arhive nije podešeno")
-        target = _target_root(item.relative_path)
+        targets = (
+            archive_target_root(item.relative_path),
+            archive_target_root(item.snapshot_relative_path),
+        )
         now = datetime.now(UTC)
         try:
-            target.mkdir(parents=True, exist_ok=True)
-            probe = target / f".ai-monitor-probe-{uuid.uuid4().hex}"
-            payload = os.urandom(64)
-            probe.write_bytes(payload)
-            with probe.open("rb") as handle:
-                os.fsync(handle.fileno())
-            if probe.read_bytes() != payload:
-                raise OSError("Sadržaj probnog fajla nije isti")
-            probe.unlink()
+            for target in targets:
+                target.mkdir(parents=True, exist_ok=True)
+                probe = target / f".ai-monitor-probe-{uuid.uuid4().hex}"
+                payload = os.urandom(64)
+                probe.write_bytes(payload)
+                with probe.open("rb") as handle:
+                    os.fsync(handle.fileno())
+                if probe.read_bytes() != payload:
+                    raise OSError("Sadržaj probnog fajla nije isti")
+                probe.unlink()
             status: Literal["SUCCEEDED", "FAILED"] = "SUCCEEDED"
             message = "Upis, čitanje i uklanjanje probnog fajla su uspešni."
         except OSError as exc:
@@ -233,7 +250,7 @@ class ArtifactArchiveService:
         source = (
             Path(settings.supplier_artifact_root) / artifact.storage_reference
         ).resolve()
-        target_root = _target_root(setting.relative_path)
+        target_root = archive_target_root(setting.relative_path)
         try:
             source.relative_to(Path(settings.supplier_artifact_root).resolve())
             if not source.is_file() or source.stat().st_size != artifact.size_bytes:
@@ -317,5 +334,6 @@ __all__ = [
     "ArchiveConfigurationError",
     "ArtifactArchiveService",
     "artifact_archive_warnings",
+    "archive_target_root",
     "copy_verified_artifact",
 ]

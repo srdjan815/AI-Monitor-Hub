@@ -85,6 +85,9 @@ class ArchiveSettingWrite(BaseModel):
     relative_path: str = Field(
         min_length=1, max_length=500, pattern=r"^[A-Za-z0-9._/-]+$"
     )
+    snapshot_relative_path: str = Field(
+        default="snapshots", min_length=1, max_length=500, pattern=r"^[A-Za-z0-9._/-]+$"
+    )
     enabled: bool = False
     local_retention_days: int = Field(default=30, ge=1, le=3650)
     expected_version: int | None = Field(default=None, ge=1, le=2_147_483_647)
@@ -95,6 +98,7 @@ class ArchiveSettingRead(BaseModel):
     backend_type: str
     display_name: str
     relative_path: str
+    snapshot_relative_path: str
     enabled: bool
     local_retention_days: int
     last_tested_at: datetime | None

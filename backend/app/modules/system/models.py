@@ -59,6 +59,9 @@ class ArtifactArchiveSetting(UUIDMixin, TimestampMixin, Base):
     )
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     relative_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    snapshot_relative_path: Mapped[str] = mapped_column(
+        String(500), nullable=False, default="snapshots"
+    )
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     local_retention_days: Mapped[int] = mapped_column(
         Integer, nullable=False, default=30

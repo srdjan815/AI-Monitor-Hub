@@ -346,6 +346,7 @@ async def test_archive_setting_is_mount_bounded_and_connection_is_verified(
                 json={
                     "display_name": "Test NAS",
                     "relative_path": "cenovnici/test",
+                    "snapshot_relative_path": "snapshots/test",
                     "enabled": True,
                     "local_retention_days": 30,
                     "expected_version": None,
@@ -354,23 +355,43 @@ async def test_archive_setting_is_mount_bounded_and_connection_is_verified(
             tested = await client.post(
                 "/api/v1/system/resources/artifact-archive/test", headers=headers
             )
+            tested_status = await client.get(
+                "/api/v1/system/resources/artifact-archive", headers=headers
+            )
+            changed = await client.put(
+                "/api/v1/system/resources/artifact-archive/setting",
+                headers=headers,
+                json={
+                    "display_name": "Test NAS",
+                    "relative_path": "cenovnici/test",
+                    "snapshot_relative_path": "snapshots/changed",
+                    "enabled": True,
+                    "local_retention_days": 30,
+                    "expected_version": tested_status.json()["setting"]["version"],
+                },
+            )
             rejected = await client.put(
                 "/api/v1/system/resources/artifact-archive/setting",
                 headers=headers,
                 json={
                     "display_name": "Unsafe",
                     "relative_path": "../outside",
+                    "snapshot_relative_path": "snapshots/test",
                     "enabled": True,
                     "local_retention_days": 30,
-                    "expected_version": saved.json().get("version"),
+                    "expected_version": changed.json().get("version"),
                 },
             )
         assert saved.status_code == 200, saved.text
         assert tested.status_code == 200, tested.text
         assert tested.json()["status"] == "SUCCEEDED"
+        assert changed.status_code == 200, changed.text
+        assert changed.json()["last_test_status"] is None
         assert rejected.status_code == 409
         assert (mount_root / "cenovnici" / "test").is_dir()
         assert list((mount_root / "cenovnici" / "test").iterdir()) == []
+        assert (mount_root / "snapshots" / "test").is_dir()
+        assert list((mount_root / "snapshots" / "test").iterdir()) == []
     finally:
         async with AsyncSessionLocal() as session:
             await session.execute(delete(ArtifactArchiveTransfer))
