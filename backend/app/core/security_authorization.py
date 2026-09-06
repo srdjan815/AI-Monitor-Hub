@@ -68,6 +68,8 @@ from app.core.security_permissions import (
     ARTICLE_REVIEWS_DECIDE,
     EOL_PRODUCTS_READ,
     EOL_PRODUCTS_MANAGE,
+    SYSTEM_RESOURCES_READ,
+    SYSTEM_RESOURCES_MANAGE,
 )
 from app.core.security_runtime import authenticate_token
 
@@ -98,6 +100,8 @@ def required_permission(request: Request) -> str | None:
     path = request.url.path
     method = request.method.upper()
     write = method not in {"GET", "HEAD", "OPTIONS"}
+    if "/system/resources" in path:
+        return SYSTEM_RESOURCES_MANAGE if write else SYSTEM_RESOURCES_READ
     if path.endswith("/auth/me") and method in {"GET", "HEAD", "OPTIONS"}:
         # Svaki uspešno autentifikovan principal sme da pročita sopstveni
         # identitet i efektivne dozvole.

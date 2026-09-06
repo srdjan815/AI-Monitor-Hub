@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     snapshot_batch_size: int = Field(default=1000, ge=10, le=10_000)
     snapshot_archive_candidate_limit: int = Field(default=500, ge=1, le=5000)
     snapshot_image_url_max_length: int = Field(default=4096, ge=256, le=16_384)
+    system_log_root: str = "/app/logs"
+    system_temporary_root: str = "/tmp/ai-monitor-hub-maintenance"
+    system_disk_warning_percent: int = Field(default=80, ge=50, le=95)
+    system_disk_critical_percent: int = Field(default=90, ge=60, le=99)
+    system_memory_warning_percent: int = Field(default=80, ge=50, le=95)
+    system_memory_critical_percent: int = Field(default=90, ge=60, le=99)
+    system_inventory_max_files: int = Field(default=200_000, ge=1000, le=2_000_000)
+    system_cleanup_max_files: int = Field(default=1000, ge=1, le=10_000)
     delta_batch_size: int = Field(default=1000, ge=10, le=10_000)
     delta_max_comparison_items: int = Field(default=250_000, ge=100, le=2_000_000)
     delta_max_changed_fields_per_item: int = Field(default=2000, ge=10, le=10_000)
@@ -217,6 +225,10 @@ class Settings(BaseSettings):
                 "SUPPLIER_SHARED_EAN_MANUAL_REVIEW_SIMILARITY must not exceed "
                 "SUPPLIER_SHARED_EAN_AUTO_ACCEPT_SIMILARITY"
             )
+        if self.system_disk_warning_percent >= self.system_disk_critical_percent:
+            raise ValueError("SYSTEM_DISK_WARNING_PERCENT must be below critical")
+        if self.system_memory_warning_percent >= self.system_memory_critical_percent:
+            raise ValueError("SYSTEM_MEMORY_WARNING_PERCENT must be below critical")
         self._validate_rate_limit_configuration()
         if self.app_env != "production":
             return self

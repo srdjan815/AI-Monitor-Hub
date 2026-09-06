@@ -38,6 +38,9 @@ const ArchivePage = lazy(() =>
 const AdministrationPage = lazy(() =>
   import("./pages/AdministrationPage").then((module) => ({ default: module.AdministrationPage }))
 );
+const SystemPage = lazy(() =>
+  import("./pages/SystemPage").then((module) => ({ default: module.SystemPage }))
+);
 const AutomationPage = lazy(() =>
   import("./pages/AutomationPage").then((module) => ({ default: module.AutomationPage }))
 );
@@ -83,6 +86,7 @@ function ProtectedRoutes() {
         <Route path="/eol-products" element={protectedPage("/eol-products", <EolProductsPage />)} />
         <Route path="/supplier-currencies" element={protectedPage("/supplier-currencies", <SupplierCurrenciesPage />)} />
         <Route path="/archive" element={protectedPage("/archive", <ArchivePage />)} />
+        <Route path="/system" element={protectedPage("/system", <SystemPage />)} />
         <Route path="/administration" element={protectedPage("/administration", <AdministrationPage />)} />
         <Route path="/automation" element={protectedPage("/automation", <AutomationPage />)} />
         <Route path="*" element={home ? <Navigate to={home} replace /> : <PermissionRoute permission="any.application.permission"><></></PermissionRoute>} />

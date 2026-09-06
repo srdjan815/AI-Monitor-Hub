@@ -20,6 +20,7 @@ import {
   SchemaRounded,
   SettingsBrightnessRounded,
   StorageRounded,
+  MemoryRounded,
   SyncRounded,
   CurrencyExchangeRounded
   , Inventory2Rounded
@@ -68,6 +69,7 @@ const items = [
   { path: "/eol-products", label: "EOL artikli", icon: Inventory2Rounded },
   { path: "/supplier-currencies", label: "Valute dobavljača", icon: CurrencyExchangeRounded },
   { path: "/archive", label: "Arhiva", icon: ArchiveRounded },
+  { path: "/system", label: "Sistem", icon: MemoryRounded },
   { path: "/administration", label: "Administracija", icon: AdminPanelSettingsRounded }
 ];
 

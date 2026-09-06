@@ -64,6 +64,8 @@ CURRENCY_RATES_WRITE = "currency_rates.write"
 EOL_PRODUCTS_READ = "eol_products.read"
 EOL_PRODUCTS_MANAGE = "eol_products.manage"
 ADMIN_ACCESS = "admin.access"
+SYSTEM_RESOURCES_READ = "system_resources.read"
+SYSTEM_RESOURCES_MANAGE = "system_resources.manage"
 
 ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
     {
@@ -129,6 +131,8 @@ ALL_PERMISSIONS: Final[frozenset[str]] = frozenset(
         EOL_PRODUCTS_READ,
         EOL_PRODUCTS_MANAGE,
         ADMIN_ACCESS,
+        SYSTEM_RESOURCES_READ,
+        SYSTEM_RESOURCES_MANAGE,
     }
 )
 

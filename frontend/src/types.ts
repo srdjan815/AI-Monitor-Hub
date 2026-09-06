@@ -347,3 +347,53 @@ export interface CurrencySourceTestResult {
   difference_percent?: string | null;
   extraction_method_used: string;
 }
+
+export interface SystemCapacity {
+  total_bytes: number | null;
+  used_bytes: number | null;
+  free_bytes: number | null;
+  used_percent: number | null;
+  status: "OK" | "UPOZORENJE" | "KRITIČNO" | "NEPOZNATO";
+}
+
+export interface SystemInventory {
+  runtime: {
+    processor_count: number;
+    processor_load_percent: number | null;
+    memory: SystemCapacity;
+    disk: SystemCapacity;
+    measured_at: string;
+  };
+  database_size_bytes: number;
+  categories: Array<{
+    code: string;
+    label: string;
+    size_bytes: number;
+    file_count: number;
+    status: "OK" | "UPOZORENJE" | "KRITIČNO" | "NEPOZNATO";
+    cleanup_allowed: boolean;
+    protection_reason?: string | null;
+    scan_truncated: boolean;
+  }>;
+}
+
+export interface CleanupPreview {
+  category: "LOGOVI" | "PRIVREMENI_FAJLOVI";
+  older_than_days: number;
+  candidate_files: number;
+  candidate_bytes: number;
+  expires_at: string;
+  confirmation_token: string;
+}
+
+export interface CleanupAudit {
+  id: string;
+  category: string;
+  older_than_days: number;
+  status: string;
+  deleted_files: number;
+  deleted_bytes: number;
+  actor_id: string;
+  error_message?: string | null;
+  created_at: string;
+}
