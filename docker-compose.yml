@@ -16,10 +16,12 @@ services:
       # provider persists by atomically replacing supplier-secrets.json.
       - ./config:/app/config:rw
       - supplier_artifacts:/app/data/supplier-artifacts
+      - ${ARTIFACT_ARCHIVE_HOST_PATH:-./data/archive-targets}:/archive-targets:rw
     environment:
       AUTH_MODE: static
       SUPPLIER_SECRET_MODE: file
       SUPPLIER_SECRETS_FILE: /app/config/supplier-secrets.json
+      SYSTEM_ARCHIVE_MOUNT_ROOT: /archive-targets
     command:
       - uvicorn
       - app.main:app
@@ -46,6 +48,7 @@ services:
       # API and worker must see the same atomically replaceable secret store.
       - ./config:/app/config:rw
       - supplier_artifacts:/app/data/supplier-artifacts
+      - ${ARTIFACT_ARCHIVE_HOST_PATH:-./data/archive-targets}:/archive-targets:rw
     command: ["python", "-m", "app.modules.execution.worker"]
     environment:
       AUTH_MODE: static
@@ -54,6 +57,7 @@ services:
       WORKER_QUEUE: default
       WORKER_POLL_SECONDS: "1"
       WORKER_STALE_AFTER_SECONDS: "300"
+      SYSTEM_ARCHIVE_MOUNT_ROOT: /archive-targets
     depends_on:
       db:
         condition: service_healthy

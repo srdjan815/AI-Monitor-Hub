@@ -80,12 +80,61 @@ class CleanupAuditRead(BaseModel):
     created_at: datetime
 
 
+class ArchiveSettingWrite(BaseModel):
+    display_name: str = Field(min_length=1, max_length=200)
+    relative_path: str = Field(
+        min_length=1, max_length=500, pattern=r"^[A-Za-z0-9._/-]+$"
+    )
+    enabled: bool = False
+    local_retention_days: int = Field(default=30, ge=1, le=3650)
+    expected_version: int | None = Field(default=None, ge=1, le=2_147_483_647)
+
+
+class ArchiveSettingRead(BaseModel):
+    id: uuid.UUID
+    backend_type: str
+    display_name: str
+    relative_path: str
+    enabled: bool
+    local_retention_days: int
+    last_tested_at: datetime | None
+    last_test_status: str | None
+    last_test_message: str | None
+    version: int
+
+
+class ArchiveStatusRead(BaseModel):
+    setting: ArchiveSettingRead | None
+    pending_transfers: int
+    verified_transfers: int
+    failed_transfers: int
+    verified_bytes: int
+    duplicate_artifacts: int
+    duplicate_bytes: int
+
+
+class ArchiveTestRead(BaseModel):
+    status: Literal["SUCCEEDED", "FAILED"]
+    message: str
+
+
+class ArchiveProcessRead(BaseModel):
+    attempted: int
+    verified: int
+    failed: int
+
+
 __all__ = [
     "CleanupAuditRead",
     "CleanupExecuteRequest",
     "CleanupPreviewRead",
     "CleanupPreviewRequest",
     "CleanupResultRead",
+    "ArchiveProcessRead",
+    "ArchiveSettingRead",
+    "ArchiveSettingWrite",
+    "ArchiveStatusRead",
+    "ArchiveTestRead",
     "SystemInventoryRead",
     "Health",
 ]

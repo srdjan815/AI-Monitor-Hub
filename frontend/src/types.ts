@@ -397,3 +397,26 @@ export interface CleanupAudit {
   error_message?: string | null;
   created_at: string;
 }
+
+export interface ArtifactArchiveSetting {
+  id: string;
+  backend_type: "MOUNT";
+  display_name: string;
+  relative_path: string;
+  enabled: boolean;
+  local_retention_days: number;
+  last_tested_at?: string | null;
+  last_test_status?: string | null;
+  last_test_message?: string | null;
+  version: number;
+}
+
+export interface ArtifactArchiveStatus {
+  setting?: ArtifactArchiveSetting | null;
+  pending_transfers: number;
+  verified_transfers: number;
+  failed_transfers: number;
+  verified_bytes: number;
+  duplicate_artifacts: number;
+  duplicate_bytes: number;
+}

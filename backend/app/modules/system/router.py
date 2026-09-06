@@ -8,6 +8,10 @@ from app.modules.system.maintenance_service import (
     CleanupConflict,
     SystemMaintenanceService,
 )
+from app.modules.system.artifact_archive_service import (
+    ArchiveConfigurationError,
+    ArtifactArchiveService,
+)
 from app.modules.system.resource_service import SystemResourceService
 from app.modules.system.schemas import (
     CleanupAuditRead,
@@ -16,6 +20,11 @@ from app.modules.system.schemas import (
     CleanupPreviewRequest,
     CleanupResultRead,
     SystemInventoryRead,
+    ArchiveProcessRead,
+    ArchiveSettingRead,
+    ArchiveSettingWrite,
+    ArchiveStatusRead,
+    ArchiveTestRead,
 )
 
 router = APIRouter(prefix="/system/resources", tags=["system-resources"])
@@ -68,6 +77,59 @@ async def cleanup_audit(
     session: AsyncSession = Depends(get_db),
 ) -> list[CleanupAuditRead]:
     return await SystemMaintenanceService(session).audit(limit)
+
+
+@router.get(
+    "/artifact-archive",
+    response_model=ArchiveStatusRead,
+    summary="Status arhiviranja cenovnika",
+)
+async def artifact_archive_status(
+    session: AsyncSession = Depends(get_db),
+) -> ArchiveStatusRead:
+    return await ArtifactArchiveService(session).status()
+
+
+@router.put(
+    "/artifact-archive/setting",
+    response_model=ArchiveSettingRead,
+    summary="Podesi odredište arhive",
+)
+async def save_artifact_archive_setting(
+    payload: ArchiveSettingWrite, session: AsyncSession = Depends(get_db)
+) -> ArchiveSettingRead:
+    try:
+        return await ArtifactArchiveService(session).save_setting(payload)
+    except ArchiveConfigurationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post(
+    "/artifact-archive/test",
+    response_model=ArchiveTestRead,
+    summary="Testiraj odredište arhive",
+)
+async def test_artifact_archive(
+    session: AsyncSession = Depends(get_db),
+) -> ArchiveTestRead:
+    try:
+        return await ArtifactArchiveService(session).test()
+    except ArchiveConfigurationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post(
+    "/artifact-archive/process",
+    response_model=ArchiveProcessRead,
+    summary="Arhiviraj cenovnike na čekanju",
+)
+async def process_artifact_archive(
+    limit: int = Query(25, ge=1, le=100), session: AsyncSession = Depends(get_db)
+) -> ArchiveProcessRead:
+    try:
+        return await ArtifactArchiveService(session).process_pending(limit)
+    except ArchiveConfigurationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 __all__ = ["router"]

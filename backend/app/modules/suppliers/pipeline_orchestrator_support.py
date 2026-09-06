@@ -38,6 +38,7 @@ from app.modules.suppliers.schema_inference_service import (
 from app.modules.suppliers.schema_profile_models import SupplierSchemaProfile
 from app.modules.suppliers.schema_profile_repository import SupplierSchemaRepository
 from app.modules.suppliers.source_artifact_service import SupplierSourceArtifactService
+from app.modules.system.artifact_archive_service import artifact_archive_warnings
 from app.modules.suppliers.source_repository import SupplierSourceRepository
 from app.modules.suppliers.source_secrets import source_secret_provider
 
@@ -254,6 +255,11 @@ class SupplierPipelineOrchestratorSupport:
         *,
         warnings: list[str] | None = None,
     ) -> PipelineResult:
+        result_warnings = warnings or []
+        if context.artifact is not None:
+            result_warnings.extend(
+                await artifact_archive_warnings(self.session, context.artifact.id)
+            )
         duration = int((time.monotonic() - started) * 1000)
         await self.repository.mutate(
             context.run,
@@ -278,7 +284,7 @@ class SupplierPipelineOrchestratorSupport:
         return PipelineResult(
             status="SUCCEEDED",
             completed_phase=phase,  # type: ignore[arg-type]
-            warnings=warnings or [],
+            warnings=result_warnings,
             references=references,
             telemetry={"duration_ms": duration},
         )

@@ -1,15 +1,25 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 import httpx
+from sqlalchemy import delete
 
 from app.core.config import settings
 from app.core.security import create_access_token
 from app.main import app
+from app.db.session import AsyncSessionLocal
+from app.modules.system.models import ArtifactArchiveSetting, ArtifactArchiveTransfer
+from app.modules.system.artifact_archive_service import copy_verified_artifact
+from app.modules.suppliers.acquisition_contracts import AcquiredPayload
+from app.modules.suppliers.acquisition_storage import LocalArtifactStorage
+from app.modules.suppliers.source_artifact_service import SupplierSourceArtifactService
 from app.modules.system.resource_service import (
     candidate_digest,
     cleanup_candidates,
@@ -92,6 +102,60 @@ def test_unsafe_broad_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(RuntimeError, match="nije dovoljno uska"):
         cleanup_candidates("LOGOVI", 30)
+
+
+def test_archive_copy_is_content_addressed_verified_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source" / "price-list.json"
+    target = tmp_path / "mounted" / "archive"
+    source.parent.mkdir()
+    source.write_bytes(b'{"products": [1, 2, 3]}')
+    checksum = hashlib.sha256(source.read_bytes()).hexdigest()
+    first = copy_verified_artifact(source, target, checksum, source.stat().st_size)
+    second = copy_verified_artifact(source, target, checksum, source.stat().st_size)
+
+    assert first == second
+    assert (target / first).read_bytes() == source.read_bytes()
+    assert source.exists()
+    assert len([path for path in target.rglob("*") if path.is_file()]) == 1
+
+
+@pytest.mark.asyncio
+async def test_new_identical_imports_share_one_local_blob(tmp_path: Path) -> None:
+    artifacts: list[object] = []
+
+    class Repository:
+        async def lock_artifact_checksum(self, checksum: str) -> None:
+            assert len(checksum) == 64
+
+        async def artifact_by_checksum(self, checksum: str, size: int):
+            return artifacts[0] if artifacts else None
+
+        async def add(self, artifact: object) -> None:
+            artifacts.append(artifact)
+
+    session = AsyncMock()
+    service = SupplierSourceArtifactService(session)
+    service.repository = Repository()  # type: ignore[assignment]
+    service.storage = LocalArtifactStorage(tmp_path / "artifacts", 1_000_000)
+    payload = AcquiredPayload(
+        content=b'[{"product_code":"A-1","price":10}]',
+        content_type="application/json",
+        original_filename="cenovnik.json",
+        source_metadata={},
+    )
+    source_id = uuid.uuid4()
+
+    first = await service.store(source_id, payload)
+    second = await service.store(source_id, payload)
+
+    # Svaki zapis zadrzava jedinstvenu referencu radi sledljivosti i rollback-a,
+    # dok hard-link obezbedjuje da identican sadrzaj fizicki zauzima prostor jednom.
+    assert first.storage_reference != second.storage_reference
+    stored = list((tmp_path / "artifacts").iterdir())
+    assert len(stored) == 2
+    assert stored[0].stat().st_ino == stored[1].stat().st_ino
 
 
 def _bearer(subject: str, role: str) -> dict[str, str]:
@@ -184,3 +248,57 @@ async def test_confirmed_cleanup_deletes_only_previewed_files_and_writes_audit(
     )
     assert record["actor_id"] == "cleanup-admin"
     assert record["deleted_files"] == 1
+
+
+@pytest.mark.asyncio
+async def test_archive_setting_is_mount_bounded_and_connection_is_verified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mount_root = tmp_path / "application" / "archive-targets"
+    monkeypatch.setattr(settings, "system_archive_mount_root", str(mount_root))
+    headers = _bearer("archive-admin", "system_admin")
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(ArtifactArchiveTransfer))
+        await session.execute(delete(ArtifactArchiveSetting))
+        await session.commit()
+    try:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            saved = await client.put(
+                "/api/v1/system/resources/artifact-archive/setting",
+                headers=headers,
+                json={
+                    "display_name": "Test NAS",
+                    "relative_path": "cenovnici/test",
+                    "enabled": True,
+                    "local_retention_days": 30,
+                    "expected_version": None,
+                },
+            )
+            tested = await client.post(
+                "/api/v1/system/resources/artifact-archive/test", headers=headers
+            )
+            rejected = await client.put(
+                "/api/v1/system/resources/artifact-archive/setting",
+                headers=headers,
+                json={
+                    "display_name": "Unsafe",
+                    "relative_path": "../outside",
+                    "enabled": True,
+                    "local_retention_days": 30,
+                    "expected_version": saved.json().get("version"),
+                },
+            )
+        assert saved.status_code == 200, saved.text
+        assert tested.status_code == 200, tested.text
+        assert tested.json()["status"] == "SUCCEEDED"
+        assert rejected.status_code == 409
+        assert (mount_root / "cenovnici" / "test").is_dir()
+        assert list((mount_root / "cenovnici" / "test").iterdir()) == []
+    finally:
+        async with AsyncSessionLocal() as session:
+            await session.execute(delete(ArtifactArchiveTransfer))
+            await session.execute(delete(ArtifactArchiveSetting))
+            await session.commit()
