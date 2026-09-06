@@ -16,7 +16,13 @@ from app.core.security import create_access_token
 from app.main import app
 from app.db.session import AsyncSessionLocal
 from app.modules.system.models import ArtifactArchiveSetting, ArtifactArchiveTransfer
-from app.modules.system.artifact_archive_service import copy_verified_artifact
+from app.modules.system.artifact_archive_service import (
+    ArchiveConfigurationError,
+    ArtifactArchiveService,
+    _target_root,
+    artifact_archive_warnings,
+    copy_verified_artifact,
+)
 from app.modules.suppliers.acquisition_contracts import AcquiredPayload
 from app.modules.suppliers.acquisition_storage import LocalArtifactStorage
 from app.modules.suppliers.source_artifact_service import SupplierSourceArtifactService
@@ -119,6 +125,53 @@ def test_archive_copy_is_content_addressed_verified_and_idempotent(
     assert (target / first).read_bytes() == source.read_bytes()
     assert source.exists()
     assert len([path for path in target.rglob("*") if path.is_file()]) == 1
+
+
+def test_archive_target_is_confined_to_configured_mount(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mount = tmp_path / "application" / "archive-targets"
+    monkeypatch.setattr(settings, "system_archive_mount_root", str(mount))
+
+    assert _target_root("cenovnici/2026") == mount / "cenovnici" / "2026"
+    with pytest.raises(ArchiveConfigurationError, match="relativna"):
+        _target_root("../izvan")
+    with pytest.raises(ArchiveConfigurationError, match="relativna"):
+        _target_root("/apsolutna")
+
+    monkeypatch.setattr(settings, "system_archive_mount_root", str(Path("/").resolve()))
+    with pytest.raises(ArchiveConfigurationError, match="dovoljno usko"):
+        _target_root("cenovnici")
+
+
+def test_archive_copy_rejects_corrupt_existing_blob(tmp_path: Path) -> None:
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"ispravan cenovnik")
+    checksum = hashlib.sha256(source.read_bytes()).hexdigest()
+    target = tmp_path / "mounted" / "archive"
+    destination = target / "blobs" / "sha256" / checksum[:2] / checksum
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b"ostecen sadrzaj")
+
+    with pytest.raises(OSError, match="Checksum"):
+        copy_verified_artifact(source, target, checksum, destination.stat().st_size)
+
+
+@pytest.mark.asyncio
+async def test_archive_failure_is_warning_and_rolls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = AsyncMock()
+    monkeypatch.setattr(
+        ArtifactArchiveService,
+        "archive_if_configured",
+        AsyncMock(side_effect=OSError("NAS nije dostupan")),
+    )
+
+    warnings = await artifact_archive_warnings(session, uuid.uuid4())
+
+    assert warnings == ["Arhiviranje nije uspelo; lokalna kopija čeka novi pokušaj."]
+    session.rollback.assert_awaited_once()
 
 
 @pytest.mark.asyncio
