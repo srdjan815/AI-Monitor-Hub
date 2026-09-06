@@ -34,6 +34,7 @@ class SupplierSnapshotArchiveService(SupplierSnapshotArchiveSupport):
         *,
         include_source_artifact: bool,
     ) -> SupplierSnapshotArchiveOperation:
+        await self._configure_verified_storage()
         snapshot = await self.queries.get(supplier_id, source_id, snapshot_id)
         self._require_exportable(snapshot)
         _, valid, _ = await self.queries.verify_integrity(
@@ -139,6 +140,7 @@ class SupplierSnapshotArchiveService(SupplierSnapshotArchiveSupport):
         archive_checksum: str,
         override_preserve_online: bool,
     ) -> SupplierSnapshot:
+        await self._configure_verified_storage()
         initial = await self.queries.get(supplier_id, source_id, snapshot_id)
         operation = await self._operation(initial.id, operation_id)
         if initial.legal_hold:
@@ -229,6 +231,7 @@ class SupplierSnapshotArchiveService(SupplierSnapshotArchiveSupport):
         source_id: uuid.UUID,
         snapshot_id: uuid.UUID,
     ) -> SupplierSnapshot:
+        await self._configure_verified_storage()
         initial = await self.queries.get(supplier_id, source_id, snapshot_id)
         if initial.storage_state != "ARCHIVED" or not initial.archive_reference:
             supplier_error(

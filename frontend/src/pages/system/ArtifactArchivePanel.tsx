@@ -19,15 +19,17 @@ export function ArtifactArchivePanel() {
   const status = useQuery({ queryKey: ["artifact-archive"], queryFn: () => api<ArtifactArchiveStatus>("/system/resources/artifact-archive") });
   const [name, setName] = useState("Primarna NAS arhiva");
   const [path, setPath] = useState("cenovnici");
+  const [snapshotPath, setSnapshotPath] = useState("snapshots");
   const [days, setDays] = useState(30);
   const [enabled, setEnabled] = useState(false);
   const pathError = archivePathError(path);
+  const snapshotPathError = archivePathError(snapshotPath);
   useEffect(() => {
     const item = status.data?.setting;
-    if (item) { setName(item.display_name); setPath(item.relative_path); setDays(item.local_retention_days); setEnabled(item.enabled); }
+    if (item) { setName(item.display_name); setPath(item.relative_path); setSnapshotPath(item.snapshot_relative_path); setDays(item.local_retention_days); setEnabled(item.enabled); }
   }, [status.data?.setting]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["artifact-archive"] });
-  const save = useMutation({ mutationFn: () => api("/system/resources/artifact-archive/setting", { method: "PUT", body: { display_name: name.trim(), relative_path: path.trim(), enabled, local_retention_days: days, expected_version: status.data?.setting?.version ?? null } }), onSuccess: refresh });
+  const save = useMutation({ mutationFn: () => api("/system/resources/artifact-archive/setting", { method: "PUT", body: { display_name: name.trim(), relative_path: path.trim(), snapshot_relative_path: snapshotPath.trim(), enabled, local_retention_days: days, expected_version: status.data?.setting?.version ?? null } }), onSuccess: refresh });
   const test = useMutation({ mutationFn: () => api<{ status: string; message: string }>("/system/resources/artifact-archive/test", { method: "POST" }), onSuccess: refresh });
   const process = useMutation({ mutationFn: () => api<{ attempted: number; verified: number; failed: number }>("/system/resources/artifact-archive/process?limit=25", { method: "POST" }), onSuccess: refresh });
   const data = status.data;
@@ -38,9 +40,10 @@ export function ArtifactArchivePanel() {
       <TextField label="Naziv odredišta" value={name} onChange={(event) => setName(event.target.value)} sx={{ flex: "1 1 360px" }} />
       <TextField label="Podfolder u montiranoj arhivi" value={path} onChange={(event) => setPath(event.target.value)} error={Boolean(pathError)} sx={{ flex: "1 1 360px" }} helperText={pathError ?? "Primer: cenovnici ili cenovnici/2026. Lokaciju na C: disku podešava administrator servera."} />
       <TextField label="Lokalno zadržavanje (dana)" type="number" value={days} onChange={(event) => setDays(Number(event.target.value))} inputProps={{ min: 1, max: 3650 }} helperText="Brisanje nije aktivno dok kopija nije verifikovana" sx={{ flex: "0 1 300px", minWidth: 260 }} />
+      <TextField label="Podfolder snapshot arhive" value={snapshotPath} onChange={(event) => setSnapshotPath(event.target.value)} error={Boolean(snapshotPathError)} sx={{ flex: "1 1 360px" }} helperText={snapshotPathError ?? "Primer: snapshots. Isti podfolder radi lokalno i na budućem NAS odredištu."} />
       <FormControlLabel sx={{ minWidth: 175, minHeight: 56, m: 0 }} control={<Switch checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />} label="Automatski prenos" />
     </Stack>
-    <Stack direction="row" gap={1} flexWrap="wrap"><Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending || Boolean(pathError) || !name.trim()}>Sačuvaj</Button><Button onClick={() => test.mutate()} disabled={!data?.setting || test.isPending}>Testiraj odredište</Button><Button onClick={() => process.mutate()} disabled={!data?.setting?.enabled || process.isPending}>Obradi sledećih 25</Button></Stack>
+    <Stack direction="row" gap={1} flexWrap="wrap"><Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending || Boolean(pathError) || Boolean(snapshotPathError) || !name.trim()}>Sačuvaj</Button><Button onClick={() => test.mutate()} disabled={!data?.setting || test.isPending}>Testiraj odredište</Button><Button onClick={() => process.mutate()} disabled={!data?.setting?.enabled || process.isPending}>Obradi sledećih 25</Button></Stack>
     {data && <Alert severity={data.failed_transfers ? "warning" : "info"} sx={{ mt: 2 }}>Na čekanju: {data.pending_transfers}. Verifikovano: {data.verified_transfers} ({bytes(data.verified_bytes)}). Neuspešno: {data.failed_transfers}. Lokalni duplikati: {data.duplicate_artifacts} ({bytes(data.duplicate_bytes)}).</Alert>}
     {operationError && <Alert severity="error" sx={{ mt: 1 }}>{operationErrorMessage(operationError)}</Alert>}
     {test.data && <Alert severity={test.data.status === "SUCCEEDED" ? "success" : "error"} sx={{ mt: 1 }}>{test.data.message}</Alert>}

@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -30,6 +31,8 @@ from app.modules.suppliers.snapshot_models import (
 )
 from app.modules.suppliers.snapshot_query_service import SupplierSnapshotQueryService
 from app.modules.suppliers.snapshot_repository import SupplierSnapshotRepository
+from app.modules.system.artifact_archive_service import archive_target_root
+from app.modules.system.models import ArtifactArchiveSetting
 
 
 class SupplierSnapshotArchiveSupport:
@@ -52,6 +55,29 @@ class SupplierSnapshotArchiveSupport:
             settings.acquisition_max_artifact_bytes,
         )
         self.format = SnapshotArchiveFormat()
+
+    async def _configure_verified_storage(self) -> None:
+        setting = await self.session.scalar(
+            select(ArtifactArchiveSetting).where(
+                ArtifactArchiveSetting.setting_key == "PRIMARY"
+            )
+        )
+        if setting is None:
+            if settings.app_env == "test":
+                return
+            raise SnapshotFailure(
+                "snapshot_archive_not_configured",
+                "Podesite i testirajte snapshot arhivu na stranici Sistem",
+            )
+        if not setting.enabled or setting.last_test_status != "SUCCEEDED":
+            raise SnapshotFailure(
+                "snapshot_archive_not_verified",
+                "Snapshot arhiva mora biti uključena i uspešno testirana",
+            )
+        self.storage = LocalSnapshotArchiveStorage(
+            archive_target_root(setting.snapshot_relative_path),
+            settings.snapshot_archive_max_bytes,
+        )
 
     async def _artifact(
         self,
