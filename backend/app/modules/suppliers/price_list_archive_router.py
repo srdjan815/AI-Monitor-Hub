@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.limits import MAX_LEGACY_OFFSET
@@ -12,6 +13,11 @@ from app.modules.suppliers.price_list_archive_schemas import (
     ArchivedPriceListItemPage,
     PriceListArchiveFilters,
     PriceListArchivePage,
+)
+from app.modules.suppliers.price_list_archive_download import (
+    ArchiveDownloadUnavailable,
+    ArchiveIntegrityError,
+    prepare_archive_download,
 )
 from app.modules.suppliers.price_list_archive_service import PriceListArchiveService
 
@@ -69,6 +75,25 @@ async def archived_price_list_items(
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{run_id}/original", response_class=FileResponse)
+async def download_archived_price_list(
+    run_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+) -> FileResponse:
+    try:
+        prepared = await prepare_archive_download(session, run_id)
+    except ArchiveDownloadUnavailable as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ArchiveIntegrityError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return FileResponse(
+        prepared.path,
+        media_type=prepared.content_type,
+        filename=prepared.filename,
+        headers={"X-Content-SHA256": prepared.checksum_sha256},
+    )
 
 
 __all__ = ["router"]

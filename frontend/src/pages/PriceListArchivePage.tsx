@@ -9,7 +9,7 @@ import {
   MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TablePagination, TableRow, TextField, Typography
 } from "@mui/material";
-import { api, queryString } from "../api/client";
+import { api, downloadApiFile, queryString } from "../api/client";
 import { EmptyState, LoadingBlock } from "../components/AsyncState";
 import { PageHeader } from "../components/PageHeader";
 import { StatusChip } from "../components/StatusChip";
@@ -56,6 +56,8 @@ export function PriceListArchivePage() {
   const [validationStatus, setValidationStatus] = useState("");
   const [itemOffset, setItemOffset] = useState(0);
   const [details, setDetails] = useState<ArchivedPriceListItem | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState("");
   const articleSectionRef = useRef<HTMLDivElement | null>(null);
 
   const filters = useQuery({
@@ -89,6 +91,24 @@ export function PriceListArchivePage() {
   const chooseArchive = (entry: PriceListArchiveEntry) => {
     setSelected(entry); setItemOffset(0); setItemSearch(""); setValidationStatus("");
   };
+  const downloadOriginal = async (entry: PriceListArchiveEntry) => {
+    setDownloadingId(entry.acquisition_run_id);
+    setDownloadError("");
+    try {
+      await downloadApiFile(
+        `/price-list-archive/${entry.acquisition_run_id}/original`,
+        entry.original_filename || `${entry.acquisition_code}.bin`
+      );
+    } catch (error) {
+      setDownloadError(
+        typeof error === "object" && error && "message" in error
+          ? String(error.message)
+          : "Originalni cenovnik nije moguće preuzeti."
+      );
+    } finally {
+      setDownloadingId(null);
+    }
+  };
   useEffect(() => {
     if (!selected) return;
     window.requestAnimationFrame(() => {
@@ -111,6 +131,7 @@ export function PriceListArchivePage() {
     </Paper>
 
     <Typography variant="h2" mb={1}>Istorijski cenovnici</Typography>
+    {downloadError && <Alert severity="error" sx={{ mb: 1 }}>{downloadError}</Alert>}
     {archives.isLoading ? <LoadingBlock /> : archives.error ? <Alert severity="error">Arhivirani cenovnici trenutno nisu dostupni.</Alert> : archives.data?.items.length ? <Paper>
       <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Datum</TableCell><TableCell>Dobavljač / izvor</TableCell><TableCell>Fajl / import</TableCell><TableCell align="right">Artikli</TableCell><TableCell align="right">Veličina</TableCell><TableCell>Skladište</TableCell><TableCell /></TableRow></TableHead><TableBody>
         {archives.data.items.map((entry) => <TableRow key={entry.acquisition_run_id} selected={selected?.acquisition_run_id === entry.acquisition_run_id} hover>
@@ -119,7 +140,7 @@ export function PriceListArchivePage() {
           <TableCell><Typography>{entry.original_filename || "Bez originalnog naziva"}</Typography><Typography variant="caption" fontFamily="monospace">{entry.acquisition_code}</Typography></TableCell>
           <TableCell align="right">{entry.total_records.toLocaleString("sr-RS")}</TableCell><TableCell align="right">{bytes(entry.size_bytes)}</TableCell>
           <TableCell><StatusChip value={storageLabels[entry.storage_status] ?? entry.storage_status} /></TableCell>
-          <TableCell><Button type="button" onClick={() => chooseArchive(entry)}>Pregledaj artikle</Button></TableCell>
+          <TableCell><Stack direction="row" gap={0.5} justifyContent="flex-end"><Button type="button" onClick={() => chooseArchive(entry)}>Pregledaj artikle</Button><Button type="button" variant="outlined" disabled={downloadingId === entry.acquisition_run_id} onClick={() => void downloadOriginal(entry)}>{downloadingId === entry.acquisition_run_id ? "Provera…" : "Preuzmi original"}</Button></Stack></TableCell>
         </TableRow>)}
       </TableBody></Table></TableContainer>
       <TablePagination component="div" count={archives.data.total} page={Math.floor(archiveOffset / pageSize)} rowsPerPage={pageSize} rowsPerPageOptions={[pageSize]} onPageChange={(_, page) => setArchiveOffset(page * pageSize)} />
