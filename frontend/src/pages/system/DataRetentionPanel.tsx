@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { Alert, Button, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography } from "@mui/material";
 import { api } from "../../api/client";
 import type { ApiError, RetentionPolicy, RetentionPreview, RetentionRun } from "../../types";
 
@@ -11,6 +12,27 @@ const bytes = (value: number) => {
   while (amount >= 1024 && index < units.length - 1) { amount /= 1024; index += 1; }
   return `${amount.toLocaleString("sr-RS", { maximumFractionDigits: 2 })} ${units[index]}`;
 };
+
+interface RetentionNumberFieldProps {
+  label: string;
+  help: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}
+
+function RetentionNumberField({ label, help, value, min, max, onChange }: RetentionNumberFieldProps) {
+  return <Stack gap={0.5} sx={{ flex: "0 1 180px", minWidth: 165 }}>
+    <Stack direction="row" alignItems="center" gap={0.5}>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
+      <Tooltip title={help} arrow>
+        <InfoOutlinedIcon color="info" fontSize="small" tabIndex={0} aria-label={help} />
+      </Tooltip>
+    </Stack>
+    <TextField aria-label={label} type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} inputProps={{ min, max }} />
+  </Stack>;
+}
 
 export function DataRetentionPanel() {
   const queryClient = useQueryClient();
@@ -46,12 +68,12 @@ export function DataRetentionPanel() {
     <Typography variant="h2">Kontrola rasta podataka</Typography>
     <Typography color="text.secondary">Analiza po dobavljačkom izvoru. Pregled ništa ne briše; statistička istorija ostaje trajno sačuvana.</Typography>
     {error && <Alert severity="error" sx={{ mt: 2 }}>{error.message}</Alert>}
-    <Stack direction={{ xs: "column", lg: "row" }} gap={2} my={2} flexWrap="wrap">
-      <FormControl sx={{ minWidth: 300, flex: 1 }}><InputLabel>Dobavljač / izvor</InputLabel><Select label="Dobavljač / izvor" value={sourceId} onChange={(event) => { setSourceId(event.target.value); preview.reset(); }}>{(policies.data?.items ?? []).map((item) => <MenuItem key={item.source_connection_id} value={item.source_connection_id}>{item.supplier_name} — {item.source_name}</MenuItem>)}</Select></FormControl>
-      <TextField label="Staging (dana)" type="number" value={stagingDays} onChange={(event) => setStagingDays(Number(event.target.value))} inputProps={{ min: 1, max: 3650 }} />
-      <TextField label="Snapshot online (dana)" type="number" value={snapshotDays} onChange={(event) => setSnapshotDays(Number(event.target.value))} inputProps={{ min: 1, max: 3650 }} />
-      <TextField label="Minimalno snapshotova" type="number" value={minimumSnapshots} onChange={(event) => setMinimumSnapshots(Number(event.target.value))} inputProps={{ min: 2, max: 100 }} />
-      <TextField label="Veličina serije" type="number" value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value))} inputProps={{ min: 1, max: 10000 }} />
+    <Stack direction={{ xs: "column", lg: "row" }} gap={2} my={2} flexWrap="wrap" alignItems={{ lg: "flex-end" }}>
+      <FormControl sx={{ minWidth: { xs: "100%", sm: 360 }, flex: "1 1 440px", maxWidth: { lg: 520 } }}><InputLabel>Dobavljač / izvor</InputLabel><Select label="Dobavljač / izvor" value={sourceId} onChange={(event) => { setSourceId(event.target.value); preview.reset(); }}>{(policies.data?.items ?? []).map((item) => <MenuItem key={item.source_connection_id} value={item.source_connection_id}>{item.supplier_name} — {item.source_name}</MenuItem>)}</Select></FormControl>
+      <RetentionNumberField label="Staging čuvanje (dana)" help="Broj dana tokom kojih se privremeni redovi importa čuvaju pre nego što postanu kandidati za kontrolisano čišćenje." value={stagingDays} min={1} max={3650} onChange={setStagingDays} />
+      <RetentionNumberField label="Snapshot online (dana)" help="Broj dana tokom kojih kompletan snapshot ostaje u brzo dostupnoj bazi pre arhiviranja." value={snapshotDays} min={1} max={3650} onChange={setSnapshotDays} />
+      <RetentionNumberField label="Minimalno snapshotova" help="Najmanji broj najnovijih snapshotova koji uvek ostaje online, bez obzira na njihovu starost." value={minimumSnapshots} min={2} max={100} onChange={setMinimumSnapshots} />
+      <RetentionNumberField label="Veličina serije" help="Maksimalan broj zapisa koji se obrađuje u jednom kontrolisanom ciklusu, radi ograničenja opterećenja baze." value={batchSize} min={1} max={10000} onChange={setBatchSize} />
       <FormControlLabel control={<Switch checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />} label="Politika uključena" />
     </Stack>
     <Stack direction="row" gap={1}><Button variant="contained" onClick={() => save.mutate()} disabled={!sourceId || save.isPending}>Sačuvaj politiku</Button><Button onClick={() => preview.mutate()} disabled={!selected?.configured || preview.isPending}>Analiziraj bez brisanja</Button></Stack>
